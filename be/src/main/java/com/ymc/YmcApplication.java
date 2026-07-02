@@ -1,13 +1,13 @@
-package com.ymc.api;
+package com.ymc;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class YmcApiApplication {
+public class YmcApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(YmcApiApplication.class, args);
+		SpringApplication.run(YmcApplication.class, args);
 	}
 
 }
