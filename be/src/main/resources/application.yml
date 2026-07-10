@@ -22,22 +22,22 @@ aws:
     parse-result-queue: parse-results
 
 ---
-# ================= local (LocalStack + H2) =================
+# ================= local (LocalStack + PostgreSQL) =================
+# DB는 infra/local/docker-compose.yml의 postgres 서비스. 로컬도 운영과 같은 PG를 쓴다.
 spring:
   config:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:h2:mem:ymc;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
-  h2:
-    console:
-      enabled: true
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ymc}
+    username: ${DB_USERNAME:ymc}
+    password: ${DB_PASSWORD:ymc}
+    driver-class-name: org.postgresql.Driver
 
 aws:
-  endpoint: http://localhost:4566   # LocalStack — 같은 SDK를 이 엔드포인트로만 돌림
+  # localhost.localstack.cloud = 항상 127.0.0.1로 풀리는 LocalStack 공식 도메인.
+  # 네이티브(bootRun)·컨테이너(compose alias)·브라우저(presigned URL) 모두 이 이름 하나로 통일
+  endpoint: http://localhost.localstack.cloud:4566
   credentials:
     access-key: test                # LocalStack은 아무 값이나 허용
     secret-key: test

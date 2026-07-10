@@ -1,0 +1,11 @@
+# 빌드 컨텍스트 최소화 — 컨테이너 안에서 다시 빌드하므로 산출물/캐시/IDE 파일 제외
+.gradle
+build
+.git
+.github
+.idea
+*.iml
+docs
+CLAUDE.md
+Dockerfile
+.dockerignore
