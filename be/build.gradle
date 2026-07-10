@@ -17,11 +17,26 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	// 빌드 시 최신 안정 버전으로 조정 가능
+	awsSdkVersion = '2.29.0'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+	// AWS SDK v2 (S3 + SQS) — 로컬(LocalStack)/prod 공통, 차이는 엔드포인트 설정뿐
+	implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:sqs'
+
+	// DB 드라이버 — local은 H2, prod는 PostgreSQL (profile로 분기)
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'org.postgresql:postgresql'
+
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'

@@ -1,0 +1,62 @@
+# ================= 공통 (모든 프로파일) =================
+spring:
+  application:
+    name: ymc-api
+  profiles:
+    default: local          # 프로파일 미지정 시 local
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update      # prod에서 validate로 덮음
+    properties:
+      hibernate:
+        format_sql: true
+
+# AWS 리소스 이름 — 환경 무관 공통. 차이는 endpoint/credentials 뿐.
+aws:
+  region: ap-northeast-2
+  s3:
+    bucket: ymc-documents
+  sqs:
+    parse-request-queue: parse-requests
+    parse-result-queue: parse-results
+
+---
+# ================= local (LocalStack + H2) =================
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:ymc;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  h2:
+    console:
+      enabled: true
+
+aws:
+  endpoint: http://localhost:4566   # LocalStack — 같은 SDK를 이 엔드포인트로만 돌림
+  credentials:
+    access-key: test                # LocalStack은 아무 값이나 허용
+    secret-key: test
+
+---
+# ================= prod (실 AWS + PostgreSQL) =================
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate            # 운영은 스키마 자동변경 금지
+
+aws:
+  endpoint:                         # 미지정 → 실제 AWS 엔드포인트
+  # credentials 미지정 → IAM 역할로 자동 획득 (키 하드코딩 안 함)
