@@ -1,0 +1,34 @@
+name: Manchu PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review] # PR 열림 / 커밋 추가 / ...
+
+concurrency:
+  group: manchu-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # github_token 미지정 → 액션이 Claude App 토큰을 발급·폐기, App 없으면 GITHUB_TOKEN 폴백
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          claude_args: |
+            --max-turns 30
+            --append-system-prompt "리뷰 규칙: 모든 코멘트는 한국어로 작성한다. 심각도 등급은 P1(머지 전 수정 필수)/P2(권장)/P3(사소) 체계를 그대로 사용한다. 각 코멘트는 '왜 위험한지 → 어떻게 고칠지' 순서로 쓴다. 마지막 요약 코멘트에 P1/P2/P3 건수 집계를 남긴다."
