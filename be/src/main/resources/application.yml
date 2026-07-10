@@ -37,7 +37,9 @@ spring:
       enabled: true
 
 aws:
-  endpoint: http://localhost:4566   # LocalStack — 같은 SDK를 이 엔드포인트로만 돌림
+  # localhost.localstack.cloud = 항상 127.0.0.1로 풀리는 LocalStack 공식 도메인.
+  # 네이티브(bootRun)·컨테이너(compose alias)·브라우저(presigned URL) 모두 이 이름 하나로 통일
+  endpoint: http://localhost.localstack.cloud:4566
   credentials:
     access-key: test                # LocalStack은 아무 값이나 허용
     secret-key: test
