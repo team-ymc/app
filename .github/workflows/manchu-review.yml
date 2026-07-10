@@ -2,7 +2,7 @@ name: Manchu PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review] # PR 열림 / 커밋 추가 / ...
+    types: [opened, ready_for_review] # PR당 1회. 재리뷰는 @만추 멘션(manchu-chat)
 
 concurrency:
   group: manchu-review-${{ github.event.pull_request.number }}
@@ -31,5 +31,6 @@ jobs:
           # --comment 없으면 findings를 텍스트로 반환만 하고 PR엔 아무것도 안 올린다 (액션 로그로 사라짐)
           prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
           claude_args: |
-            --max-turns 30
+            --model claude-sonnet-5
+            --max-turns 15
             --append-system-prompt "리뷰 규칙: 모든 코멘트는 한국어로 작성한다. 심각도 등급은 P1(머지 전 수정 필수)/P2(권장)/P3(사소) 체계를 그대로 사용한다. 각 코멘트는 '왜 위험한지 → 어떻게 고칠지' 순서로 쓴다. 마지막 요약 코멘트에 P1/P2/P3 건수 집계를 남긴다."

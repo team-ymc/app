@@ -33,13 +33,17 @@ dependencies {
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:sqs'
 
-	// DB 드라이버 — local은 H2, prod는 PostgreSQL (profile로 분기)
-	runtimeOnly 'com.h2database:h2'
+	// DB 드라이버 — local/prod 모두 PostgreSQL. 로컬은 compose로 띄운다 (infra/local)
 	runtimeOnly 'org.postgresql:postgresql'
 
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// 통합 테스트는 진짜 PostgreSQL 컨테이너에 붙는다. 버전은 Spring Boot BOM이 관리
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:postgresql'
+
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
