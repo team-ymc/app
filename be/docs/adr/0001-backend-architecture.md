@@ -29,7 +29,7 @@ com.ymc.<context>
 1. **컨텍스트 우선 패키지** — 기능 작업은 해당 컨텍스트 폴더 안에서 끝낸다.
 2. **컨텍스트 간 참조는 ID로만** — 다른 컨텍스트의 Entity 직접 참조 금지. 필요한 데이터는 service 호출이나 이벤트로 조회한다.
 3. **Entity = Domain 겸용** — 초기에는 JPA Entity를 Domain 객체로 함께 사용한다.
-4. **계약은 안쪽에, 손으로 쓴 구현은 `infra`에** — 외부 시스템(S3·SQS)은 service에 Port 인터페이스를 두고 구현체는 infra에 둔다. Repository는 `JpaRepository` 직상속 대신 메서드 0개인 `Repository<T, ID>` 마커를 상속해 필요한 메서드만 노출한다.
+4. **계약은 안쪽에, 손으로 쓴 구현은 `infra`에** — 외부 시스템(S3·SQS)은 service에 Port 인터페이스를 두고 구현체는 infra에 둔다. Repository는 `JpaRepository<T, ID>`를 직상속하고, 복잡한 쿼리는 `~Custom`/`~CustomImpl` 프래그먼트로 분리한다.
 5. **로직 배치** — 단일 엔티티의 상태 전이·불변식은 엔티티 메서드에, 여러 엔티티/외부 연동의 조율은 service에 둔다.
 
 세부 컨벤션(쿼리 작성 단계, LAZY 강제 등)은 `app/be/CLAUDE.md`에 둔다.
@@ -75,32 +75,32 @@ com.ymc.<context>
 
 - 2026-07-02 최초 작성 (팀 컴펌 대기 — Proposed).
 
-## 부록: 샘플 구조 (document 컨텍스트)
+## 부록: 샘플 구조 (paper 컨텍스트)
 
 규칙 1~5가 실제 파일로 어떻게 놓이는지의 기준 예시. 새 컨텍스트는 이 모양을 복제한다.
-(용어: 등록·파싱 대상은 논문에 한정되지 않으므로 `Paper`가 아니라 **`Document`** — 파일 포맷명(`PDF` 등)은 도메인 개념이 아니므로 금지. 단, 파싱 서버와의 메시지 필드명 `paperId`(ADR-001 D9)는 계약이므로 `documentId`로 바꿀지 AI/파싱 담당과 합의 전까지 유지한다.)
+(용어: 등록·파싱 대상은 **`Paper`**다 — 계약(`project-docs/contracts/openapi.yaml`)이 `/api/papers`·`paperId`·`PaperStatus`를 쓰므로 코드도 같은 말을 쓴다. 경계에서 이름을 바꾸지 않는다. 파일 포맷명(`PDF` 등)은 도메인 개념이 아니므로 금지. MVP 범위는 논문이고, E-Book 등으로 확장할 때 재명명을 검토한다.)
 
 ```
-com.ymc.document
+com.ymc.paper
 ├── api/
-│   ├── DocumentController.java             # HTTP ↔ DTO 변환만. 엔티티 직접 노출 금지
+│   ├── PaperController.java             # HTTP ↔ DTO 변환만. 엔티티 직접 노출 금지
 │   └── dto/
-│       ├── RegisterDocumentRequest.java
-│       └── DocumentResponse.java
+│       ├── RegisterPaperRequest.java
+│       └── PaperResponse.java
 ├── service/
-│   ├── DocumentService.java                # 조율 + 트랜잭션 경계 (규칙 5)
+│   ├── PaperService.java                # 조율 + 트랜잭션 경계 (규칙 5)
 │   ├── FileStoragePort.java                # S3 포트 — 사용하는 쪽이 소유 (규칙 4)
 │   └── ParseRequestPort.java               # SQS 포트
 ├── domain/
-│   ├── Document.java                       # JPA 엔티티 = 도메인 (규칙 3). 상태 전이·불변식은 여기 (규칙 5)
-│   ├── DocumentStatus.java
-│   ├── DocumentRepository.java             # extends Repository<Document, UUID> 마커 + 필요 메서드만 (규칙 4)
-│   └── DocumentRepositoryCustom.java       # 복잡한 쿼리가 필요해질 때만 — 쿼리 계약 (CLAUDE.md 쿼리 사다리 참고)
+│   ├── Paper.java                       # JPA 엔티티 = 도메인 (규칙 3). 상태 전이·불변식은 여기 (규칙 5)
+│   ├── PaperStatus.java
+│   ├── PaperRepository.java             # extends JpaRepository<Paper, UUID>, PaperRepositoryCustom (규칙 4)
+│   └── PaperRepositoryCustom.java       # 복잡한 쿼리가 필요해질 때만 — 쿼리 계약 (CLAUDE.md 쿼리 사다리 참고)
 └── infra/                                  # 손으로 쓴 구현 전부 (규칙 4)
     ├── S3FileStorage.java                  # implements FileStoragePort
     ├── SqsParsePublisher.java              # implements ParseRequestPort
-    └── DocumentRepositoryCustomImpl.java   # 복잡한 쿼리가 필요해질 때만 — QueryDSL/JdbcTemplate
+    └── PaperRepositoryCustomImpl.java   # 복잡한 쿼리가 필요해질 때만 — QueryDSL/JdbcTemplate
 ```
 
-- 컨텍스트 간 참조(규칙 2): `Document`는 `Member`를 모른다 — `private UUID ownerId` 필드만 갖고, 소유자 정보가 필요하면 service에서 `memberService.getMember(ownerId)`를 명시적으로 호출한다. 같은 컨텍스트 안(`Document` ↔ `DocumentSection` 등)에서는 JPA 연관관계 자유(단, 전부 `LAZY` 명시).
+- 컨텍스트 간 참조(규칙 2): `Paper`는 `Member`를 모른다 — `private UUID ownerId` 필드만 갖고, 소유자 정보가 필요하면 service에서 `memberService.getMember(ownerId)`를 명시적으로 호출한다. 같은 컨텍스트 안(`Paper` ↔ `PaperSection` 등)에서는 JPA 연관관계 자유(단, 전부 `LAZY` 명시).
 - `~Custom`/`~CustomImpl` 두 파일은 처음부터 만들지 않는다 — 복잡한 쿼리가 실제로 필요해진 시점에 추가.
