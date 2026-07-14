@@ -24,3 +24,8 @@
   Source: project-docs/features/FT-XXX-....md / Jira: YMC-XXX
   Decision: project-docs/decisions/ADR-XXX-....md   # 관련 결정이 있을 때
   ```
+
+## 라이브러리 문서는 context7으로 확인
+
+- Spring Boot·JPA·React 등 외부 라이브러리의 API·설정·마이그레이션을 다룰 때는 기억에 의존하지 말고, context7으로 **해당 버전의 공식 문서를 먼저 조회한 뒤** 코드를 쓴다. 모델의 학습 시점이 지난 API는 틀리거나 없는 메서드를 지어낼 수 있다.
+- context7은 이 repo의 `.mcp.json`에 등록돼 있다. `app/`에서 Claude Code를 처음 띄울 때 서버 승인 프롬프트가 한 번 뜨며, 승인하면 이후 자동으로 붙는다.
