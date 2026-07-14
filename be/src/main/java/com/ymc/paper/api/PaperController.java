@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +15,7 @@ import com.ymc.paper.api.dto.CreatePaperRequest;
 import com.ymc.paper.api.dto.PaperCreated;
 import com.ymc.paper.api.dto.PaperStatusResponse;
 import com.ymc.paper.service.PaperRegistrationService;
+import com.ymc.paper.service.PaperStatusService;
 import com.ymc.paper.service.PaperStatusView;
 import com.ymc.paper.service.PaperUploadCompletionService;
 
@@ -28,6 +30,7 @@ public class PaperController {
 
     private final PaperRegistrationService registrationService;
     private final PaperUploadCompletionService uploadCompletionService;
+    private final PaperStatusService statusService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. */
     @PostMapping
@@ -43,6 +46,11 @@ public class PaperController {
         return toResponse(uploadCompletionService.complete(paperId));
     }
 
+    /** 처리 상태 조회 (폴링용). */
+    @GetMapping("/{paperId}/status")
+    public PaperStatusResponse status(@PathVariable UUID paperId) {
+        return toResponse(statusService.getStatus(paperId));
+    }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {
         return new PaperStatusResponse(view.paperId(), view.status(), view.updatedAt());
