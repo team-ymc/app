@@ -1,5 +1,7 @@
 package com.ymc.common.config;
 
+import java.time.Duration;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -18,7 +20,8 @@ public record AwsProperties(
 ) {
     public record Credentials(String accessKey, String secretKey) {}
 
-    public record S3(String bucket) {}
+    /** presignExpiry: presigned PUT URL의 유효 기간. 업로드 권한을 짧게만 위임한다 (ADR-001). */
+    public record S3(String bucket, Duration presignExpiry) {}
 
     public record Sqs(String parseRequestQueue, String parseResultQueue) {}
 
