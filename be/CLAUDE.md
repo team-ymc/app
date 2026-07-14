@@ -31,6 +31,13 @@ com.ymc.paper
 - 여러 엔티티/외부 연동 조율 → **service**
 - 엔티티는 도메인 겸용(JPA 어노테이션 허용). setter 남발 금지 — 의도 드러나는 메서드로.
 
+## Lombok
+
+- **빈(`api`·`service`·`infra`)의 의존성 주입은 `@RequiredArgsConstructor`.** 필드는 `final`로 둔다.
+  - 생성자에서 검증·변환·기본값 같은 **작업이 필요하면 그때만 명시적 생성자를 쓴다**.
+- **`domain` 엔티티에는 `@Getter`만 허용.** `@Setter`(불변식 무력화)·`@Data`/`@EqualsAndHashCode`(프록시·신규 엔티티 동등성 깨짐)·`@ToString`(연관관계 지연로딩·무한재귀) 금지.
+  - 상태 변경은 의도 드러나는 엔티티 메서드로만 (생성=정적 팩토리, 전이=`markProcessing` 등).
+
 ## JPA 연관관계·로딩
 
 - 컨텍스트 내부 연관관계 자유. 단 **모든 연관관계 `fetch = LAZY` 명시** (`@ManyToOne`·`@OneToOne` 기본값이 EAGER). 최적화는 fetch join.
