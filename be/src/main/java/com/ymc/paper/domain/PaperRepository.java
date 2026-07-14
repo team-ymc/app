@@ -37,4 +37,25 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
             """)
     int markUploaded(@Param("id") UUID id, @Param("now") Instant now);
 
+    /**
+     * 결과 수신 시의 {@code PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
+     *
+     * @param terminal  {@code COMPLETED} 또는 {@code FAILED}
+     * @param errorCode 실패 코드. {@code COMPLETED}면 null
+     * @return 변경된 row 수 (0이면 이미 전이됐거나 PROCESSING이 아님 — 경고 로그 후 소비)
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.status = :terminal,
+                   p.errorCode = :errorCode,
+                   p.updatedAt = :now
+             where p.id = :id
+               and p.status = com.ymc.paper.domain.PaperStatus.PROCESSING
+            """)
+    int markParsed(
+            @Param("id") UUID id,
+            @Param("terminal") PaperStatus terminal,
+            @Param("errorCode") String errorCode,
+            @Param("now") Instant now);
 }

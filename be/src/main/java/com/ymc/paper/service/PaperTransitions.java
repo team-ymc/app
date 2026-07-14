@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.domain.PaperStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -50,4 +51,13 @@ public class PaperTransitions {
         return PaperStatusView.from(paper);
     }
 
+    /**
+     * 결과 수신 시의 {@code PROCESSING → COMPLETED | FAILED}.
+     *
+     * @return 전이했으면 true. false면 이미 terminal이거나 PROCESSING이 아니다 (중복 수신 등)
+     */
+    @Transactional
+    public boolean markParsed(UUID paperId, PaperStatus terminal, String errorCode) {
+        return paperRepository.markParsed(paperId, terminal, errorCode, Instant.now()) == 1;
+    }
 }
