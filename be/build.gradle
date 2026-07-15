@@ -18,8 +18,11 @@ repositories {
 }
 
 ext {
-	// 빌드 시 최신 안정 버전으로 조정 가능
-	awsSdkVersion = '2.29.0'
+	springCloudAwsVersion = '3.4.2'
+	// ⚠ spring-cloud-aws BOM이 관리하는 awssdk-v2 버전과 같아야 한다. 두 BOM이 같은 아티팩트
+	// (s3·sqs)를 관리하므로 값이 어긋나면 높은 쪽으로 조용히 해소된다. spring-cloud-aws를
+	// 올릴 때 이 값도 함께 맞춘다.
+	awsSdkVersion = '2.31.78'
 }
 
 dependencies {
@@ -28,21 +31,31 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
-	// AWS SDK v2 (S3 + SQS) — 로컬(LocalStack)/prod 공통, 차이는 엔드포인트 설정뿐
+	// AWS SDK v2 (S3 + SQS) — 로컬(LocalStack)/prod 공통
 	implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:sqs'
 
-	// DB 드라이버 — local/prod 모두 PostgreSQL. 로컬은 compose로 띄운다 (infra/local)
+	// parse-results 컨슈머(@SqsListener). 발행은 SDK v2 SqsClient로 충분하므로 이것만 쓴다.
+	// SqsAsyncClient 빈은 AwsConfig가 직접 등록한다 (aws.* 설정 하나로 통일) — 스타터의
+	// 자동설정은 @ConditionalOnMissingBean이라 물러난다.
+	implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:${springCloudAwsVersion}")
+	implementation 'io.awspring.cloud:spring-cloud-aws-starter-sqs'
+
+	// DB 드라이버 — local/prod 모두 PostgreSQL
 	runtimeOnly 'org.postgresql:postgresql'
 
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
-	// 통합 테스트는 진짜 PostgreSQL 컨테이너에 붙는다. 버전은 Spring Boot BOM이 관리
+	// 통합 테스트는 진짜 PostgreSQL·LocalStack(S3·SQS) 컨테이너에 붙는다. 버전은 Spring Boot BOM이 관리
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:postgresql'
+	testImplementation 'org.testcontainers:localstack'
+
+	// 비동기 컨슈머(@SqsListener) 검증 — 폴링 대신 조건 대기
+	testImplementation 'org.awaitility:awaitility'
 
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

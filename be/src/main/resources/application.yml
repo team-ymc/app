@@ -12,11 +12,17 @@ spring:
       hibernate:
         format_sql: true
 
+# 인증 도입(FT-001) 전까지 모든 논문의 소유자로 쓰는 고정 사용자.
+# ADR-001/design D3: owner_id 컬럼을 지금 두어야 FT-001에서 스키마 변경·백필 없이 주체만 교체하면 된다.
+app:
+  fixed-owner-id: 00000000-0000-0000-0000-000000000001
+
 # AWS 리소스 이름 — 환경 무관 공통. 차이는 endpoint/credentials 뿐.
 aws:
   region: ap-northeast-2
   s3:
     bucket: ymc-documents
+    presign-expiry: 10m       # presigned PUT URL 유효 기간
   sqs:
     parse-request-queue: parse-requests
     parse-result-queue: parse-results

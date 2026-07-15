@@ -1,0 +1,6 @@
+# Claude Code / OpenSpec — 로컬 실험 (팀 채택 시 재검토해서 필요한 부분만 커밋)
+.claude/
+openspec/
+
+# FE 임시 작업 — fe 작업 끝나면 삭제 예정
+fe/temp/
