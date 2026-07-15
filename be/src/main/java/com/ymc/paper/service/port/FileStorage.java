@@ -16,4 +16,12 @@ public interface FileStorage {
 
     /** 업로드가 실제로 끝났는지 확인한다 (S3 HEAD). */
     boolean exists(String fileKey);
+
+    /**
+     * 원본 파일을 내려받는 presigned GET URL을 발급한다. 만료는 구현이 설정에서 정한다.
+     *
+     * <p>서명에 Content-Disposition(attachment; filename=주어진 filename)을 포함해
+     * 브라우저가 원본 파일명으로 저장하게 한다.
+     */
+    PresignedDownload presignDownload(String fileKey, String filename);
 }
