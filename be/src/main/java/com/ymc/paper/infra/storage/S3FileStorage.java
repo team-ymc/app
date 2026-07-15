@@ -4,16 +4,20 @@ import org.springframework.stereotype.Component;
 
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.service.port.FileStorage;
+import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
 
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.http.HttpStatusCode;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -41,6 +45,21 @@ public class S3FileStorage implements FileStorage {
                                 .build())
                         .build());
         return new PresignedUpload(presigned.url().toString(), presigned.expiration());
+    }
+
+    @Override
+    public PresignedDownload presignDownload(String fileKey, String filename) {
+        PresignedGetObjectRequest presigned = presigner.presignGetObject(
+                GetObjectPresignRequest.builder()
+                        .signatureDuration(props.s3().presignExpiry())
+                        .getObjectRequest(GetObjectRequest.builder()
+                                .bucket(props.s3().bucket())
+                                .key(fileKey)
+                                .responseContentDisposition(
+                                        "attachment; filename=\"" + filename + "\"")
+                                .build())
+                        .build());
+        return new PresignedDownload(presigned.url().toString(), presigned.expiration());
     }
 
     /**

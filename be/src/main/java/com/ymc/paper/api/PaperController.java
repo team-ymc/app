@@ -13,7 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ymc.paper.api.dto.CreatePaperRequest;
 import com.ymc.paper.api.dto.PaperCreated;
+import com.ymc.paper.api.dto.PaperDownloadResponse;
+import com.ymc.paper.api.dto.PaperListResponse;
 import com.ymc.paper.api.dto.PaperStatusResponse;
+import com.ymc.paper.service.PaperDownloadService;
+import com.ymc.paper.service.PaperListService;
 import com.ymc.paper.service.PaperRegistrationService;
 import com.ymc.paper.service.PaperStatusService;
 import com.ymc.paper.service.PaperStatusView;
@@ -31,6 +35,8 @@ public class PaperController {
     private final PaperRegistrationService registrationService;
     private final PaperUploadCompletionService uploadCompletionService;
     private final PaperStatusService statusService;
+    private final PaperDownloadService downloadService;
+    private final PaperListService listService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. */
     @PostMapping
@@ -50,6 +56,18 @@ public class PaperController {
     @GetMapping("/{paperId}/status")
     public PaperStatusResponse status(@PathVariable UUID paperId) {
         return toResponse(statusService.getStatus(paperId));
+    }
+
+    /** 원본 PDF 다운로드 URL 발급. */
+    @GetMapping("/{paperId}/download")
+    public PaperDownloadResponse download(@PathVariable UUID paperId) {
+        return PaperDownloadResponse.from(downloadService.download(paperId));
+    }
+
+    /** 서재 목록 조회. */
+    @GetMapping
+    public PaperListResponse list() {
+        return PaperListResponse.from(listService.list());
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {

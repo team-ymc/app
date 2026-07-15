@@ -1,6 +1,7 @@
 package com.ymc.paper.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +20,9 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
      * 중복으로 걸린다 (계약 주의사항, MVP는 같은 파일명 재업로드 미지원).
      */
     boolean existsByOwnerIdAndFilename(UUID ownerId, String filename);
+
+    /** 서재 목록. 고정 owner 전체 (정렬·페이징 없음, 계약대로 단순 전체). */
+    List<Paper> findAllByOwnerId(UUID ownerId);
 
     /**
      * complete 수신 시의 {@code UPLOAD_PENDING → UPLOADED}. 동시 complete 호출 중 한 건만 1을 받는다.
