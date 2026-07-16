@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paper Teacher — 논문 등록 (BE 검증용 임시 UI)</title>
+    <style>
+      /* Pretendard Variable — temp/논문 등록 처리 UI.html 번들에서 추출 (DESIGN.md Risks). */
+      @font-face {
+        font-family: 'Pretendard Variable';
+        font-weight: 45 920;
+        font-style: normal;
+        font-display: swap;
+        src: url('/PretendardVariable.woff2') format('woff2-variations');
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      @keyframes indeterminate {
+        0% { transform: translateX(-60%); }
+        100% { transform: translateX(220%); }
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f8f7f4;
+        font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      #root { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
