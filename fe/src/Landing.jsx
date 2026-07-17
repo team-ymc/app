@@ -1,5 +1,5 @@
 // 랜딩(WF-001/002) + 인증 모달(WF-003). 와이어프레임 수준 구현 — 시안 확정 시 표현만 교체한다.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { login } from './auth';
 
 const center = {
@@ -23,11 +23,24 @@ export default function Landing({ user, initialError, onAuthed, onEnterLibrary }
   const [error, setError] = useState(initialError);
   const [pending, setPending] = useState(false);
 
+  // login()이 돌려주는 message 리스너 해제 함수 — 모달을 닫으면 진행 중 로그인을 정리한다.
+  const cleanupRef = useRef(null);
+
+  const closeModal = () => {
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    setPending(false);
+    setModalOpen(false);
+  };
+
   const handleGoogle = () => {
     setPending(true);
     setError(null);
-    login({
+    cleanupRef.current = login({
       onComplete: (authedUser, loginError) => {
+        cleanupRef.current = null;
         setPending(false);
         if (loginError || !authedUser) {
           setError('로그인에 실패했습니다. 다시 시도해 주세요.');
@@ -66,7 +79,7 @@ export default function Landing({ user, initialError, onAuthed, onEnterLibrary }
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          onClick={() => setModalOpen(false)}
+          onClick={closeModal}
         >
           <div
             style={{ background: '#fff', borderRadius: 12, padding: 32, width: 360, position: 'relative' }}
@@ -75,7 +88,7 @@ export default function Landing({ user, initialError, onAuthed, onEnterLibrary }
             <button
               type="button" aria-label="닫기"
               style={{ position: 'absolute', top: 12, right: 12, border: 'none', background: 'none', fontSize: 18, cursor: 'pointer' }}
-              onClick={() => setModalOpen(false)}
+              onClick={closeModal}
             >
               ✕
             </button>
