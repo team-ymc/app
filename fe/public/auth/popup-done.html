@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+  <head><meta charset="utf-8" /><title>로그인 처리 중…</title></head>
+  <body>
+    <script>
+      // OAuth 복귀 지점. 팝업이면 본창에 알리고 닫힌다. 전체 리다이렉트 폴백이면 루트로.
+      var error = new URLSearchParams(location.search).get('error');
+      if (window.opener) {
+        window.opener.postMessage({ type: 'auth:complete', error: error }, location.origin);
+        window.close();
+      } else {
+        location.replace(error ? '/?error=' + encodeURIComponent(error) : '/');
+      }
+    </script>
+  </body>
+</html>
