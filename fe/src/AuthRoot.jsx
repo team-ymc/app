@@ -8,25 +8,32 @@ import { bootstrap, logout, onSessionExpired } from './auth';
 export default function AuthRoot() {
   const [auth, setAuth] = useState({ status: 'loading', user: null });
   const [view, setView] = useState('landing'); // 'landing' | 'library'
-  // 전체 리다이렉트 폴백의 실패 복귀(/?error=...) 표시용 — 1회 읽고 URL에서 지운다.
-  const [initialError] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    if (error) window.history.replaceState(null, '', '/');
-    return error ? '로그인에 실패했습니다. 다시 시도해 주세요.' : null;
-  });
+  const [initialError, setInitialError] = useState(null);
 
   useEffect(() => {
+    // ?error 소비는 부수효과(URL 정리)라 initializer가 아닌 effect에서 —
+    // StrictMode 이중 실행 시 initializer 2차 호출이 값을 잃는 버그 방지 (최종 리뷰).
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error) {
+      window.history.replaceState(null, '', '/');
+      setInitialError('로그인에 실패했습니다. 다시 시도해 주세요.');
+    }
     onSessionExpired(() => {
       setAuth({ status: 'guest', user: null });
       setView('landing');
     });
-    bootstrap().then((user) =>
-      setAuth({ status: user ? 'authed' : 'guest', user }));
+    bootstrap()
+      .then((user) => setAuth({ status: user ? 'authed' : 'guest', user }))
+      .catch(() => setAuth({ status: 'guest', user: null })); // BE 불통이어도 게스트 랜딩으로
   }, []);
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // 네트워크 실패해도 로컬 세션은 정리한다 — 쿠키는 다음 refresh 실패로 자연 소멸
+    }
     setAuth({ status: 'guest', user: null });
     setView('landing');
   };

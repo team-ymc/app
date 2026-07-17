@@ -37,8 +37,10 @@ function doRefresh() {
 }
 
 /**
- * Google 로그인 시작 — 팝업에서 진행하고 랜딩을 떠나지 않는다 (design §3).
- * 팝업 차단 시 전체 리다이렉트 폴백. 반환값은 message 리스너 해제 함수.
+ * Google 로그인 시작 — 팝업에서 진행하고 랜딩을 떠나지 않는다.
+ * 완료 신호는 postMessage(opener 생존 시)와 BroadcastChannel(COOP로 opener가 끊긴 경우) 이중화 —
+ * 먼저 도착한 쪽이 이기고 나머지는 정리된다. 팝업 차단 시 전체 리다이렉트 폴백.
+ * 반환값은 리스너 해제 함수.
  */
 export function login({ onComplete }) {
   const url = '/api/oauth2/authorization/google';
@@ -47,24 +49,53 @@ export function login({ onComplete }) {
     window.location.href = url; // 폴백 — 복귀는 브릿지가 루트로 돌려보내고 bootstrap이 집어 올린다
     return () => {};
   }
-  const listener = async (event) => {
-    if (event.origin !== window.location.origin) return;
-    if (!event.data || event.data.type !== 'auth:complete') return;
-    window.removeEventListener('message', listener);
-    if (event.data.error) {
-      onComplete(null, event.data.error);
+
+  let channel = null;
+  let done = false;
+
+  const cleanup = () => {
+    window.removeEventListener('message', onWindowMessage);
+    if (channel) {
+      channel.close();
+      channel = null;
+    }
+  };
+
+  const finish = async (error) => {
+    if (done) return;
+    done = true;
+    cleanup();
+    if (error) {
+      onComplete(null, error);
       return;
     }
     const user = await doRefresh();
     onComplete(user, user ? null : 'refresh_failed');
   };
-  window.addEventListener('message', listener);
-  return () => window.removeEventListener('message', listener);
+
+  const onWindowMessage = (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (!event.data || event.data.type !== 'auth:complete') return;
+    finish(event.data.error ?? null);
+  };
+
+  window.addEventListener('message', onWindowMessage);
+  if (typeof BroadcastChannel !== 'undefined') {
+    channel = new BroadcastChannel('ymc-auth');
+    channel.addEventListener('message', (event) => {
+      if (!event.data || event.data.type !== 'auth:complete') return;
+      finish(event.data.error ?? null);
+    });
+  }
+  return cleanup;
 }
 
 export async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  accessToken = null;
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } finally {
+    accessToken = null;
+  }
 }
 
 /**
