@@ -26,7 +26,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     void returnsCurrentStatus() throws Exception {
         Paper paper = givenProcessingPaper("processing.pdf");
 
-        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()))
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paperId").value(paper.getId().toString()))
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
@@ -43,7 +43,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         String errorCode = terminal == PaperStatus.FAILED ? "PDF_UNREADABLE" : null;
         paperTransitions.markParsed(paper.getId(), terminal, errorCode);
 
-        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()))
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(terminal.name()));
     }
@@ -57,7 +57,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
 
         JsonNode body = objectMapper.readTree(
-                mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()))
+                mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.status").value("COMPLETED"))
                         .andReturn().getResponse().getContentAsString());
@@ -70,7 +70,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("없는 paperId: 404 PAPER_NOT_FOUND")
     void rejectsUnknownPaperId() throws Exception {
-        mockMvc.perform(get("/api/papers/{paperId}/status", UUID.randomUUID()))
+        mockMvc.perform(get("/api/papers/{paperId}/status", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
     }
@@ -78,7 +78,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("UUID가 아닌 paperId: 400 VALIDATION_ERROR")
     void rejectsMalformedPaperId() throws Exception {
-        mockMvc.perform(get("/api/papers/{paperId}/status", "not-a-uuid"))
+        mockMvc.perform(get("/api/papers/{paperId}/status", "not-a-uuid").with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }

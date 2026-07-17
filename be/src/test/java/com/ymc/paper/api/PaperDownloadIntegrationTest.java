@@ -21,7 +21,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     void returnsDownloadUrlForUploadedPaper() throws Exception {
         Paper paper = givenProcessingPaper("attention.pdf");
 
-        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()))
+        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.downloadUrl").isNotEmpty())
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty());
@@ -33,7 +33,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("done.pdf");
         paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
 
-        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()))
+        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.downloadUrl").isNotEmpty());
     }
@@ -43,7 +43,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     void rejectsPendingPaper() throws Exception {
         Paper paper = givenPendingPaper("pending.pdf");
 
-        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()))
+        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(userJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("UPLOAD_NOT_FOUND"));
     }
@@ -51,7 +51,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("없는 paperId: 404 PAPER_NOT_FOUND")
     void rejectsUnknownPaperId() throws Exception {
-        mockMvc.perform(get("/api/papers/{id}/download", UUID.randomUUID()))
+        mockMvc.perform(get("/api/papers/{id}/download", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
     }
@@ -59,7 +59,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("UUID가 아닌 paperId: 400 VALIDATION_ERROR")
     void rejectsMalformedPaperId() throws Exception {
-        mockMvc.perform(get("/api/papers/{id}/download", "not-a-uuid"))
+        mockMvc.perform(get("/api/papers/{id}/download", "not-a-uuid").with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }

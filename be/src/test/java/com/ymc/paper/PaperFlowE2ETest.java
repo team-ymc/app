@@ -47,7 +47,7 @@ class PaperFlowE2ETest extends IntegrationTest {
 
         uploadTo(created.get("uploadUrl").asText());
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paperId))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paperId).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESSING"));
 
@@ -73,7 +73,7 @@ class PaperFlowE2ETest extends IntegrationTest {
         UUID paperId = UUID.fromString(created.get("paperId").asText());
 
         uploadTo(created.get("uploadUrl").asText());
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paperId))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paperId).with(userJwt()))
                 .andExpect(status().isOk());
 
         publishParseResult("""
@@ -86,7 +86,7 @@ class PaperFlowE2ETest extends IntegrationTest {
     }
 
     private JsonNode createPaper(String filename) throws Exception {
-        String response = mockMvc.perform(post("/api/papers")
+        String response = mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 Map.of("filename", filename, "contentType", "application/pdf"))))
@@ -109,7 +109,7 @@ class PaperFlowE2ETest extends IntegrationTest {
     }
 
     private void assertStatus(UUID paperId, PaperStatus expected) throws Exception {
-        mockMvc.perform(get("/api/papers/{paperId}/status", paperId))
+        mockMvc.perform(get("/api/papers/{paperId}/status", paperId).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(expected.name()));
     }

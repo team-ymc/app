@@ -17,8 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.common.config.AppProperties;
@@ -52,6 +54,10 @@ public abstract class IntegrationTest {
 
     /** 비동기 소비를 기다리는 상한. 재전달(visibility timeout 2초)까지 넉넉히 덮는다. */
     protected static final Duration CONSUME_TIMEOUT = Duration.ofSeconds(20);
+
+    /** 기존 fixed-owner-id와 같은 값 — Task 8 전까지 데이터 소유자와 JWT 주체가 일치하게 한다. */
+    protected static final UUID TEST_USER_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Autowired
     protected MockMvc mockMvc;
@@ -101,6 +107,11 @@ public abstract class IntegrationTest {
         paperRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
+    }
+
+    /** MockMvc 요청에 인증 principal 주입. 디코더를 거치지 않는 테스트 전용 JWT다. */
+    protected RequestPostProcessor userJwt() {
+        return SecurityMockMvcRequestPostProcessors.jwt().jwt(j -> j.subject(TEST_USER_ID.toString()));
     }
 
     /** UPLOAD_PENDING 레코드. S3에는 아직 아무것도 없다. */

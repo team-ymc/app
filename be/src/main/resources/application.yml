@@ -17,6 +17,14 @@ spring:
 app:
   fixed-owner-id: 00000000-0000-0000-0000-000000000001
 
+# FT-001 인증. 만료값은 UX 파라미터 — 설계 §2 (30m/14d).
+auth:
+  jwt-secret: ${AUTH_JWT_SECRET:local-dev-only-secret-key-32bytes-min!!}   # HS256, 32바이트 이상
+  access-ttl: 30m
+  refresh-ttl: 14d
+  fe-origin: http://localhost:5173
+  cookie-secure: false
+
 # AWS 리소스 이름 — 환경 무관 공통. 차이는 endpoint/credentials 뿐.
 aws:
   region: ap-northeast-2
@@ -66,3 +74,8 @@ spring:
 aws:
   endpoint:                         # 미지정 → 실제 AWS 엔드포인트
   # credentials 미지정 → IAM 역할로 자동 획득 (키 하드코딩 안 함)
+
+auth:
+  jwt-secret: ${AUTH_JWT_SECRET}    # prod는 기본값 없음 — 미설정 시 기동 실패가 맞다
+  fe-origin: ${FE_ORIGIN}
+  cookie-secure: true
