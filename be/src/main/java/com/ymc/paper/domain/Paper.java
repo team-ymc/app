@@ -33,14 +33,14 @@ import lombok.Getter;
                 columnNames = {"owner_id", "filename"}))
 public class Paper {
 
-    /** 계약(openapi.yaml `PaperCreated.fileKey`)의 형식. */
-    private static final String FILE_KEY_FORMAT = "papers/%s/original.pdf";
+    /** 계약(openapi.yaml `PaperCreated.fileKey`)의 형식 — uploads/{ownerId}/{paperId}.pdf (ADR-002). */
+    private static final String FILE_KEY_FORMAT = "uploads/%s/%s.pdf";
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    /** 소유자. 인증 도입(FT-001) 전까지 설정된 고정값이 들어간다 (design D3). */
+    /** 소유자. 인증 주체(JWT subject)가 들어간다 (YMC-215). */
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
@@ -74,7 +74,7 @@ public class Paper {
         this.id = id;
         this.ownerId = ownerId;
         this.filename = filename;
-        this.fileKey = FILE_KEY_FORMAT.formatted(id);
+        this.fileKey = FILE_KEY_FORMAT.formatted(ownerId, id);
         this.status = PaperStatus.UPLOAD_PENDING;
         this.createdAt = now;
         this.updatedAt = now;
