@@ -11,6 +11,18 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  # FT-001 Google OAuth (YMC-227에서 콘솔 등록 완료 — 실값은 환경변수로).
+  # redirect-uri의 baseUrl은 요청 Host 기준 → vite proxy(5173) 경유 시 5173으로 생성돼
+  # 콘솔에 등록된 http://localhost:5173/api/login/oauth2/code/google 과 일치한다.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dummy-client-secret}
+            scope: [openid, email, profile]
+            redirect-uri: "{baseUrl}/api/login/oauth2/code/{registrationId}"
 
 # 인증 도입(FT-001) 전까지 모든 논문의 소유자로 쓰는 고정 사용자.
 # ADR-001/design D3: owner_id 컬럼을 지금 두어야 FT-001에서 스키마 변경·백필 없이 주체만 교체하면 된다.

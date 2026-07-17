@@ -32,6 +32,27 @@ public class SecurityConfig {
 
     private final ApiAuthenticationEntryPoint entryPoint;
 
+    /**
+     * OAuth 로그인 전용 체인 — /api prefix를 써서 vite proxy(/api → :8080)가 그대로 커버한다.
+     * 핸드셰이크 동안만 세션을 쓴다(state 저장). API 인증은 apiChain이 무세션으로 처리.
+     */
+    @Bean
+    @Order(1)
+    SecurityFilterChain oauthLoginChain(HttpSecurity http,
+            OAuthLoginSuccessHandler successHandler,
+            OAuthLoginFailureHandler failureHandler) throws Exception {
+        http
+                .securityMatcher("/api/oauth2/**", "/api/login/oauth2/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(a -> a.baseUri("/api/oauth2/authorization"))
+                        .redirectionEndpoint(r -> r.baseUri("/api/login/oauth2/code/*"))
+                        .successHandler(successHandler)
+                        .failureHandler(failureHandler));
+        return http.build();
+    }
+
     @Bean
     @Order(2)
     SecurityFilterChain apiChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
