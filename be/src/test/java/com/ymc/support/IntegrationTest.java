@@ -69,6 +69,12 @@ public abstract class IntegrationTest {
     protected PaperRepository paperRepository;
 
     @Autowired
+    protected com.ymc.user.domain.UserRepository userRepository;
+
+    @Autowired
+    protected com.ymc.user.domain.RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     protected S3Client s3;
 
     @Autowired
@@ -104,6 +110,8 @@ public abstract class IntegrationTest {
      */
     @BeforeEach
     void resetState() {
+        refreshTokenRepository.deleteAll();
+        userRepository.deleteAll();
         paperRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
