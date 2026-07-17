@@ -22,7 +22,7 @@ import com.ymc.user.infra.security.TokenHasher;
 
 import lombok.RequiredArgsConstructor;
 
-/** 세션(토큰 쌍) 발급·회전·폐기. 회전·재사용 탐지 규칙은 design §5. */
+/** 세션(토큰 쌍) 발급·회전·폐기. 회전·재사용 탐지 규칙은 refresh()를 참고 (FT-001). */
 @Service
 @RequiredArgsConstructor
 public class AuthService {

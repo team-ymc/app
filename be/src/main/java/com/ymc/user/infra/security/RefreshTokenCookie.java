@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * ymc_refresh 쿠키. Path를 /api/auth로 좁혀 다른 API 요청에는 실리지 않게 한다.
- * SameSite=Lax — 크로스사이트 POST에 쿠키가 실리지 않아 CSRF 방어의 근거다 (design §5).
+ * SameSite=Lax — 크로스사이트 POST에 쿠키가 실리지 않아 CSRF 방어의 근거다 (FT-001).
  */
 @Component
 @RequiredArgsConstructor

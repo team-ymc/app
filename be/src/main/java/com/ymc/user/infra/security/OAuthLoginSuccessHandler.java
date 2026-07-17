@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Google 인증 성공 → 사용자 upsert → refresh 쿠키 → FE 브릿지 페이지로 302.
- * access token은 여기서 주지 않는다 — FE가 /api/auth/refresh로 받아 메모리에만 둔다 (design §3).
+ * access token은 여기서 주지 않는다 — FE가 /api/auth/refresh로 받아 메모리에만 둔다 (FT-001).
  */
 @Component
 @RequiredArgsConstructor

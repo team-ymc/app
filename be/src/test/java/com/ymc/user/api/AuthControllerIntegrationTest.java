@@ -48,6 +48,17 @@ class AuthControllerIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("무효 토큰으로 refresh → 401과 함께 죽은 쿠키를 지운다")
+    void 무효_쿠키는_401과_함께_삭제된다() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("ymc_refresh", "unknown-token")))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+        assertThat(result.getResponse().getHeader("Set-Cookie"))
+                .contains("ymc_refresh=").contains("Max-Age=0");
+    }
+
+    @Test
     @DisplayName("refresh 성공: access+user 반환, 새 refresh 쿠키(HttpOnly) 세팅")
     void 리프레시_성공() throws Exception {
         Cookie cookie = refreshCookie();

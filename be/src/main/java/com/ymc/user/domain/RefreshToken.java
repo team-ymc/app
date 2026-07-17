@@ -15,7 +15,7 @@ import lombok.Getter;
 
 /**
  * refresh token — 원문은 저장하지 않고 SHA-256 해시만 둔다. 회전 시 이전 행을 revoke하고
- * 새 행을 만든다. revoked 행과의 대조가 재사용 탐지의 근거다 (design §5).
+ * 새 행을 만든다. revoked 행과의 대조가 재사용 탐지의 근거다 (FT-001).
  */
 @Getter
 @Entity

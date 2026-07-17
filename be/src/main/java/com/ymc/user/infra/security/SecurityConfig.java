@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * /api/** 는 bearer access JWT 필수. 예외는 refresh·logout(인증 수단이 쿠키 자체)뿐이다.
  * /api 밖(actuator 등)은 체인 미적용 — vite proxy가 /api만 전달하므로 노출면이 아니다.
- * CSRF는 끈다 — 쿠키 인증 POST(refresh/logout)는 SameSite=Lax가 크로스사이트 전송을 차단한다 (design §5).
+ * CSRF는 끈다 — 쿠키 인증 POST(refresh/logout)는 SameSite=Lax가 크로스사이트 전송을 차단한다 (FT-001).
  */
 @Configuration
 @EnableWebSecurity

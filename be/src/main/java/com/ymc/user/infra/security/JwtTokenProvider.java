@@ -21,7 +21,7 @@ import com.ymc.common.config.AuthProperties;
 
 /**
  * access JWT 발급 (HS256 대칭키). 검증은 resource server의 {@code JwtDecoder}가 같은 키로 한다.
- * access는 발급 후 회수 불가 — 만료가 곧 폐기다 (design §3).
+ * access는 발급 후 회수 불가 — 만료가 곧 폐기다 (FT-001).
  */
 @Component
 public class JwtTokenProvider {
