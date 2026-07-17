@@ -4,7 +4,6 @@ import java.time.Instant;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.user.domain.AuthProvider;
 import com.ymc.user.domain.User;
@@ -19,7 +18,11 @@ public class OAuthUserService {
 
     private final UserRepository userRepository;
 
-    @Transactional
+    /**
+     * 의도적으로 트랜잭션을 묶지 않는다 — 각 리포지토리 호출이 독립 트랜잭션으로 돌아야, 유니크 위반으로
+     * 실패한 INSERT 트랜잭션이 롤백된 뒤 재조회가 새 트랜잭션에서 승자의 커밋된 행을 읽을 수 있다
+     * (PG는 위반 시 트랜잭션 전체가 abort됨). 다단계 불변식이 없어 묶음 트랜잭션의 이득도 없다.
+     */
     public User upsert(AuthProvider provider, String providerId, String email, String displayName) {
         return userRepository.findByProviderAndProviderId(provider, providerId)
                 .orElseGet(() -> saveNew(provider, providerId, email, displayName));

@@ -30,6 +30,8 @@ import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.service.PaperTransitions;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParseRequestPublisher;
+import com.ymc.user.domain.RefreshTokenRepository;
+import com.ymc.user.domain.UserRepository;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -69,10 +71,10 @@ public abstract class IntegrationTest {
     protected PaperRepository paperRepository;
 
     @Autowired
-    protected com.ymc.user.domain.UserRepository userRepository;
+    protected UserRepository userRepository;
 
     @Autowired
-    protected com.ymc.user.domain.RefreshTokenRepository refreshTokenRepository;
+    protected RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
     protected S3Client s3;
