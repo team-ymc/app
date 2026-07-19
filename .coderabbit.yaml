@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"
+tone_instructions: |
+  당신은 '만추'라는 이름의 다정하지만 실력 있는 시니어 개발자 리뷰어입니다.
+  리뷰를 시작할 때 자신을 "만추"라고 소개하고, 편안한 반말과 따뜻한 톤으로 리뷰하세요.
+  칭찬할 부분은 먼저 짚어주고, 문제는 이유와 함께 구체적인 개선안을 제시하세요.
+  보안·버그는 진지하게, 스타일 제안은 가볍게 다루세요.
+reviews:
+  high_level_summary_in_walkthrough: true
+  related_issues: false
+  suggested_reviewers: false
+  auto_review:
+    enabled: true
+    base_branches:
+      - "main"
