@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head><meta charset="utf-8" /><title>로그인 처리 중…</title></head>
+  <body>
+    <script>
+      // OAuth 복귀 지점. 완료 신호를 BroadcastChannel과 opener postMessage로 이중 송신한다 —
+      // Google 경유 중 COOP로 opener가 끊길 수 있어 어느 한쪽만으로는 부족하다.
+      var error = new URLSearchParams(location.search).get('error');
+      var payload = { type: 'auth:complete', error: error };
+      if (typeof BroadcastChannel !== 'undefined') {
+        var channel = new BroadcastChannel('ymc-auth');
+        channel.postMessage(payload);
+        channel.close();
+      }
+      if (window.opener) {
+        window.opener.postMessage(payload, location.origin);
+      }
+      window.close();
+      // close가 무시되는 경우(전체 리다이렉트 폴백 등) 앱으로 복귀
+      setTimeout(function () {
+        location.replace(error ? '/?error=' + encodeURIComponent(error) : '/');
+      }, 150);
+    </script>
+  </body>
+</html>

@@ -24,27 +24,28 @@ describe('api.js — fetch 계열', () => {
   it('completeUpload: POST /complete', async () => {
     mockFetch({ body: { status: 'PROCESSING' } });
     await completeUpload('p1');
-    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/complete', { method: 'POST' });
+    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/complete',
+      expect.objectContaining({ method: 'POST' }));
   });
 
   it('getStatus: GET /status', async () => {
     mockFetch({ body: { status: 'COMPLETED' } });
     const res = await getStatus('p1');
-    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/status');
+    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/status', expect.objectContaining({}));
     expect(res.status).toBe('COMPLETED');
   });
 
   it('getDownloadUrl: GET /download → {downloadUrl, expiresAt}', async () => {
     mockFetch({ body: { downloadUrl: 'https://s3/get', expiresAt: '2026-07-15T00:00:00Z' } });
     const res = await getDownloadUrl('p1');
-    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/download');
+    expect(global.fetch).toHaveBeenCalledWith('/api/papers/p1/download', expect.objectContaining({}));
     expect(res.downloadUrl).toBe('https://s3/get');
   });
 
   it('listPapers: GET /api/papers → {papers}', async () => {
     mockFetch({ body: { papers: [{ paperId: 'p1', status: 'COMPLETED' }] } });
     const res = await listPapers();
-    expect(global.fetch).toHaveBeenCalledWith('/api/papers');
+    expect(global.fetch).toHaveBeenCalledWith('/api/papers', expect.objectContaining({}));
     expect(res.papers[0].paperId).toBe('p1');
   });
 
