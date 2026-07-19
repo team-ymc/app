@@ -16,7 +16,7 @@ class PaperListIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("빈 서재: 200과 papers: []")
     void returnsEmptyList() throws Exception {
-        mockMvc.perform(get("/api/papers"))
+        mockMvc.perform(get("/api/papers").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.papers").isArray())
                 .andExpect(jsonPath("$.papers").isEmpty());
@@ -27,7 +27,7 @@ class PaperListIntegrationTest extends IntegrationTest {
     void returnsRegisteredPapers() throws Exception {
         Paper paper = givenProcessingPaper("attention.pdf");
 
-        mockMvc.perform(get("/api/papers"))
+        mockMvc.perform(get("/api/papers").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.papers.length()").value(1))
                 .andExpect(jsonPath("$.papers[0].paperId").value(paper.getId().toString()))

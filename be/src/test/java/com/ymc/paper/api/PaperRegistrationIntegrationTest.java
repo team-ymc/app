@@ -50,7 +50,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("정상 등록: UPLOAD_PENDING 레코드 생성 + presigned URL 발급 (201)")
     void createsRecordAndIssuesPresignedUrl() throws Exception {
-        MvcResult result = mockMvc.perform(createRequest(FILENAME, "application/pdf"))
+        MvcResult result = mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("UPLOAD_PENDING"))
                 .andExpect(jsonPath("$.paperId").isNotEmpty())
@@ -78,7 +78,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("발급된 presigned URL로 S3에 직접 PUT 하면 fileKey 위치에 객체가 저장된다")
     void presignedUrlAcceptsDirectUpload() throws Exception {
-        JsonNode body = readBody(mockMvc.perform(createRequest(FILENAME, "application/pdf"))
+        JsonNode body = readBody(mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
                 .andExpect(status().isCreated())
                 .andReturn());
 
@@ -100,9 +100,9 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("중복 파일명: 레코드를 만들지 않고 409 DUPLICATE_FILENAME")
     void rejectsDuplicateFilename() throws Exception {
-        mockMvc.perform(createRequest(FILENAME, "application/pdf")).andExpect(status().isCreated());
+        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
 
-        mockMvc.perform(createRequest(FILENAME, "application/pdf"))
+        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
 
@@ -113,12 +113,12 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @DisplayName("업로드에 실패해 UPLOAD_PENDING으로 남은 레코드도 중복으로 걸린다 (MVP 재업로드 미지원)")
     void pendingRecordAlsoCountsAsDuplicate() throws Exception {
         // 업로드하지 않아 UPLOAD_PENDING에 머무는 레코드
-        mockMvc.perform(createRequest(FILENAME, "application/pdf")).andExpect(status().isCreated());
+        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
         assertThat(paperRepository.findAll()).singleElement()
                 .extracting(Paper::getStatus)
                 .isEqualTo(PaperStatus.UPLOAD_PENDING);
 
-        mockMvc.perform(createRequest(FILENAME, "application/pdf"))
+        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
     }
@@ -172,7 +172,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("contentType 불허: 400 UNSUPPORTED_FILE_TYPE, 레코드 생성 안 함")
     void rejectsNonPdfContentType() throws Exception {
-        mockMvc.perform(createRequest(FILENAME, "image/png"))
+        mockMvc.perform(createRequest(FILENAME, "image/png").with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_FILE_TYPE"));
 
@@ -182,7 +182,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("filename 누락: 400 VALIDATION_ERROR")
     void rejectsMissingFilename() throws Exception {
-        mockMvc.perform(post("/api/papers")
+        mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"contentType": "application/pdf"}
@@ -196,7 +196,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("malformed JSON: 400 VALIDATION_ERROR")
     void rejectsMalformedJson() throws Exception {
-        mockMvc.perform(post("/api/papers")
+        mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ not json"))
                 .andExpect(status().isBadRequest())

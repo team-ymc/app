@@ -58,7 +58,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         Paper paper = givenPendingPaper(FILENAME);
         givenUploadedObject(paper);
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paperId").value(paper.getId().toString()))
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
@@ -82,13 +82,13 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         Paper paper = givenPendingPaper(FILENAME);
         givenUploadedObject(paper);
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk());
 
         drain(parseRequestQueueUrl());
         clearInvocations(fileStorage, parseRequestPublisher);
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESSING"));
 
@@ -132,7 +132,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     void rejectsWhenObjectMissing() throws Exception {
         Paper paper = givenPendingPaper(FILENAME);   // 업로드하지 않았다
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("UPLOAD_NOT_FOUND"));
 
@@ -144,7 +144,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("없는 paperId: S3를 조회하지 않고 404 PAPER_NOT_FOUND")
     void rejectsUnknownPaperId() throws Exception {
-        mockMvc.perform(post("/api/papers/{paperId}/complete", UUID.randomUUID()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
 
@@ -171,7 +171,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
 
         // 재호출해도 UPLOAD_PENDING이 아니므로 재발행하지 않는다 — MVP는 이 정체를 복구하지 않는다
         clearInvocations(parseRequestPublisher);
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()))
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UPLOADED"));
 

@@ -31,6 +31,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
+	// FT-001 인증 — BE 주도 Google 로그인(oauth2Login) + 자체 발급 JWT 검증(resource server)
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
 	// AWS SDK v2 (S3 + SQS) — 로컬(LocalStack)/prod 공통
 	implementation platform("software.amazon.awssdk:bom:${awsSdkVersion}")
 	implementation 'software.amazon.awssdk:s3'
@@ -48,6 +52,9 @@ dependencies {
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// MockMvc에 JWT principal 주입 (SecurityMockMvcRequestPostProcessors.jwt)
+	testImplementation 'org.springframework.security:spring-security-test'
 
 	// 통합 테스트는 진짜 PostgreSQL·LocalStack(S3·SQS) 컨테이너에 붙는다. 버전은 Spring Boot BOM이 관리
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'

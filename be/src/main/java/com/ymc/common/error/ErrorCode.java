@@ -23,7 +23,13 @@ public enum ErrorCode {
     PAPER_NOT_FOUND(HttpStatus.NOT_FOUND),
 
     /** S3에 객체가 없음 (complete) */
-    UPLOAD_NOT_FOUND(HttpStatus.CONFLICT);
+    UPLOAD_NOT_FOUND(HttpStatus.CONFLICT),
+
+    /** access token 없음·만료 (FT-001) */
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
+
+    /** refresh 쿠키 없음·만료·폐기·재사용 (FT-001) */
+    AUTH_REFRESH_INVALID(HttpStatus.UNAUTHORIZED);
 
     private final HttpStatus status;
 
