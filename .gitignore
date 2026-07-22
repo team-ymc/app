@@ -2,7 +2,6 @@
 .claude/
 openspec/
 .superpowers/
-docs/superpowers/
 
 # FE 임시 작업 — fe 작업 끝나면 삭제 예정
 fe/temp/
