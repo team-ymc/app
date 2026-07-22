@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -11,6 +12,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import com.ymc.chat.api.dto.ChatDuplicateMessageResponse;
+import com.ymc.chat.service.DuplicateChatMessageException;
 
 /**
  * 계약(openapi.yaml)의 `Error` 스키마로 응답을 통일한다 (design D8).
@@ -49,6 +53,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return badRequest(ErrorCode.VALIDATION_ERROR, e.getName() + " 값의 형식이 올바르지 않습니다.");
+    }
+
+    /** 같은 clientMessageId·같은 content 재전송 — 기존 실행 식별자·상태를 담아 409 (계약 ChatDuplicateMessageError). */
+    @ExceptionHandler(DuplicateChatMessageException.class)
+    public ResponseEntity<ChatDuplicateMessageResponse> handleDuplicateChatMessage(
+            DuplicateChatMessageException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ChatDuplicateMessageResponse.of(
+                        e.getMessage(), e.getSessionId(), e.getMessageId(), e.getStatus()));
     }
 
     private static String defaultMessage(FieldError fieldError) {
