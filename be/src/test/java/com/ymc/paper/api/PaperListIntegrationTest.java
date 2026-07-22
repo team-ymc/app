@@ -4,6 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,5 +38,17 @@ class PaperListIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.papers[0].status").value("PROCESSING"))
                 .andExpect(jsonPath("$.papers[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.papers[0].updatedAt").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 논문은 목록에 나오지 않는다 — 소유자 필터링 (YMC-215)")
+    void 다른_사용자_논문은_안_보인다() throws Exception {
+        givenPendingPaper("mine.pdf");
+        paperRepository.save(Paper.register(UUID.randomUUID(), "others.pdf", Instant.now()));
+
+        mockMvc.perform(get("/api/papers").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.papers.length()").value(1))
+                .andExpect(jsonPath("$.papers[0].filename").value("mine.pdf"));
     }
 }

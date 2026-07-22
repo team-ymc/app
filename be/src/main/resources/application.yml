@@ -24,11 +24,6 @@ spring:
             scope: [openid, email, profile]
             redirect-uri: "{baseUrl}/api/login/oauth2/code/{registrationId}"
 
-# 인증 도입(FT-001) 전까지 모든 논문의 소유자로 쓰는 고정 사용자.
-# ADR-001/design D3: owner_id 컬럼을 지금 두어야 FT-001에서 스키마 변경·백필 없이 주체만 교체하면 된다.
-app:
-  fixed-owner-id: 00000000-0000-0000-0000-000000000001
-
 # FT-001 인증. 만료값은 UX 파라미터 — 설계 §2 (30m/14d).
 auth:
   jwt-secret: ${AUTH_JWT_SECRET:local-dev-only-secret-key-32bytes-min!!}   # HS256, 32바이트 이상

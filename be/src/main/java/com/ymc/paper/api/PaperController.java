@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,11 +40,13 @@ public class PaperController {
     private final PaperDownloadService downloadService;
     private final PaperListService listService;
 
-    /** 논문 레코드 생성 및 presigned 업로드 URL 발급. */
+    /** 논문 레코드 생성 및 presigned 업로드 URL 발급. 소유자는 인증 주체다 (YMC-215). */
     @PostMapping
-    public ResponseEntity<PaperCreated> create(@Valid @RequestBody CreatePaperRequest request) {
+    public ResponseEntity<PaperCreated> create(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreatePaperRequest request) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
         PaperCreated body = PaperCreated.from(
-                registrationService.register(request.filename(), request.contentType()));
+                registrationService.register(ownerId, request.filename(), request.contentType()));
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
@@ -64,10 +68,11 @@ public class PaperController {
         return PaperDownloadResponse.from(downloadService.download(paperId));
     }
 
-    /** 서재 목록 조회. */
+    /** 서재 목록 조회. 인증 주체 소유 논문만 반환한다 (YMC-215). */
     @GetMapping
-    public PaperListResponse list() {
-        return PaperListResponse.from(listService.list());
+    public PaperListResponse list(@AuthenticationPrincipal Jwt jwt) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return PaperListResponse.from(listService.list(ownerId));
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {

@@ -5,6 +5,6 @@ import org.springframework.context.annotation.Configuration;
 
 /** 애플리케이션 공통 설정 바인딩. */
 @Configuration
-@EnableConfigurationProperties({AppProperties.class, AuthProperties.class})
+@EnableConfigurationProperties(AuthProperties.class)
 public class AppConfig {
 }

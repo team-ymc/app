@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ymc.common.config.AppProperties;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -57,7 +56,7 @@ public abstract class IntegrationTest {
     /** 비동기 소비를 기다리는 상한. 재전달(visibility timeout 2초)까지 넉넉히 덮는다. */
     protected static final Duration CONSUME_TIMEOUT = Duration.ofSeconds(20);
 
-    /** 기존 fixed-owner-id와 같은 값 — Task 8 전까지 데이터 소유자와 JWT 주체가 일치하게 한다. */
+    /** 테스트 JWT의 subject이자 테스트 데이터의 소유자 (YMC-215). */
     protected static final UUID TEST_USER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -84,9 +83,6 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected AwsProperties awsProperties;
-
-    @Autowired
-    protected AppProperties appProperties;
 
     /*
      * 스파이를 (쓰지 않는 테스트까지 포함해) 베이스에 모아 둔 이유: 빈 override는 스프링 컨텍스트
@@ -126,8 +122,7 @@ public abstract class IntegrationTest {
 
     /** UPLOAD_PENDING 레코드. S3에는 아직 아무것도 없다. */
     protected Paper givenPendingPaper(String filename) {
-        return paperRepository.save(
-                Paper.register(appProperties.fixedOwnerId(), filename, Instant.now()));
+        return paperRepository.save(Paper.register(TEST_USER_ID, filename, Instant.now()));
     }
 
     /** 파싱 대기 중(PROCESSING) 레코드 — 결과 수신 시나리오의 출발점. */

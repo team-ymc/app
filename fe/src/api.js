@@ -1,7 +1,10 @@
 // BE 연동 단일 접점 (DESIGN.md D3). 표현 층과 분리 — 진짜 FE는 이 모듈을 그대로 승계한다.
+// BE 호출은 authFetch(자동 Bearer + 401 재시도)를 쓴다. S3 presigned PUT은 예외 — 서명 URL이 인가다.
+
+import { authFetch } from './auth';
 
 export async function createPaper(filename, contentType) {
-  const res = await fetch('/api/papers', {
+  const res = await authFetch('/api/papers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename, contentType }),
@@ -29,27 +32,27 @@ export function uploadToS3(uploadUrl, file, onProgress) {
 }
 
 export async function completeUpload(paperId) {
-  const res = await fetch(`/api/papers/${paperId}/complete`, { method: 'POST' });
+  const res = await authFetch(`/api/papers/${paperId}/complete`, { method: 'POST' });
   if (!res.ok) throw await apiError(res);
   return res.json(); // { paperId, status, updatedAt }
 }
 
 export async function getStatus(paperId) {
-  const res = await fetch(`/api/papers/${paperId}/status`);
+  const res = await authFetch(`/api/papers/${paperId}/status`);
   if (!res.ok) throw await apiError(res);
   return res.json(); // { paperId, status, updatedAt }
 }
 
 // 원본 PDF 다운로드 URL 발급 (계약 0.1.1).
 export async function getDownloadUrl(paperId) {
-  const res = await fetch(`/api/papers/${paperId}/download`);
+  const res = await authFetch(`/api/papers/${paperId}/download`);
   if (!res.ok) throw await apiError(res);
   return res.json(); // { downloadUrl, expiresAt }
 }
 
 // 서재 목록 (FT-002, BE는 YMC-223). D3 폐기 — 실제 목록을 받는다.
 export async function listPapers() {
-  const res = await fetch('/api/papers');
+  const res = await authFetch('/api/papers');
   if (!res.ok) throw await apiError(res);
   return res.json(); // { papers: [{ paperId, filename, status, createdAt, updatedAt }] }
 }

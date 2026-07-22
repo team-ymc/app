@@ -63,13 +63,13 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
         UUID paperId = UUID.fromString(body.get("paperId").asText());
 
         // fileKey는 계약 형식 그대로
-        assertThat(body.get("fileKey").asText()).isEqualTo("papers/" + paperId + "/original.pdf");
+        assertThat(body.get("fileKey").asText()).isEqualTo("uploads/" + TEST_USER_ID + "/" + paperId + ".pdf");
 
         // 레코드가 실제로 UPLOAD_PENDING으로 저장됐다
         Paper saved = paperRepository.findById(paperId).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
         assertThat(saved.getFilename()).isEqualTo(FILENAME);
-        assertThat(saved.getOwnerId()).isEqualTo(appProperties.fixedOwnerId());
+        assertThat(saved.getOwnerId()).isEqualTo(TEST_USER_ID);
 
         // 만료 시각은 미래
         assertThat(Instant.parse(body.get("uploadExpiresAt").asText())).isAfter(Instant.now());
@@ -123,6 +123,36 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
     }
 
+    @Test
+    @DisplayName("등록된 Paper의 ownerId는 JWT subject다 (YMC-215)")
+    void 소유자는_인증_주체다() throws Exception {
+        mockMvc.perform(post("/api/papers").with(userJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filename\":\"owner.pdf\",\"contentType\":\"application/pdf\"}"))
+                .andExpect(status().isCreated());
+
+        Paper saved = paperRepository.findAll().get(0);
+        assertThat(saved.getOwnerId()).isEqualTo(TEST_USER_ID);
+        assertThat(saved.getFileKey())
+                .isEqualTo("uploads/%s/%s.pdf".formatted(TEST_USER_ID, saved.getId()));
+    }
+
+    @Test
+    @DisplayName("파일명 중복 판정은 사용자 단위 — 다른 사용자는 같은 파일명 등록 가능 (YMC-215)")
+    void 중복_판정은_사용자_스코프다() throws Exception {
+        String body = "{\"filename\":\"same.pdf\",\"contentType\":\"application/pdf\"}";
+        mockMvc.perform(post("/api/papers").with(userJwt())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        UUID otherUser = UUID.randomUUID();
+        mockMvc.perform(post("/api/papers")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                                .jwt().jwt(j -> j.subject(otherUser.toString())))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+    }
+
     /**
      * 사전 조회를 나란히 통과한 동시 요청은 DB 유니크 제약이 잡아 409로 변환돼야 한다 (design D4).
      * MockMvc는 동시 호출을 보장하지 않으므로 서비스를 직접 경쟁시킨다.
@@ -138,7 +168,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
             List<Callable<Outcome>> calls = Collections.nCopies(attempts, () -> {
                 startLine.await();
                 try {
-                    registrationService.register("race.pdf", "application/pdf");
+                    registrationService.register(TEST_USER_ID, "race.pdf", "application/pdf");
                     return Outcome.CREATED;
                 } catch (ApiException e) {
                     return e.code() == ErrorCode.DUPLICATE_FILENAME

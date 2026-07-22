@@ -7,7 +7,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.ymc.common.config.AppProperties;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
@@ -30,7 +29,6 @@ public class PaperRegistrationService {
 
     private final PaperRepository paperRepository;
     private final FileStorage fileStorage;
-    private final AppProperties appProperties;
 
     /**
      * 파일명이 중복이 아니면 레코드를 만들고 업로드 URL을 발급한다.
@@ -42,7 +40,7 @@ public class PaperRegistrationService {
      * @throws ApiException {@code DUPLICATE_FILENAME} — 같은 소유자에게 같은 파일명이 이미 있음
      */
     @Transactional
-    public PaperRegistrationResult register(String filename, String contentType) {
+    public PaperRegistrationResult register(UUID ownerId, String filename, String contentType) {
 
         // 1. PDF 타입 검사
         if (!PDF_CONTENT_TYPE.equals(contentType)) {
@@ -51,7 +49,6 @@ public class PaperRegistrationService {
                     "지원하지 않는 파일 형식입니다: " + contentType);
         }
 
-        UUID ownerId = appProperties.fixedOwnerId();
         // 2. 사전 조회
         if (paperRepository.existsByOwnerIdAndFilename(ownerId, filename)) {
             throw duplicateFilename(filename);
