@@ -11,7 +11,7 @@
 
 ## 1. 아키텍처
 
-```
+```text
 FE (React)                    BE (Spring MVC)                        AI (FastAPI)
 ─────────                     ────────────────                       ────────────
 fetch POST                    ChatController
@@ -92,19 +92,35 @@ fetch POST                    ChatController
 
 ### API 흐름
 
-```
+```text
 POST /api/papers/{paperId}/chat/messages
  1. JWT 인증(401) → paper 존재·소유(404/403) → paper 학습 가능 상태 검증
  2. sessionId 있음 → 소유·paper 일치 검증(404 CHAT_SESSION_NOT_FOUND)
-    sessionId 없음 → ChatSession.open
- 3. clientMessageId 중복 → 새 run 미생성 (멱등)
- 4. [한 트랜잭션] user message(COMPLETED) + assistant message(GENERATING) 저장 → commit
+    → 세션 행 비관적 잠금(`SELECT ... FOR UPDATE`) 후 GENERATING 존재 검증 (있으면 409)
+    sessionId 없음 → ChatSession.open (방금 만든 UUID라 경쟁 상대가 없음)
+ 3. clientMessageId 중복 → 새 run 미생성, 409 + 기존 {sessionId, messageId, status} 반환 (멱등)
+ 4. [한 트랜잭션] user message(COMPLETED) + assistant message(GENERATING) 저장 → commit (락 해제)
  5. commit 후 SseEmitter 반환 + message.started 전송
  6. AiAgentStreamPort.stream(...) 시작 — 256에서는 fake 구현
 ```
 
 - 4→5 순서 보장을 위해 트랜잭션 서비스(`ChatCommandService`)와 스트리밍 시작(`ChatStreamRelay`)을 분리한다. `@Transactional` 메서드 종료(commit) 후 relay가 비동기 시작.
-- 세션당 동시 실행 1개: "GENERATING assistant 존재 시 거부" 조회 검증으로 시작. 완전한 race-free(partial unique index)는 ddl-auto 한계로 미룸 — 현 규모에서 조회 검증 + client_message_id unique로 충분하다고 판단.
+- 세션당 동시 실행 1개는 **기존 세션 행 비관적 잠금**(JPA `@Lock(PESSIMISTIC_WRITE)`)으로 보장한다.
+  검증+저장 트랜잭션이 짧고(스트리밍 시작 전 commit) 단일 행 잠금이라 데드락 여지가 없으며,
+  같은 세션의 동시 요청만 수십 ms 직렬화된다. check-then-insert 조회 검증만으로는 두 요청이
+  동시에 검증을 통과하는 race가 있어 채택하지 않았다. 낙관적 락은 이 불변식이 UPDATE 충돌이
+  아닌 INSERT 개수 제한이라 자연스럽게 적용되지 않는다 (FORCE_INCREMENT 우회는 commit 시점
+  예외 번역이 필요해 더 복잡).
+
+### 멱등 재시도 의미론 (clientMessageId 수명)
+
+재시도는 두 종류이며 FE의 clientMessageId 처리가 다르다:
+
+- **결과를 모르는 재시도** (전송 중 단절·응답 유실): 같은 clientMessageId를 재사용한다.
+  BE는 unique 충돌 시 409 + 기존 `{sessionId, messageId, status}`를 반환하고, FE는 status로
+  분기한다 — `GENERATING`: 생성 중 안내, `COMPLETED`: 저장 완료 안내(본문 조회는 YMC-260 이후),
+  `FAILED`: 새 UUID로 재시도.
+- **실패를 확인한 재시도** (`error` event 수신 후 재시도 버튼): 새로운 시도이므로 새 UUID를 쓴다.
 
 ### 포트
 
@@ -128,15 +144,19 @@ fake 구현(고정 delta 몇 개 → completed → run.completed 순 콜백)은 
 
 ### 계약 보완 필요 (contract-first)
 
-- **중복 `clientMessageId` 응답이 계약에 미정** — `409 + code DUPLICATE_MESSAGE` 제안. 구현 전 `project-docs/contracts/frontend-backend/openapi.yaml`에 409 응답 추가 PR 선행.
+- **중복 `clientMessageId` 응답이 계약에 미정** — `409 + code DUPLICATE_MESSAGE`에 기존
+  `{sessionId, messageId, status}`를 본문에 포함하는 형태로 제안. 구현 전
+  `project-docs/contracts/frontend-backend/openapi.yaml`에 409 응답 추가 PR 선행.
 - 세션당 동시 실행 거부 응답(409 계열)도 같은 PR에서 정의.
 - 파싱 미완료 paper의 거부 응답 코드가 계약에 정의돼 있는지 확인, 미정이면 같은 PR에서 정의.
+- 답변 길이 상한 초과 오류 코드(`AI_RESPONSE_TOO_LARGE`, retryable: false)도 같은 PR에서 terminal
+  `error` event code 목록에 추가.
 
 ## 4. YMC-257 — WebClient 어댑터 + relay
 
 ### 구성
 
-```
+```text
 service/ChatStreamRelay          오케스트레이터 (AiStreamListener 구현)
 infra/ai/AiAgentWebClientAdapter AiAgentStreamPort 구현 (WebClient)
 infra/ai/AiWebClientConfig       WebClient 빈 + ai.base-url
@@ -168,7 +188,7 @@ webClient.post().uri("/api/v1/agents/simple-agent/runs/stream")
 | AI 이벤트 | relay 동작 | FE 전송 |
 |---|---|---|
 | `run.started` | 내부 로깅만 | — |
-| `message.delta` | 상한 있는 StringBuilder 누적 | `message.delta` 즉시 |
+| `message.delta` | StringBuilder 누적 (상한 정책 아래 참조) | `message.delta` 즉시 |
 | `message.completed` | 최종 content 후보 보관 (성공 아님) | — |
 | `run.completed` | completed 수신 확인 → 조건부 UPDATE로 COMPLETED commit | commit 후 `message.completed`(messageId + 전체 content) → emitter 정상 종료 |
 | `run.failed` | FAILED commit. raw error 미노출 | `error`(AI_RUN_FAILED, retryable) |
@@ -182,6 +202,15 @@ webClient.post().uri("/api/v1/agents/simple-agent/runs/stream")
 세 경우 공통: partial delta 저장 안 함 → FAILED commit → FE `error` → emitter 종료. FAILED commit조차 실패하면 terminal 없이 닫고 경보 로그 (계약 명시).
 
 - 누적 delta ≠ `message.completed.message`이면 경고 로그 남기고 completed 우선 (ADR-004).
+
+### delta 누적 상한 정책
+
+누적 버퍼는 BE 힙 메모리이므로 AI 오작동(무한 생성 등) 시 무제한 소비를 막는 상한이 필요하다.
+idle timeout은 "안 올 때"만 잡고 "너무 많이 올 때"는 못 잡는다.
+
+- `chat.stream.max-content-length=65536` (문자 수, 설정 프로퍼티 — 정상 답변이 넘을 수 없는 값)
+- 누적 중 초과하는 순간: upstream dispose(AI 생성 취소) → partial 미저장 → FAILED 조건부 commit
+  → FE에 `error(AI_RESPONSE_TOO_LARGE, retryable: false)` → emitter 종료. 기존 실패 경로와 동일한 모양.
 
 ### 타이머 4종
 
@@ -206,7 +235,7 @@ webClient.post().uri("/api/v1/agents/simple-agent/runs/stream")
 
 ### 파일 구성
 
-```
+```text
 fe/src/
 ├── api.js              (기존 유지)
 ├── chat/
@@ -226,14 +255,16 @@ fe/src/
 
 ### chatStream.js — 종결 판정
 
-- `clientMessageId = crypto.randomUUID()` 요청마다 생성.
+- `clientMessageId = crypto.randomUUID()` — **논리적 메시지마다** 생성. 결과를 모르는 재전송은
+  같은 값을 재사용하고(§3 멱등 재시도 의미론), 409 응답의 status로 분기한다. `error`를 받고
+  누르는 재시도 버튼만 새 UUID.
 - HTTP 비-200 → 기존 `apiError` 헬퍼 재사용.
 - `message.completed` → 성공 / `error` → 실패(code·retryable 전달) / **terminal 없는 EOF → 실패** / `heartbeat` → 무시.
 - 인증은 기존 api.js 방식(같은 오리진 fetch, 쿠키) 그대로 — Bearer 전환 시 함께 변경.
 
 ### ChatPanel 상태 모델
 
-```
+```text
 messages: [{ messageId, role, content, status }]
 sessionId: message.started에서 저장 → 후속 질문에 재사용
 ```
