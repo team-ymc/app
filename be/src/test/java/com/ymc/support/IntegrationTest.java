@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
+import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -109,6 +110,9 @@ public abstract class IntegrationTest {
 
     @MockitoSpyBean
     protected PaperTransitions paperTransitions;
+
+    @MockitoSpyBean
+    protected AiAgentStreamPort aiAgentStreamPort;
 
     /**
      * 컨텍스트(=컨테이너)를 재사용하므로 테스트마다 DB와 큐를 직접 비운다.

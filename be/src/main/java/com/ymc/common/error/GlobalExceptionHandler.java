@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -21,6 +22,12 @@ import com.ymc.chat.service.DuplicateChatMessageException;
  *
  * <p>계약에 없는 실패(예: 큐 발행 실패)는 여기서 코드를 지어내지 않고 그대로 흘려보내
  * Spring 기본 5xx가 되게 한다 — 에러 코드 enum은 계약이 소유한다.
+ *
+ * <p>모든 응답에 {@code Content-Type: application/json}을 명시한다. 채팅 SSE 엔드포인트처럼
+ * {@code produces=text/event-stream}인 매핑에서 던진 예외는, 요청 Accept 헤더가
+ * (계약상 필수인) {@code text/event-stream}뿐이라 콘텐츠 협상이 원 매핑의 producible
+ * media type을 그대로 물려받아 JSON을 못 쓰고 그대로 raise된다 — Content-Type을 미리
+ * 지정하면 Spring이 협상 자체를 건너뛴다 (스트림 시작 전 오류는 JSON, 계약).
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -30,6 +37,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException e) {
         return ResponseEntity.status(e.code().status())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(e.code(), e.getMessage()));
     }
 
@@ -60,6 +68,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ChatDuplicateMessageResponse> handleDuplicateChatMessage(
             DuplicateChatMessageException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ChatDuplicateMessageResponse.of(
                         e.getMessage(), e.getSessionId(), e.getMessageId(), e.getStatus()));
     }
@@ -69,6 +78,8 @@ public class GlobalExceptionHandler {
     }
 
     private static ResponseEntity<ErrorResponse> badRequest(ErrorCode code, String message) {
-        return ResponseEntity.status(code.status()).body(ErrorResponse.of(code, message));
+        return ResponseEntity.status(code.status())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(code, message));
     }
 }
