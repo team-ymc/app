@@ -2,7 +2,7 @@
 
 Paper Teacher의 백엔드·프론트엔드를 함께 담는 monorepo다. 요구사항·설계·계약의 SSOT는 이 repo가 아니라 형제 repo `project-docs/`에 있다.
 
-```
+```text
 app/
   be/         # Spring Boot 3.5 / Java 21 / JPA / AWS SDK v2 (S3·SQS) / PostgreSQL
   fe/         # 프론트엔드
