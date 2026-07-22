@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -34,7 +35,10 @@ import lombok.Getter;
         name = "chat_message",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_chat_message_client_id_role",
-                columnNames = {"client_message_id", "role"}))
+                columnNames = {"client_message_id", "role"}),
+        indexes = @Index(
+                name = "ix_chat_message_session_created",
+                columnList = "session_id, created_at"))
 public class ChatMessage {
 
     @Id
