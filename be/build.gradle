@@ -31,6 +31,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
+	// FT-007 채팅 — AI SSE 소비용 WebClient (클라이언트 용도만, 서버는 MVC 유지).
+	// spring-boot-starter-web이 함께 있으면 auto-config는 MVC를 선택한다.
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 	// FT-001 인증 — BE 주도 Google 로그인(oauth2Login) + 자체 발급 JWT 검증(resource server)
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'

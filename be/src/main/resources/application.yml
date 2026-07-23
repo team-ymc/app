@@ -37,6 +37,19 @@ auth:
   fe-origin: http://localhost:5173
   cookie-secure: false
 
+# FT-007 채팅 — AI 서버 연동과 스트림 타이머 (설계 §4)
+ai:
+  base-url: http://localhost:8000   # 로컬 AI 서버(uvicorn). prod는 내부망 주소로 덮는다
+  fake-stream: false                # true면 고정 delta fake 어댑터 (자동화 테스트용)
+
+chat:
+  stream:
+    idle-timeout: 60s               # AI 이벤트 사이 침묵 상한 — 행(hang) 감지
+    deadline: 10m                   # 총 시한 안전망 — 워치독. 인프라 timeout보다 짧게 (ADR-004)
+    heartbeat-interval: 15s         # FE 방향 침묵 시 heartbeat (계약 고정값 — 바꾸면 계약 위반)
+    max-content-length: 65536       # delta 누적 상한 (문자 수). 초과 시 AI_RESPONSE_TOO_LARGE
+    emitter-timeout: 11m            # MVC async timeout — deadline보다 커야 워치독이 먼저 발화
+
 # AWS 리소스 이름 — 환경 무관 공통. 차이는 endpoint/credentials 뿐.
 aws:
   region: ap-northeast-2
