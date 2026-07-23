@@ -4,6 +4,7 @@
 // 상태 모델은 DESIGN.md D4.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPaper, uploadToS3, completeUpload, getStatus, getDownloadUrl, listPapers } from './api';
+import ChatPanel from './chat/ChatPanel.jsx';
 
 // 행 표시는 서버 status가 정한다 (FT-002 Story 3 매핑, DESIGN.md D4).
 const IN_PROGRESS_STATUSES = ['UPLOAD_PENDING', 'UPLOADED', 'PROCESSING'];
@@ -37,6 +38,7 @@ export default function App() {
   const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [chatPaper, setChatPaper] = useState(null); // 채팅 패널 대상 (FT-007)
 
   const pollTimers = useRef({}); // paperId -> intervalId (DESIGN.md D2: 폴링으로만 진행 확인)
   const fileInputRef = useRef(null);
@@ -423,13 +425,23 @@ export default function App() {
                     <span style={{ fontSize: 12, color: '#A8A5A0' }}>{formatTime(paper.updatedAt)}</span>
                     {/* Task 8: COMPLETED 행에만 다운로드 버튼 (FT-002 Story 5) */}
                     {phase === 'completed' && (
-                      <button
-                        onClick={() => handleDownload(paper.paperId)}
-                        style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#059669', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><polyline points="7 11 12 16 17 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><line x1="12" y1="16" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                        다운로드
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => handleDownload(paper.paperId)}
+                          style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#059669', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><polyline points="7 11 12 16 17 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><line x1="12" y1="16" x2="12" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                          다운로드
+                        </button>
+                        {/* Task 3: COMPLETED 행 채팅 진입 (FT-007) — 다운로드 버튼과 동일 스타일 */}
+                        <button
+                          onClick={() => setChatPaper(paper)}
+                          style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1B4FD8', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          채팅
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -540,6 +552,15 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Task 3: 채팅 패널 (FT-007) */}
+      {chatPaper && (
+        <ChatPanel
+          paperId={chatPaper.paperId}
+          filename={chatPaper.filename}
+          onClose={() => setChatPaper(null)}
+        />
       )}
     </div>
   );
