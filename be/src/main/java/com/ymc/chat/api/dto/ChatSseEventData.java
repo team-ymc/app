@@ -1,5 +1,6 @@
 package com.ymc.chat.api.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -54,6 +55,14 @@ public final class ChatSseEventData {
                 String code, String message, boolean retryable) {
             return new StreamError("error", paperId, sessionId, messageId, "FAILED",
                     new Detail(code, message, retryable));
+        }
+    }
+
+    /** event: heartbeat — 침묵 구간 연결 유지용. 상태를 바꾸지 않는다 (계약). */
+    public record Heartbeat(String type, UUID paperId, UUID sessionId, UUID messageId, Instant emittedAt) {
+
+        public static Heartbeat of(UUID paperId, UUID sessionId, UUID messageId) {
+            return new Heartbeat("heartbeat", paperId, sessionId, messageId, Instant.now());
         }
     }
 }

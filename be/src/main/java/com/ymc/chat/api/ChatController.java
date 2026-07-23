@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.ymc.chat.api.dto.ChatMessageStreamRequest;
+import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatStartResult;
 import com.ymc.chat.service.ChatStreamService;
@@ -28,14 +29,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ChatController {
 
-    /**
-     * MVC async timeout. YMC-257의 application deadline(10분)보다 커야 워치독이 먼저
-     * 발화한다 (설계 §4 타이머 표). 값 조정은 257에서 설정 프로퍼티로 옮기며 함께 한다.
-     */
-    static final long EMITTER_TIMEOUT_MS = 11 * 60 * 1000L;
-
     private final ChatCommandService chatCommandService;
     private final ChatStreamService chatStreamService;
+    private final ChatStreamProperties chatStreamProperties;
 
     /** 질문을 저장(commit)한 뒤 SSE 스트림을 시작한다. 스트림 전 오류는 JSON으로 반환된다. */
     @PostMapping(path = "/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -48,7 +44,7 @@ public class ChatController {
         ChatStartResult started = chatCommandService.start(
                 ownerId, paperId, request.sessionId(), request.clientMessageId(), request.content());
 
-        SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
+        SseEmitter emitter = new SseEmitter(chatStreamProperties.emitterTimeout().toMillis());
         chatStreamService.begin(emitter, started, request.content());
 
         return ResponseEntity.ok()

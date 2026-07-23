@@ -222,4 +222,66 @@ class AiRelayIntegrationTest extends IntegrationTest {
         assertThat(assistant.getContent()).isEqualTo("나");
         streamBody(result);
     }
+
+    @Test
+    @DisplayName("delta가 계속 흘러도 총 시한(deadline)을 넘기면 AI_TIMEOUT이다")
+    void deadlineExceededWhileStreaming() throws Exception {
+        Paper paper = givenCompletedPaper();
+        // idle(1s)에는 안 걸리는 400ms 간격 delta 12개 = 4.8s > deadline(4s)
+        FakeAiSseServer.Frame[] frames = new FakeAiSseServer.Frame[13];
+        frames[0] = FakeAiSseServer.runStarted("t");
+        for (int i = 1; i <= 12; i++) {
+            frames[i] = new FakeAiSseServer.Frame("message.delta",
+                    "{\"type\":\"message.delta\",\"thread_id\":\"t\",\"delta\":\"x\"}", 400);
+        }
+        aiServer.enqueue(Script.of(frames));
+
+        MvcResult result = startStream(paper);
+        ChatMessage assistant = awaitAssistantTerminal();
+
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.FAILED);
+        assertThat(streamBody(result)).contains("\"code\":\"AI_TIMEOUT\"");
+    }
+
+    @Test
+    @DisplayName("outbound 침묵이 heartbeat-interval을 넘으면 heartbeat event가 나간다")
+    void heartbeatDuringSilence() throws Exception {
+        Paper paper = givenCompletedPaper();
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted("t"),
+                // 800ms 침묵(heartbeat 300ms의 2배 이상, idle 1s 미만) 뒤 완료
+                new FakeAiSseServer.Frame("message.completed",
+                        "{\"type\":\"message.completed\",\"thread_id\":\"t\",\"message\":\"끝\"}", 800),
+                FakeAiSseServer.runCompleted("t")));
+
+        MvcResult result = startStream(paper);
+        awaitAssistantTerminal();
+        String stream = streamBody(result);
+
+        assertThat(stream).contains("event:heartbeat");
+        assertThat(stream).contains("\"emittedAt\"");
+    }
+
+    @Test
+    @DisplayName("FE가 끊겨도 upstream 소비와 최종 저장은 계속된다")
+    void feDisconnectStillPersists() throws Exception {
+        Paper paper = givenCompletedPaper();
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted("t"),
+                new FakeAiSseServer.Frame("message.delta",
+                        "{\"type\":\"message.delta\",\"thread_id\":\"t\",\"delta\":\"느린\"}", 300),
+                FakeAiSseServer.messageCompleted("t", "느린 완성"),
+                FakeAiSseServer.runCompleted("t")));
+
+        // 컨트롤러 우회 — emitter를 직접 만들어 relay에 넘기고 즉시 FE 종료를 시뮬레이션한다
+        var started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+        var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(6_000L);
+        chatStreamService.begin(emitter, started, "질문");
+        emitter.complete(); // onCompletion → feConnected=false
+
+        ChatMessage assistant = awaitAssistantTerminal();
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
+        assertThat(assistant.getContent()).isEqualTo("느린 완성");
+    }
 }

@@ -1,6 +1,9 @@
 package com.ymc.chat.service;
 
 import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -38,6 +41,7 @@ public class ChatStreamService {
     private final AiAgentStreamPort aiAgentStreamPort;
     private final ChatMessageTransitions transitions;
     private final ChatStreamProperties chatStreamProperties;
+    private final ScheduledExecutorService chatTimerExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
     public void begin(SseEmitter emitter, ChatStartResult started, String userContent) {
@@ -45,7 +49,7 @@ public class ChatStreamService {
         run.sendStarted();
         AiRunHandle handle = aiAgentStreamPort.stream(
                 new AiRunRequest(started.sessionId().toString(), userContent), run);
-        run.attach(handle);
+        run.arm(handle);
     }
 
     /** 한 스트림의 상태. 어댑터가 콜백을 직렬 호출하므로 필드 동기화는 FE 단절 플래그만 필요하다. */
@@ -68,8 +72,54 @@ public class ChatStreamService {
             emitter.onTimeout(() -> feConnected.set(false));
         }
 
-        void attach(AiRunHandle handle) {
+        private volatile ScheduledFuture<?> deadlineTask;
+        private volatile ScheduledFuture<?> heartbeatTask;
+
+        /** upstream 손잡이를 받고 타이머를 건다. 콜백이 이미 종결시켰다면 걸지 않는다. */
+        void arm(AiRunHandle handle) {
             this.handle = handle;
+            if (finished.get()) {
+                return;
+            }
+            deadlineTask = chatTimerExecutor.schedule(
+                    this::onDeadlineExceeded,
+                    chatStreamProperties.deadline().toMillis(), TimeUnit.MILLISECONDS);
+            long interval = chatStreamProperties.heartbeatInterval().toMillis();
+            heartbeatTask = chatTimerExecutor.scheduleAtFixedRate(
+                    this::maybeSendHeartbeat, interval, interval, TimeUnit.MILLISECONDS);
+            if (finished.get()) {
+                cancelTimers(); // arm 도중 종결된 경합 — 방금 건 타이머를 되돌린다
+            }
+        }
+
+        /** 총 시한 안전망 (설계 §4). 정상 완료가 먼저면 finished 가드가 무시한다. */
+        private void onDeadlineExceeded() {
+            log.warn("application deadline 초과. messageId={}", ids.assistantMessageId());
+            cancelUpstream();
+            failWith("AI_TIMEOUT", "답변 생성 시간이 초과되었습니다.", true);
+        }
+
+        /** 마지막 outbound 이후 침묵이 interval을 넘으면 heartbeat를 보낸다 (계약 15s 규칙). */
+        private void maybeSendHeartbeat() {
+            if (finished.get() || !feConnected.get()) {
+                return;
+            }
+            long silenceNanos = System.nanoTime() - lastOutboundNanos;
+            if (silenceNanos >= chatStreamProperties.heartbeatInterval().toNanos()) {
+                send("heartbeat", ChatSseEventData.Heartbeat.of(
+                        ids.paperId(), ids.sessionId(), ids.assistantMessageId()));
+            }
+        }
+
+        private void cancelTimers() {
+            ScheduledFuture<?> d = deadlineTask;
+            if (d != null) {
+                d.cancel(false);
+            }
+            ScheduledFuture<?> h = heartbeatTask;
+            if (h != null) {
+                h.cancel(false);
+            }
         }
 
         private void cancelUpstream() {
@@ -117,6 +167,7 @@ public class ChatStreamService {
             if (!finished.compareAndSet(false, true)) {
                 return; // 워치독·상한·transport 중 하나가 이미 종결함
             }
+            cancelTimers();
             if (finalContent == null) {
                 // message.completed 없이 run.completed — 계약의 AI_PROTOCOL_ERROR
                 failLocked("AI_PROTOCOL_ERROR", "답변 생성 결과가 올바르지 않습니다.", false);
@@ -174,6 +225,7 @@ public class ChatStreamService {
 
         /** 종결 결정권을 이미 가진 쪽(onRunCompleted)이 부르는 실패 경로. */
         private void failLocked(String code, String message, boolean retryable) {
+            cancelTimers();
             try {
                 transitions.fail(ids.assistantMessageId());
             } catch (RuntimeException e) {
