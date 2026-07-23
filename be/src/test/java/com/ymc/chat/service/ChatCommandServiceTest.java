@@ -174,4 +174,43 @@ class ChatCommandServiceTest extends IntegrationTest {
             paperRepository.deleteAll();
         }
     }
+
+    @Test
+    @DisplayName("타인이 같은 clientMessageId·content를 보내도 남의 식별자가 노출되지 않는다")
+    void foreignOwnerSameClientMessageIdIsConflict() {
+        Paper paper = givenCompletedPaper();
+        UUID clientMessageId = UUID.randomUUID();
+        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+
+        // 다른 사용자 소유의 COMPLETED 논문
+        UUID otherOwner = UUID.randomUUID();
+        Paper othersPaper = paperRepository.save(
+                com.ymc.paper.domain.Paper.register(otherOwner, "others-dup.pdf", Instant.now()));
+        paperTransitions.markUploaded(othersPaper.getId());
+        paperTransitions.markProcessing(othersPaper.getId());
+        paperTransitions.markParsed(othersPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문"))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT))
+                .isNotInstanceOf(DuplicateChatMessageException.class);
+        assertThat(chatMessageRepository.count()).isEqualTo(2); // 타인의 행이 안 생겼다
+    }
+
+    @Test
+    @DisplayName("같은 사용자라도 다른 논문에 같은 clientMessageId를 재사용하면 CONFLICT다")
+    void samePaperScopeRequiredForIdempotency() {
+        Paper paper = givenCompletedPaper();
+        UUID clientMessageId = UUID.randomUUID();
+        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+
+        Paper secondPaper = givenProcessingPaper("second-paper.pdf");
+        paperTransitions.markParsed(secondPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT));
+    }
 }
