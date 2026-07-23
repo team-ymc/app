@@ -23,6 +23,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ymc.chat.domain.ChatMessageRepository;
+import com.ymc.chat.domain.ChatSessionRepository;
+import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -59,6 +62,12 @@ public abstract class IntegrationTest {
     /** 테스트 JWT의 subject이자 테스트 데이터의 소유자 (YMC-215). */
     protected static final UUID TEST_USER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Autowired
+    protected ChatMessageRepository chatMessageRepository;
+
+    @Autowired
+    protected ChatSessionRepository chatSessionRepository;
 
     @Autowired
     protected MockMvc mockMvc;
@@ -102,12 +111,17 @@ public abstract class IntegrationTest {
     @MockitoSpyBean
     protected PaperTransitions paperTransitions;
 
+    @MockitoSpyBean
+    protected AiAgentStreamPort aiAgentStreamPort;
+
     /**
      * 컨텍스트(=컨테이너)를 재사용하므로 테스트마다 DB와 큐를 직접 비운다.
      * PurgeQueue는 호출 간격 제한이 있어 쓰지 않고 받아서 지운다.
      */
     @BeforeEach
     void resetState() {
+        chatMessageRepository.deleteAll();
+        chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         paperRepository.deleteAll();

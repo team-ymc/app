@@ -29,7 +29,25 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
 
     /** refresh 쿠키 없음·만료·폐기·재사용 (FT-001) */
-    AUTH_REFRESH_INVALID(HttpStatus.UNAUTHORIZED);
+    AUTH_REFRESH_INVALID(HttpStatus.UNAUTHORIZED),
+
+    /** 인증됐지만 대상 논문 접근 권한 없음 (FT-001) */
+    FORBIDDEN(HttpStatus.FORBIDDEN),
+
+    /** 논문이 아직 채팅 가능한 상태가 아님 (FT-007) */
+    PAPER_NOT_READY(HttpStatus.CONFLICT),
+
+    /** 세션 없음 또는 현재 사용자·논문에 속하지 않음 (FT-007) */
+    CHAT_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 같은 세션에서 assistant 답변 생성 중 (FT-007) */
+    CHAT_RUN_IN_PROGRESS(HttpStatus.CONFLICT),
+
+    /** clientMessageId를 다른 요청 내용에 재사용함 (FT-007) */
+    CLIENT_MESSAGE_ID_CONFLICT(HttpStatus.CONFLICT),
+
+    /** 같은 clientMessageId·같은 content 재전송 — 기존 실행 상태 반환 (FT-007) */
+    DUPLICATE_MESSAGE(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

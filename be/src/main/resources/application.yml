@@ -4,6 +4,11 @@ spring:
     name: ymc-api
   profiles:
     default: local          # 프로파일 미지정 시 local
+  jackson:
+    deserialization:
+      # 계약(additionalProperties: false)에 없는 필드를 조용히 무시하지 않는다 —
+      # FE 오타(sessoinId 등)가 새 세션을 만드는 사고 방지. 실패는 400 VALIDATION_ERROR로 변환된다.
+      fail-on-unknown-properties: true
   jpa:
     open-in-view: false
     hibernate:
