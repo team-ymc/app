@@ -113,7 +113,9 @@ public class ChatStreamService {
 
         @Override
         public void onRunFailed(String error) {
-            log.warn("AI run 실패. messageId={} error={}", ids.assistantMessageId(), error);
+            // AI가 만든 임의 문자열이라 사용자 입력이 섞일 수 있다 — 원인 파악이 가능한 선에서 절단해 남긴다
+            log.warn("AI run 실패. messageId={} error={}",
+                    ids.assistantMessageId(), truncate(error, 200));
             failWith("AI_RUN_FAILED", "답변을 생성하지 못했습니다.", true);
         }
 
@@ -156,5 +158,12 @@ public class ChatStreamService {
                 emitter.complete();
             }
         }
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength) + "…(절단)";
     }
 }
