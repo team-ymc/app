@@ -1,11 +1,14 @@
 package com.ymc.chat.service;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,7 @@ public class ChatStreamService {
     private final ChatMessageTransitions transitions;
     private final ChatStreamProperties chatStreamProperties;
     private final ScheduledExecutorService chatTimerExecutor;
+    private final ExecutorService chatRelayExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
     public void begin(SseEmitter emitter, ChatStartResult started, String userContent) {
@@ -61,7 +65,7 @@ public class ChatStreamService {
         private final StringBuilder accumulated = new StringBuilder();
         private String finalContent;
         private final AtomicBoolean finished = new AtomicBoolean(false);
-        private final Object sendLock = new Object();
+        private final ReentrantLock sendLock = new ReentrantLock();
         private volatile AiRunHandle handle;
 
         private Run(SseEmitter emitter, ChatStartResult ids) {
@@ -92,11 +96,13 @@ public class ChatStreamService {
             }
         }
 
-        /** 총 시한 안전망 (설계 §4). 정상 완료가 먼저면 finished 가드가 무시한다. */
+        /** 총 시한 안전망 (설계 §4). 타이머 스레드에서는 위임만 — DB 전이·emitter 전송은 블로킹이다. */
         private void onDeadlineExceeded() {
-            log.warn("application deadline 초과. messageId={}", ids.assistantMessageId());
-            cancelUpstream();
-            failWith("AI_TIMEOUT", "답변 생성 시간이 초과되었습니다.", true);
+            delegate(() -> {
+                log.warn("application deadline 초과. messageId={}", ids.assistantMessageId());
+                cancelUpstream();
+                failWith("AI_TIMEOUT", "답변 생성 시간이 초과되었습니다.", true);
+            });
         }
 
         /** 마지막 outbound 이후 침묵이 interval을 넘으면 heartbeat를 보낸다 (계약 15s 규칙). */
@@ -104,10 +110,28 @@ public class ChatStreamService {
             if (finished.get() || !feConnected.get()) {
                 return;
             }
-            long silenceNanos = System.nanoTime() - lastOutboundNanos;
-            if (silenceNanos >= chatStreamProperties.heartbeatInterval().toNanos()) {
+            if (System.nanoTime() - lastOutboundNanos < chatStreamProperties.heartbeatInterval().toNanos()) {
+                return;
+            }
+            delegate(() -> {
+                if (finished.get() || !feConnected.get()) {
+                    return; // 위임 사이에 종결된 경합 재확인
+                }
                 send("heartbeat", ChatSseEventData.Heartbeat.of(
                         ids.paperId(), ids.sessionId(), ids.assistantMessageId()));
+            });
+        }
+
+        /**
+         * 공유 단일 타이머 스레드 보호 — 느린 FE의 emitter.send가 다른 세션의 워치독을
+         * 지연시키지 않도록 실제 작업은 relay executor(virtual thread)에서 실행한다.
+         * scheduleAtFixedRate는 콜백 예외 시 반복 자체가 죽으므로 셧다운 경합도 삼킨다.
+         */
+        private void delegate(Runnable work) {
+            try {
+                chatRelayExecutor.execute(work);
+            } catch (RejectedExecutionException e) {
+                log.debug("셧다운 중 타이머 위임 거부됨. messageId={}", ids.assistantMessageId());
             }
         }
 
@@ -252,15 +276,16 @@ public class ChatStreamService {
             if (!feConnected.get()) {
                 return;
             }
-            synchronized (sendLock) { // 타이머 스레드(heartbeat, Task 5)와 relay 스레드가 겹칠 수 있다
-                try {
-                    emitter.send(SseEmitter.event().name(eventName)
-                            .data(payload, MediaType.APPLICATION_JSON));
-                    lastOutboundNanos = System.nanoTime();
-                } catch (IOException | IllegalStateException e) {
-                    feConnected.set(false);
-                    log.debug("FE 전송 중단 — 연결 종료로 판단. messageId={}", ids.assistantMessageId());
-                }
+            sendLock.lock(); // synchronized는 virtual thread를 carrier에 고정(pinning)시킨다 — ReentrantLock은 아니다
+            try {
+                emitter.send(SseEmitter.event().name(eventName)
+                        .data(payload, MediaType.APPLICATION_JSON));
+                lastOutboundNanos = System.nanoTime();
+            } catch (IOException | IllegalStateException e) {
+                feConnected.set(false);
+                log.debug("FE 전송 중단 — 연결 종료로 판단. messageId={}", ids.assistantMessageId());
+            } finally {
+                sendLock.unlock();
             }
         }
 
