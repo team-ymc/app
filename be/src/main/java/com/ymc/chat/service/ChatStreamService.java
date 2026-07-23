@@ -1,7 +1,14 @@
 package com.ymc.chat.service;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.ymc.chat.api.dto.ChatSseEventData;
+import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.port.AiAgentStreamPort;
+import com.ymc.chat.service.port.AiRunHandle;
 import com.ymc.chat.service.port.AiRunRequest;
 import com.ymc.chat.service.port.AiStreamListener;
 
@@ -34,13 +43,17 @@ public class ChatStreamService {
 
     private final AiAgentStreamPort aiAgentStreamPort;
     private final ChatMessageTransitions transitions;
+    private final ChatStreamProperties chatStreamProperties;
+    private final ScheduledExecutorService chatTimerExecutor;
+    private final ExecutorService chatRelayExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
     public void begin(SseEmitter emitter, ChatStartResult started, String userContent) {
         Run run = new Run(emitter, started);
         run.sendStarted();
-        aiAgentStreamPort.stream(
+        AiRunHandle handle = aiAgentStreamPort.stream(
                 new AiRunRequest(started.sessionId().toString(), userContent), run);
+        run.arm(handle);
     }
 
     /** 한 스트림의 상태. 어댑터가 콜백을 직렬 호출하므로 필드 동기화는 FE 단절 플래그만 필요하다. */
@@ -51,6 +64,9 @@ public class ChatStreamService {
         private final AtomicBoolean feConnected = new AtomicBoolean(true);
         private final StringBuilder accumulated = new StringBuilder();
         private String finalContent;
+        private final AtomicBoolean finished = new AtomicBoolean(false);
+        private final ReentrantLock sendLock = new ReentrantLock();
+        private volatile AiRunHandle handle;
 
         private Run(SseEmitter emitter, ChatStartResult ids) {
             this.emitter = emitter;
@@ -58,6 +74,83 @@ public class ChatStreamService {
             emitter.onCompletion(() -> feConnected.set(false));
             emitter.onError(t -> feConnected.set(false));
             emitter.onTimeout(() -> feConnected.set(false));
+        }
+
+        private volatile ScheduledFuture<?> deadlineTask;
+        private volatile ScheduledFuture<?> heartbeatTask;
+
+        /** upstream 손잡이를 받고 타이머를 건다. 콜백이 이미 종결시켰다면 걸지 않는다. */
+        void arm(AiRunHandle handle) {
+            this.handle = handle;
+            if (finished.get()) {
+                return;
+            }
+            deadlineTask = chatTimerExecutor.schedule(
+                    this::onDeadlineExceeded,
+                    chatStreamProperties.deadline().toMillis(), TimeUnit.MILLISECONDS);
+            long interval = chatStreamProperties.heartbeatInterval().toMillis();
+            heartbeatTask = chatTimerExecutor.scheduleAtFixedRate(
+                    this::maybeSendHeartbeat, interval, interval, TimeUnit.MILLISECONDS);
+            if (finished.get()) {
+                cancelTimers(); // arm 도중 종결된 경합 — 방금 건 타이머를 되돌린다
+            }
+        }
+
+        /** 총 시한 안전망 (설계 §4). 타이머 스레드에서는 위임만 — DB 전이·emitter 전송은 블로킹이다. */
+        private void onDeadlineExceeded() {
+            delegate(() -> {
+                log.warn("application deadline 초과. messageId={}", ids.assistantMessageId());
+                cancelUpstream();
+                failWith("AI_TIMEOUT", "답변 생성 시간이 초과되었습니다.", true);
+            });
+        }
+
+        /** 마지막 outbound 이후 침묵이 interval을 넘으면 heartbeat를 보낸다 (계약 15s 규칙). */
+        private void maybeSendHeartbeat() {
+            if (finished.get() || !feConnected.get()) {
+                return;
+            }
+            if (System.nanoTime() - lastOutboundNanos < chatStreamProperties.heartbeatInterval().toNanos()) {
+                return;
+            }
+            delegate(() -> {
+                if (finished.get() || !feConnected.get()) {
+                    return; // 위임 사이에 종결된 경합 재확인
+                }
+                send("heartbeat", ChatSseEventData.Heartbeat.of(
+                        ids.paperId(), ids.sessionId(), ids.assistantMessageId()));
+            });
+        }
+
+        /**
+         * 공유 단일 타이머 스레드 보호 — 느린 FE의 emitter.send가 다른 세션의 워치독을
+         * 지연시키지 않도록 실제 작업은 relay executor(virtual thread)에서 실행한다.
+         * scheduleAtFixedRate는 콜백 예외 시 반복 자체가 죽으므로 셧다운 경합도 삼킨다.
+         */
+        private void delegate(Runnable work) {
+            try {
+                chatRelayExecutor.execute(work);
+            } catch (RejectedExecutionException e) {
+                log.debug("셧다운 중 타이머 위임 거부됨. messageId={}", ids.assistantMessageId());
+            }
+        }
+
+        private void cancelTimers() {
+            ScheduledFuture<?> d = deadlineTask;
+            if (d != null) {
+                d.cancel(false);
+            }
+            ScheduledFuture<?> h = heartbeatTask;
+            if (h != null) {
+                h.cancel(false);
+            }
+        }
+
+        private void cancelUpstream() {
+            AiRunHandle current = handle;
+            if (current != null) {
+                current.cancel();
+            }
         }
 
         private void sendStarted() {
@@ -72,6 +165,17 @@ public class ChatStreamService {
 
         @Override
         public void onDelta(String delta) {
+            if (finished.get()) {
+                return; // 이미 종결 — 늦게 도착한 delta는 버린다
+            }
+            if (accumulated.length() + delta.length() > chatStreamProperties.maxContentLength()) {
+                // idle timeout은 "안 올 때"만 잡는다 — "너무 많이 올 때"는 이 상한이 잡는다 (설계 §4)
+                log.warn("delta 누적 상한 초과. messageId={} 누적={}자",
+                        ids.assistantMessageId(), accumulated.length());
+                cancelUpstream();
+                failWith("AI_RESPONSE_TOO_LARGE", "답변이 허용 길이를 초과했습니다.", false);
+                return;
+            }
             accumulated.append(delta);
             send("message.delta", ChatSseEventData.Delta.of(
                     ids.paperId(), ids.sessionId(), ids.assistantMessageId(), delta));
@@ -84,9 +188,13 @@ public class ChatStreamService {
 
         @Override
         public void onRunCompleted() {
+            if (!finished.compareAndSet(false, true)) {
+                return; // 워치독·상한·transport 중 하나가 이미 종결함
+            }
+            cancelTimers();
             if (finalContent == null) {
                 // message.completed 없이 run.completed — 계약의 AI_PROTOCOL_ERROR
-                failWith("AI_PROTOCOL_ERROR", "답변 생성 결과가 올바르지 않습니다.", false);
+                failLocked("AI_PROTOCOL_ERROR", "답변 생성 결과가 올바르지 않습니다.", false);
                 return;
             }
             if (!accumulated.toString().equals(finalContent)) {
@@ -98,7 +206,7 @@ public class ChatStreamService {
                 committed = transitions.complete(ids.assistantMessageId(), finalContent);
             } catch (RuntimeException e) {
                 log.error("최종 답변 저장 실패. messageId={}", ids.assistantMessageId(), e);
-                failWith("MESSAGE_PERSISTENCE_FAILED", "답변을 저장하지 못했습니다.", true);
+                failLocked("MESSAGE_PERSISTENCE_FAILED", "답변을 저장하지 못했습니다.", true);
                 return;
             }
             if (!committed) {
@@ -121,12 +229,27 @@ public class ChatStreamService {
 
         @Override
         public void onTransportError(Exception cause) {
+            if (cause instanceof TimeoutException) {
+                // 어댑터의 idle timeout — 이벤트 사이 침묵이 상한을 넘었다
+                log.warn("AI 스트림 침묵 초과. messageId={}", ids.assistantMessageId());
+                cancelUpstream();
+                failWith("AI_TIMEOUT", "답변 생성 시간이 초과되었습니다.", true);
+                return;
+            }
+            if (finalContent != null) {
+                // message.completed 후 run.completed 없이 종료 — 계약의 AI_PROTOCOL_ERROR
+                log.warn("최종 답변 후 종료 신호 없이 스트림 종료. messageId={} causeType={}",
+                        ids.assistantMessageId(), cause.getClass().getSimpleName());
+                failWith("AI_PROTOCOL_ERROR", "답변 생성 결과가 올바르지 않습니다.", false);
+                return;
+            }
             log.warn("AI 스트림 단절. messageId={}", ids.assistantMessageId(), cause);
             failWith("AI_STREAM_DISCONNECTED", "답변 생성 연결이 끊어졌습니다.", true);
         }
 
-        /** FAILED 확정 후 terminal error 전송. 저장 실패 시 terminal 없이 닫는다 (계약). */
-        private void failWith(String code, String message, boolean retryable) {
+        /** 종결 결정권을 이미 가진 쪽(onRunCompleted)이 부르는 실패 경로. */
+        private void failLocked(String code, String message, boolean retryable) {
+            cancelTimers();
             try {
                 transitions.fail(ids.assistantMessageId());
             } catch (RuntimeException e) {
@@ -140,16 +263,29 @@ public class ChatStreamService {
             complete();
         }
 
+        private void failWith(String code, String message, boolean retryable) {
+            if (!finished.compareAndSet(false, true)) {
+                return;
+            }
+            failLocked(code, message, retryable);
+        }
+
+        private volatile long lastOutboundNanos = System.nanoTime();
+
         private void send(String eventName, Object payload) {
             if (!feConnected.get()) {
-                return; // FE만 끊긴 것 — upstream 소비·저장은 계속 (계약 frontendDisconnect)
+                return;
             }
+            sendLock.lock(); // synchronized는 virtual thread를 carrier에 고정(pinning)시킨다 — ReentrantLock은 아니다
             try {
                 emitter.send(SseEmitter.event().name(eventName)
                         .data(payload, MediaType.APPLICATION_JSON));
+                lastOutboundNanos = System.nanoTime();
             } catch (IOException | IllegalStateException e) {
                 feConnected.set(false);
                 log.debug("FE 전송 중단 — 연결 종료로 판단. messageId={}", ids.assistantMessageId());
+            } finally {
+                sendLock.unlock();
             }
         }
 

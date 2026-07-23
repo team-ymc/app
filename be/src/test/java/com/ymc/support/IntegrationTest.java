@@ -51,7 +51,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
  * 통합 테스트 베이스 — PostgreSQL·LocalStack 컨테이너를 띄운 실제 스프링 컨텍스트.
  * 두 설정을 같은 조합으로 import 하므로 하위 테스트 클래스들이 컨텍스트(=컨테이너)를 공유한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = "ai.fake-stream=true")
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class})
 public abstract class IntegrationTest {
