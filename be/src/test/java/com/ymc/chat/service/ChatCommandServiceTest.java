@@ -129,4 +129,49 @@ class ChatCommandServiceTest extends IntegrationTest {
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT));
         assertThat(chatMessageRepository.count()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("동시 재전송 경쟁 — 한쪽만 성공하고 진 쪽은 DUPLICATE로 응답한다 (aborted 트랜잭션 500 회귀 방지)")
+    void concurrentDuplicateResendLoserGetsDuplicate() throws Exception {
+        // 경쟁 창을 매번 보장할 수는 없으므로 5회 반복 — 수정 전 코드에서는 진 쪽 재조회가
+        // aborted 트랜잭션(25P02)에서 실행되어 DuplicateChatMessageException이 아닌 예외가 난다.
+        for (int i = 0; i < 5; i++) {
+            Paper paper = givenCompletedPaper();
+            UUID clientMessageId = UUID.randomUUID();
+            var barrier = new java.util.concurrent.CyclicBarrier(2);
+            var results = new java.util.concurrent.ConcurrentLinkedQueue<Object>();
+
+            Runnable attempt = () -> {
+                try {
+                    barrier.await();
+                    results.add(chatCommandService.start(
+                            TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문"));
+                } catch (Throwable t) {
+                    results.add(t);
+                }
+            };
+            Thread t1 = Thread.ofVirtual().start(attempt);
+            Thread t2 = Thread.ofVirtual().start(attempt);
+            t1.join();
+            t2.join();
+
+            long successes = results.stream().filter(r -> r instanceof ChatStartResult).count();
+            long duplicates = results.stream()
+                    .filter(r -> r instanceof DuplicateChatMessageException).count();
+            long unexpected = results.stream()
+                    .filter(r -> !(r instanceof ChatStartResult)
+                            && !(r instanceof DuplicateChatMessageException)).count();
+
+            assertThat(unexpected).as("반복 %d: 예상 밖 예외 — %s", i, results).isZero();
+            assertThat(successes).as("반복 %d: 성공 수", i).isEqualTo(1);
+            assertThat(duplicates).as("반복 %d: 중복 응답 수", i).isEqualTo(1);
+            assertThat(chatMessageRepository.count())
+                    .as("반복 %d: user+assistant 2행만 존재", i).isEqualTo(2);
+
+            // 반복 간 격리
+            chatMessageRepository.deleteAll();
+            chatSessionRepository.deleteAll();
+            paperRepository.deleteAll();
+        }
+    }
 }

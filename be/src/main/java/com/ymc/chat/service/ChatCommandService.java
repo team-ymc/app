@@ -7,7 +7,10 @@ import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ymc.chat.domain.ChatMessage;
 import com.ymc.chat.domain.ChatMessageRepository;
@@ -19,8 +22,6 @@ import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.service.PaperChatAccessValidator;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * 채팅 시작 트랜잭션 — 검증과 저장까지만. 스트리밍은 이 메서드가 commit된 뒤
  * {@link ChatStreamService}가 시작한다 (계약: commit 뒤 message.started).
@@ -29,12 +30,24 @@ import lombok.RequiredArgsConstructor;
  * 새 세션은 방금 만든 UUID라 경쟁 상대가 존재할 수 없다 (설계 §3).
  */
 @Service
-@RequiredArgsConstructor
 public class ChatCommandService {
 
     private final PaperChatAccessValidator paperChatAccessValidator;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final TransactionTemplate requiresNewTx;
+
+    public ChatCommandService(
+            PaperChatAccessValidator paperChatAccessValidator,
+            ChatSessionRepository chatSessionRepository,
+            ChatMessageRepository chatMessageRepository,
+            PlatformTransactionManager transactionManager) {
+        this.paperChatAccessValidator = paperChatAccessValidator;
+        this.chatSessionRepository = chatSessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     /**
      * @throws ApiException PAPER_NOT_FOUND / FORBIDDEN / PAPER_NOT_READY — 논문 검증 실패
@@ -65,8 +78,10 @@ public class ChatCommandService {
             assistant = chatMessageRepository.saveAndFlush(
                     ChatMessage.assistantGenerating(session, clientMessageId, now));
         } catch (DataIntegrityViolationException e) {
-            // 사전 조회를 나란히 통과한 동시 재전송 — 유니크 제약이 최후 방어선 (paper design D4 준용)
-            rejectDuplicate(clientMessageId, content);
+            // 사전 조회를 나란히 통과한 동시 재전송 — 유니크 제약이 최후 방어선 (paper design D4 준용).
+            // PG는 제약 위반 후 같은 트랜잭션의 추가 쿼리를 거부하므로(aborted, 25P02)
+            // 재조회는 REQUIRES_NEW 새 트랜잭션에서 한다. 승자 커밋은 이미 끝났으므로 조회 가능하다.
+            requiresNewTx.executeWithoutResult(tx -> rejectDuplicate(clientMessageId, content));
             throw e; // rejectDuplicate가 못 잡는 위반이면 예상 밖 — 그대로 5xx
         }
 
