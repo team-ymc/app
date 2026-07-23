@@ -95,7 +95,9 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 default -> log.debug("알 수 없는 AI event 무시: {}", name);
             }
         } catch (JsonProcessingException | IllegalArgumentException e) {
-            listener.onTransportError(e);
+            // reactive 체인으로 던진다 — Reactor가 구독을 취소(=연결 종료=AI 생성 취소)하고
+            // error 경로를 타서 onTransportError가 정확히 한 번 호출된다
+            throw new IllegalStateException("AI event data 파싱 실패: " + name, e);
         }
     }
 

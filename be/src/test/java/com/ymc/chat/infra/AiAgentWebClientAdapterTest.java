@@ -127,7 +127,7 @@ class AiAgentWebClientAdapterTest {
 
     @Test
     @DisplayName("data JSON이 깨졌으면 onTransportError다")
-    void malformedDataIsTransportError() {
+    void malformedDataIsTransportError() throws InterruptedException {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.Frame.of("message.delta", "{not-json"),
                 FakeAiSseServer.runCompleted("t-5")));
@@ -135,5 +135,9 @@ class AiAgentWebClientAdapterTest {
         adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-5", "질문"), recorder);
 
         await().atMost(WAIT).until(() -> events.stream().anyMatch(e -> e.startsWith("transport-error:")));
+        // 오류 후 구독이 취소됐으므로 후속 terminal 콜백이 오지 않는다
+        Thread.sleep(300);
+        assertThat(events).doesNotContain("run-completed");
+        assertThat(events.stream().filter(e -> e.startsWith("transport-error:")).count()).isEqualTo(1);
     }
 }
