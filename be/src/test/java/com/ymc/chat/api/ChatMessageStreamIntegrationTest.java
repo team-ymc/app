@@ -270,4 +270,19 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
 
         assertThat(chatSessionRepository.count()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("계약에 없는 필드(sessoinId 오타)는 새 세션을 만들지 않고 400이다")
+    void unknownFieldRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientMessageId\":\"" + UUID.randomUUID()
+                                + "\",\"content\":\"질문\",\"sessoinId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+    }
 }
