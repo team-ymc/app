@@ -19,6 +19,11 @@ public record ChatStreamProperties(
         Duration emitterTimeout) {
 
     public ChatStreamProperties {
+        requirePositiveMillis("idle-timeout", idleTimeout);
+        requirePositiveMillis("deadline", deadline);
+        requirePositiveMillis("heartbeat-interval", heartbeatInterval);
+        requirePositiveMillis("emitter-timeout", emitterTimeout);
+
         if (idleTimeout.compareTo(deadline) >= 0) {
             throw new IllegalArgumentException("chat.stream.idle-timeout은 deadline보다 짧아야 합니다.");
         }
@@ -27,6 +32,12 @@ public record ChatStreamProperties(
         }
         if (maxContentLength <= 0) {
             throw new IllegalArgumentException("chat.stream.max-content-length는 양수여야 합니다.");
+        }
+    }
+
+    private static void requirePositiveMillis(String name, Duration value) {
+        if (value == null || value.toMillis() < 1) {
+            throw new IllegalArgumentException("chat.stream." + name + "은 1ms 이상이어야 합니다.");
         }
     }
 }
