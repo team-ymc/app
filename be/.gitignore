@@ -10,6 +10,7 @@ build/
 *.log
 .env
 .env.*
+!.env.example
 application-local.properties
 
 ### STS ###

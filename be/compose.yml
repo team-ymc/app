@@ -1,0 +1,49 @@
+name: ymc-be
+
+services:
+  be:
+    container_name: ymc-be
+    image: ymc-be:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+
+    # .env가 없어도 컨테이너는 뜬다 (빌드·헬스체크 확인용). 다만 /api/**가 인증을
+    # 요구하므로, 브라우저로 쓰려면 구글 OAuth 실값이 든 .env가 필요하다 — LOCALDEPLOY.md
+    env_file:
+      - path: .env
+        required: false
+
+    environment:
+      # .env는 호스트(localhost) 기준 — 컨테이너는 ymc-local 네트워크 안 주소로 덮는다.
+      DB_URL: jdbc:postgresql://ymc-postgres:5432/ymc_dev
+      # ai.base-url 오버라이드 (Spring relaxed binding). AI_BASEURL도 @ConfigurationProperties
+      # 바인더에는 먹지만, 이 형태는 @Value·Environment.getProperty 경로로는 해석되지 않는다.
+      # AI_BASE_URL은 두 경로 모두 지원 → 나중에 소비 방식이 바뀌어도 조용히 무시되지 않는다.
+      AI_BASE_URL: http://ymc-ai:8000
+      # LocalStack endpoint(localhost.localstack.cloud:4566)는 컨테이너 안에서도
+      # network alias로 풀리므로 오버라이드가 필요 없다 (infra/local/localstack/README.md).
+
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    networks:
+      ymc-local:
+        aliases:
+          - ymc-be
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+    stop_grace_period: 30s
+
+networks:
+  ymc-local:
+    external: true
+    name: ymc-local
