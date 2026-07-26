@@ -1,11 +1,21 @@
 # 빌드 컨텍스트 최소화 — 컨테이너 안에서 다시 빌드하므로 산출물/캐시/IDE 파일 제외
 .gradle
 build
+
+# 로컬 시크릿 — 이미지에 구워지면 유출 + .env 주입을 덮어버림 (컨테이너 설정은 .env로만)
+src/main/resources/application-local.properties
+.env
+.env.*
 .git
 .github
 .idea
 *.iml
 docs
+bin
 CLAUDE.md
+README.md
+LOCALDEPLOY.md
 Dockerfile
 .dockerignore
+compose.yml
+.env.example
