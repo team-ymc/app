@@ -52,9 +52,9 @@ public class PaperTransitions {
     }
 
     /**
-     * 결과 수신 시의 {@code PROCESSING → COMPLETED | FAILED}.
+     * 결과 수신 시의 {@code UPLOADED | PROCESSING → COMPLETED | FAILED}.
      *
-     * @return 전이했으면 true. false면 이미 terminal이거나 PROCESSING이 아니다 (중복 수신 등)
+     * @return 전이했으면 true. false면 이미 terminal이거나 UPLOAD_PENDING이다 (중복 수신 등)
      */
     @Transactional
     public boolean markParsed(UUID paperId, PaperStatus terminal, String errorCode) {

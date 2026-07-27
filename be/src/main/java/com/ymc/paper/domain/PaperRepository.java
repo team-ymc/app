@@ -42,11 +42,14 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     int markUploaded(@Param("id") UUID id, @Param("now") Instant now);
 
     /**
-     * 결과 수신 시의 {@code PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
+     * 결과 수신 시의 {@code UPLOADED | PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
+     *
+     * <p>{@code UPLOADED}를 포함하는 이유: request 발행 후 PROCESSING 커밋 전에 결과가 도착하거나
+     * BE가 죽는 경합을 흡수한다 (spec §3, ADR-002 Follow-ups).
      *
      * @param terminal  {@code COMPLETED} 또는 {@code FAILED}
      * @param errorCode 실패 코드. {@code COMPLETED}면 null
-     * @return 변경된 row 수 (0이면 이미 전이됐거나 PROCESSING이 아님 — 경고 로그 후 소비)
+     * @return 변경된 row 수 (0이면 이미 terminal이거나 진행 전 상태 — 경고 로그 후 소비)
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -55,7 +58,8 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                    p.errorCode = :errorCode,
                    p.updatedAt = :now
              where p.id = :id
-               and p.status = com.ymc.paper.domain.PaperStatus.PROCESSING
+               and p.status in (com.ymc.paper.domain.PaperStatus.UPLOADED,
+                                com.ymc.paper.domain.PaperStatus.PROCESSING)
             """)
     int markParsed(
             @Param("id") UUID id,
