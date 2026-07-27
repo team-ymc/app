@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -74,6 +75,29 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         assertThat(body.get("fileKey").asText()).isEqualTo(paper.getFileKey());
         // 계약(parse-request.schema.json)은 additionalProperties: false — 필드가 딱 둘이어야 한다
         assertThat(body.properties()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("빠른 결과 선도착: complete는 5xx 없이 terminal을 반환하고 PROCESSING이 덮지 않는다")
+    void fastResultBeforeProcessingReturnsTerminal() throws Exception {
+        Paper paper = givenPendingPaper(FILENAME);
+        givenUploadedObject(paper);
+
+        // 발행 직후·PROCESSING 커밋 전에 빠른 FAILED 결과가 도착한 상황을 재현한다.
+        // markParsed는 UPLOADED에서 terminal로 전이한다 (Task 2 / spec §3).
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            paperTransitions.markParsed(paper.getId(), PaperStatus.FAILED, "PDF_UNREADABLE");
+            return null;
+        }).when(parseRequestPublisher).publish(any(), anyString());
+
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+
+        Paper after = reload(paper.getId());
+        assertThat(after.getStatus()).isEqualTo(PaperStatus.FAILED);       // PROCESSING이 덮지 않았다
+        assertThat(after.getErrorCode()).isEqualTo("PDF_UNREADABLE");
     }
 
     @Test

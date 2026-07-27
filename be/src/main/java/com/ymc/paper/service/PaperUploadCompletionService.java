@@ -80,11 +80,12 @@ public class PaperUploadCompletionService {
         }
         log.info("파싱 요청 발행: paperId={}, fileKey={}", paperId, paper.getFileKey());
 
-        // (3) PROCESSING 커밋 — 실패해도 파싱은 이미 진행 중이다. 마찬가지로 방치한다.
+        // (3) PROCESSING 커밋 — CAS라 빠른 결과가 이미 terminal로 전이시켰으면 그 상태를
+        //     그대로 돌려준다 (정상 경합, 5xx 아님). 여기서의 예외는 DB 장애 등 실제 오류뿐이다.
         try {
             return transitions.markProcessing(paperId);
         } catch (RuntimeException e) {
-            // 발행은 이미 나갔다. 결과가 와도 PROCESSING CAS가 0 row라 반영되지 않는다.
+            // 발행은 이미 나갔다. 결과가 오면 UPLOADED에서 바로 terminal로 전이된다 (spec §3 C2).
             log.warn("PROCESSING 전이 실패, 발행 후 UPLOADED 정체: paperId={}", paperId, e);
             throw e;
         }

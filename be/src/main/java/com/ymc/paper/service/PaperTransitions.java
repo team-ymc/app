@@ -40,15 +40,29 @@ public class PaperTransitions {
     /**
      * 파싱 요청 발행에 성공한 뒤의 {@code UPLOADED → PROCESSING}. 별도 트랜잭션으로 커밋한다.
      *
+     * <p>CAS가 0 row면 재조회해 분기한다 — terminal이면 빠른 결과가 먼저 온 정상 경합이라
+     * 그 상태를 그대로 돌려주고(5xx 아님), 그 외는 예상하지 못한 상태라 예외를 던진다 (spec §3).
+     *
      * <p>이 커밋이 실패하면 레코드는 {@code UPLOADED}에 남고 파싱은 진행된다 — ADR-001 §5가 문서화한
      * MVP 갭이라 복구하지 않는다.
      */
     @Transactional
     public PaperStatusView markProcessing(UUID paperId) {
-        Paper paper = paperRepository.findById(paperId).orElseThrow(
+        if (paperRepository.markProcessing(paperId, Instant.now()) == 1) {
+            return PaperStatusView.from(reload(paperId));
+        }
+        Paper paper = reload(paperId);
+        if (paper.getStatus().isTerminal()) {
+            return PaperStatusView.from(paper);   // 빠른 결과 선도착 — 정상 경합
+        }
+        throw new IllegalStateException(
+                "UPLOADED가 아닌 상태에서 PROCESSING 전이를 시도했습니다: paperId=%s, status=%s"
+                        .formatted(paperId, paper.getStatus()));
+    }
+
+    private Paper reload(UUID paperId) {
+        return paperRepository.findById(paperId).orElseThrow(
                 () -> new IllegalStateException("전이 직전에 사라진 논문입니다: " + paperId));
-        paper.markProcessing(Instant.now());
-        return PaperStatusView.from(paper);
     }
 
     /**

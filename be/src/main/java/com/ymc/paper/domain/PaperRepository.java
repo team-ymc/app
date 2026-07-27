@@ -42,6 +42,20 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     int markUploaded(@Param("id") UUID id, @Param("now") Instant now);
 
     /**
+     * 파싱 요청 발행 후의 {@code UPLOADED → PROCESSING}. 빠른 결과가 이미 terminal로
+     * 전이시켰으면 0을 받는다 — 호출자가 재조회해 분기한다 (spec §3).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.status = com.ymc.paper.domain.PaperStatus.PROCESSING,
+                   p.updatedAt = :now
+             where p.id = :id
+               and p.status = com.ymc.paper.domain.PaperStatus.UPLOADED
+            """)
+    int markProcessing(@Param("id") UUID id, @Param("now") Instant now);
+
+    /**
      * 결과 수신 시의 {@code UPLOADED | PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
      *
      * <p>{@code UPLOADED}를 포함하는 이유: request 발행 후 PROCESSING 커밋 전에 결과가 도착하거나
