@@ -42,11 +42,10 @@ class PaperTest {
         }
 
         @Test
-        void register는_uploads_ownerId_paperId_형식의_fileKey를_만든다() {
-            UUID ownerId = UUID.randomUUID();
-            Paper paper = Paper.register(ownerId, "a.pdf", Instant.now());
+        void register는_uploads_paperId_original_형식의_fileKey를_만든다() {
+            Paper paper = Paper.register(UUID.randomUUID(), "a.pdf", Instant.now());
             assertThat(paper.getFileKey())
-                    .isEqualTo("uploads/%s/%s.pdf".formatted(ownerId, paper.getId()));
+                    .isEqualTo("uploads/%s/original.pdf".formatted(paper.getId()));
         }
 
         @Test

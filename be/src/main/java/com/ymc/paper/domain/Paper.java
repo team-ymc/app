@@ -33,8 +33,13 @@ import lombok.Getter;
                 columnNames = {"owner_id", "filename"}))
 public class Paper {
 
-    /** 계약(openapi.yaml `PaperCreated.fileKey`)의 형식 — uploads/{ownerId}/{paperId}.pdf (ADR-002). */
-    private static final String FILE_KEY_FORMAT = "uploads/%s/%s.pdf";
+    /**
+     * 원본 PDF의 S3 key 형식 — uploads/{paperId}/original.pdf.
+     * 형식은 계약이 아니라 BE 저장소 내부 구현이다 — AI는 메시지의 fileKey를 그대로 GetObject에
+     * 쓴다 (contracts/backend-ai/messaging.yml `ParseRequest.fileKey`). 구형 키 row는 저장된 값을
+     * 그대로 발행하므로 마이그레이션하지 않는다 (spec §1 역할 구분).
+     */
+    private static final String FILE_KEY_FORMAT = "uploads/%s/original.pdf";
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -74,7 +79,7 @@ public class Paper {
         this.id = id;
         this.ownerId = ownerId;
         this.filename = filename;
-        this.fileKey = FILE_KEY_FORMAT.formatted(ownerId, id);
+        this.fileKey = FILE_KEY_FORMAT.formatted(id);
         this.status = PaperStatus.UPLOAD_PENDING;
         this.createdAt = now;
         this.updatedAt = now;
