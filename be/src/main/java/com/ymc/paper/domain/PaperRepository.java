@@ -10,8 +10,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 경쟁이 실재하는 두 전이는 조건부 UPDATE(CAS)로 판정한다 — 변경된 row가 1일 때만 후속 동작을 진행한다 (design D2).
- * 나머지 전이·불변식은 {@link Paper}의 메서드가 갖는다.
+ * 상태 전이는 전부 조건부 UPDATE(CAS)로 판정한다 — 변경된 row가 1일 때만 후속 동작을 진행한다 (spec §3).
+ * 동시 complete·결과 선도착·중복 수신이 실재하는 전이라 load-modify-save로는 lost update를 막을 수 없다.
+ * {@link Paper}에는 생성 불변식만 남는다.
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
