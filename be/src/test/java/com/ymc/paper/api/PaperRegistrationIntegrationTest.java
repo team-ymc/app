@@ -62,7 +62,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
         JsonNode body = readBody(result);
         UUID paperId = UUID.fromString(body.get("paperId").asText());
 
-        // fileKey는 계약 형식 그대로
+        // 신규 fileKey 형식 — uploads/{paperId}/original.pdf (BE 내부 형식, 계약 아님)
         assertThat(body.get("fileKey").asText()).isEqualTo("uploads/" + paperId + "/original.pdf");
 
         // 레코드가 실제로 UPLOAD_PENDING으로 저장됐다
