@@ -10,8 +10,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 경쟁이 실재하는 두 전이는 조건부 UPDATE(CAS)로 판정한다 — 변경된 row가 1일 때만 후속 동작을 진행한다 (design D2).
- * 나머지 전이·불변식은 {@link Paper}의 메서드가 갖는다.
+ * 상태 전이는 전부 조건부 UPDATE(CAS)로 판정한다 — 변경된 row가 1일 때만 후속 동작을 진행한다 (spec §3).
+ * 동시 complete·결과 선도착·중복 수신이 실재하는 전이라 load-modify-save로는 lost update를 막을 수 없다.
+ * {@link Paper}에는 생성 불변식만 남는다.
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
@@ -42,11 +43,28 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     int markUploaded(@Param("id") UUID id, @Param("now") Instant now);
 
     /**
-     * 결과 수신 시의 {@code PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
+     * 파싱 요청 발행 후의 {@code UPLOADED → PROCESSING}. 빠른 결과가 이미 terminal로
+     * 전이시켰으면 0을 받는다 — 호출자가 재조회해 분기한다 (spec §3).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.status = com.ymc.paper.domain.PaperStatus.PROCESSING,
+                   p.updatedAt = :now
+             where p.id = :id
+               and p.status = com.ymc.paper.domain.PaperStatus.UPLOADED
+            """)
+    int markProcessing(@Param("id") UUID id, @Param("now") Instant now);
+
+    /**
+     * 결과 수신 시의 {@code UPLOADED | PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
+     *
+     * <p>{@code UPLOADED}를 포함하는 이유: request 발행 후 PROCESSING 커밋 전에 결과가 도착하거나
+     * BE가 죽는 경합을 흡수한다 (spec §3, ADR-002 Follow-ups).
      *
      * @param terminal  {@code COMPLETED} 또는 {@code FAILED}
      * @param errorCode 실패 코드. {@code COMPLETED}면 null
-     * @return 변경된 row 수 (0이면 이미 전이됐거나 PROCESSING이 아님 — 경고 로그 후 소비)
+     * @return 변경된 row 수 (0이면 이미 terminal이거나 진행 전 상태 — 경고 로그 후 소비)
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -55,7 +73,8 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                    p.errorCode = :errorCode,
                    p.updatedAt = :now
              where p.id = :id
-               and p.status = com.ymc.paper.domain.PaperStatus.PROCESSING
+               and p.status in (com.ymc.paper.domain.PaperStatus.UPLOADED,
+                                com.ymc.paper.domain.PaperStatus.PROCESSING)
             """)
     int markParsed(
             @Param("id") UUID id,

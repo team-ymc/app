@@ -1,12 +1,9 @@
 package com.ymc.paper.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -42,11 +39,10 @@ class PaperTest {
         }
 
         @Test
-        void register는_uploads_ownerId_paperId_형식의_fileKey를_만든다() {
-            UUID ownerId = UUID.randomUUID();
-            Paper paper = Paper.register(ownerId, "a.pdf", Instant.now());
+        void register는_uploads_paperId_original_형식의_fileKey를_만든다() {
+            Paper paper = Paper.register(UUID.randomUUID(), "a.pdf", Instant.now());
             assertThat(paper.getFileKey())
-                    .isEqualTo("uploads/%s/%s.pdf".formatted(ownerId, paper.getId()));
+                    .isEqualTo("uploads/%s/original.pdf".formatted(paper.getId()));
         }
 
         @Test
@@ -63,37 +59,6 @@ class PaperTest {
         void rejectsBlankFilename() {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> Paper.register(OWNER_ID, "   ", NOW));
-        }
-    }
-
-    @Nested
-    @DisplayName("markProcessing")
-    class MarkProcessing {
-
-        @Test
-        @DisplayName("UPLOADED에서만 PROCESSING으로 전이하고 updatedAt을 전이 시각으로 갱신한다")
-        void transitionsFromUploaded() {
-            Paper paper = uploaded();
-            Instant transitionedAt = NOW.plus(5, ChronoUnit.MINUTES);
-
-            paper.markProcessing(transitionedAt);
-
-            assertThat(paper.getStatus()).isEqualTo(PaperStatus.PROCESSING);
-            assertThat(paper.getUpdatedAt()).isEqualTo(transitionedAt);
-            assertThat(paper.getCreatedAt()).isEqualTo(NOW);
-        }
-
-        @ParameterizedTest(name = "{0}에서는 PROCESSING으로 전이할 수 없다")
-        @EnumSource(
-                value = PaperStatus.class,
-                names = "UPLOADED",
-                mode = EnumSource.Mode.EXCLUDE)
-        @DisplayName("UPLOADED가 아닌 상태에서의 전이는 거부한다")
-        void rejectsTransitionFromNonUploaded(PaperStatus status) {
-            Paper paper = paperWith(status);
-
-            assertThatIllegalStateException().isThrownBy(() -> paper.markProcessing(NOW));
-            assertThat(paper.getStatus()).isEqualTo(status);
         }
     }
 
@@ -126,20 +91,5 @@ class PaperTest {
         void nonTerminalStatuses(PaperStatus status) {
             assertThat(status.isTerminal()).isFalse();
         }
-    }
-
-    /** UPLOAD_PENDING → UPLOADED는 CAS(repository) 몫이라 엔티티 메서드가 없다 — 테스트에선 리플렉션으로 세운다. */
-    private static Paper uploaded() {
-        return paperWith(PaperStatus.UPLOADED);
-    }
-
-    private static Paper paperWith(PaperStatus status) {
-        Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
-        assertThatCode(() -> {
-            var field = Paper.class.getDeclaredField("status");
-            field.setAccessible(true);
-            field.set(paper, status);
-        }).doesNotThrowAnyException();
-        return paper;
     }
 }

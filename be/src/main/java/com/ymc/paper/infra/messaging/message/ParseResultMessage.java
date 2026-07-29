@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.ymc.paper.domain.PaperStatus;
 
 /**
- * contracts/schema/parse-result.schema.json 대응. BE가 읽는 것은 envelope뿐이다 (design D7).
+ * project-docs/contracts/backend-ai/messaging.yml `ParseResult` 대응. BE가 읽는 것은 envelope뿐이다 (design D7).
  *
  * <p>{@code result}는 역직렬화만 하고 해석·저장하지 않는다 — 본문 구조는 AI 소유이며 미확정이다.
  * 필드를 들여다보지 않겠다는 뜻으로 {@link JsonNode}로 받는다.

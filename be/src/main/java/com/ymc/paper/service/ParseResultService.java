@@ -11,7 +11,7 @@ import com.ymc.paper.domain.PaperStatus;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 파싱 결과 반영 — {@code PROCESSING → COMPLETED | FAILED} (design D2·D7).
+ * 파싱 결과 반영 — {@code UPLOADED | PROCESSING → COMPLETED | FAILED} (spec §3).
  *
  * <p>상태의 단일 writer는 BE다. 전이는 조건부 UPDATE라 중복 수신·이미 terminal인 레코드는 0 row가 되고,
  * 그때는 경고만 남기고 정상 소비한다 — 재시도해도 결과가 달라지지 않는다.
@@ -37,9 +37,8 @@ public class ParseResultService {
             return;
         }
 
-        // 알 수 없는 paperId이거나 이미 전이된(=PROCESSING이 아닌) 레코드. 중복 수신이거나,
-        // complete의 PROCESSING 커밋이 실패해 UPLOADED에 머문 경우다 (design D6의 의도된 갭).
-        // 어느 쪽이든 재전달해도 달라지지 않으므로 관측만 하고 정상 소비한다.
-        log.warn("파싱 결과 미반영, PROCESSING 아님: paperId={}, status={}", paperId, terminal);
+        // 알 수 없는 paperId이거나 이미 terminal인 레코드(중복 수신 등). 재전달해도
+        // 달라지지 않으므로 관측만 하고 정상 소비한다.
+        log.warn("파싱 결과 미반영, 이미 terminal이거나 진행 전: paperId={}, status={}", paperId, terminal);
     }
 }

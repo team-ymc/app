@@ -41,6 +41,20 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("UPLOADED 상태의 결과도 terminal로 전이된다 (PROCESSING 커밋 전 선도착 흡수)")
+    void appliesResultArrivingBeforeProcessing() {
+        Paper paper = givenPendingPaper("early-result.pdf");
+        paperTransitions.markUploaded(paper.getId());
+
+        publishParseResult("""
+                {"paperId": "%s", "status": "COMPLETED"}
+                """.formatted(paper.getId()));
+
+        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
+        assertThat(reload(paper.getId()).getErrorCode()).isNull();
+    }
+
+    @Test
     @DisplayName("파싱 성공 수신: result 본문이 있어도 해석하지 않고 상태만 전이한다")
     void ignoresResultBody() {
         Paper paper = givenProcessingPaper("with-result.pdf");

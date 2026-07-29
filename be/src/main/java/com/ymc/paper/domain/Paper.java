@@ -20,9 +20,9 @@ import lombok.Getter;
  * <p>id는 DB가 아니라 BE가 insert 전에 만든다 — fileKey가 id를 포함해야 하고(design D5),
  * presigned URL도 insert 전에 발급 대상 key를 알아야 하기 때문이다.
  *
- * <p>{@code UPLOAD_PENDING → UPLOADED}와 {@code PROCESSING → terminal}은 여기 메서드가 아니라
- * {@link PaperRepository}의 조건부 UPDATE로 한다 — 동시 요청·중복 수신이 실재하는 전이라
- * load-modify-save로는 lost update를 막을 수 없다 (design D2). 경쟁이 없는 전이만 여기 둔다.
+ * <p>상태 전이는 전부 {@link PaperRepository}의 조건부 UPDATE(CAS)로 한다 — 동시 complete·
+ * 결과 선도착·중복 수신이 실재하는 전이라 load-modify-save로는 lost update를 막을 수 없다
+ * (spec §3). 엔티티에는 생성 불변식만 남는다.
  */
 @Getter
 @Entity
@@ -33,8 +33,13 @@ import lombok.Getter;
                 columnNames = {"owner_id", "filename"}))
 public class Paper {
 
-    /** 계약(openapi.yaml `PaperCreated.fileKey`)의 형식 — uploads/{ownerId}/{paperId}.pdf (ADR-002). */
-    private static final String FILE_KEY_FORMAT = "uploads/%s/%s.pdf";
+    /**
+     * 원본 PDF의 S3 key 형식 — uploads/{paperId}/original.pdf.
+     * 형식은 계약이 아니라 BE 저장소 내부 구현이다 — AI는 메시지의 fileKey를 그대로 GetObject에
+     * 쓴다 (contracts/backend-ai/messaging.yml `ParseRequest.fileKey`). 구형 키 row는 저장된 값을
+     * 그대로 발행하므로 마이그레이션하지 않는다 (spec §1 역할 구분).
+     */
+    private static final String FILE_KEY_FORMAT = "uploads/%s/original.pdf";
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -74,7 +79,7 @@ public class Paper {
         this.id = id;
         this.ownerId = ownerId;
         this.filename = filename;
-        this.fileKey = FILE_KEY_FORMAT.formatted(ownerId, id);
+        this.fileKey = FILE_KEY_FORMAT.formatted(id);
         this.status = PaperStatus.UPLOAD_PENDING;
         this.createdAt = now;
         this.updatedAt = now;
@@ -93,19 +98,5 @@ public class Paper {
             throw new IllegalArgumentException("filename은 비어 있을 수 없습니다.");
         }
         return new Paper(UUID.randomUUID(), ownerId, filename, now);
-    }
-
-    /**
-     * 파싱 요청 발행 직후의 전이. 발행에 성공한 호출자 한 명만 도달하므로 경쟁이 없다 (design D6).
-     *
-     * @throws IllegalStateException 현재 상태가 {@code UPLOADED}가 아닐 때
-     */
-    public void markProcessing(Instant now) {
-        if (status != PaperStatus.UPLOADED) {
-            throw new IllegalStateException(
-                    "UPLOADED에서만 PROCESSING으로 전이할 수 있습니다. 현재 상태=" + status);
-        }
-        this.status = PaperStatus.PROCESSING;
-        this.updatedAt = now;
     }
 }
