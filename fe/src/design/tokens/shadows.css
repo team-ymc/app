@@ -1,0 +1,5 @@
+:root{
+--shadow-paper:0 12px 32px -14px rgba(38,27,23,0.32);
+--shadow-menu:0 4px 16px -4px rgba(38,27,23,0.24);
+--shadow-focus:0 0 0 3px var(--color-primary-subtle)
+}
