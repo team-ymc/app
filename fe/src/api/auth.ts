@@ -1,22 +1,24 @@
 // 인증 연동 단일 접점 — api.js와 같은 결. access token은 이 모듈 메모리에만 존재한다
 // (URL·스토리지 노출 금지, design §3). 표현 층과 분리 — 진짜 FE가 이 모듈을 승계한다.
 
-let accessToken = null;
-let refreshPromise = null;
-let sessionExpiredHandler = null;
+import type { AuthUser } from './types';
+
+let accessToken: string | null = null;
+let refreshPromise: Promise<AuthUser | null> | null = null;
+let sessionExpiredHandler: (() => void) | null = null;
 
 /** 세션이 죽었을 때(재갱신 실패) 한 곳에서 비로그인 전환을 처리하게 한다. */
-export function onSessionExpired(handler) {
+export function onSessionExpired(handler: () => void): void {
   sessionExpiredHandler = handler;
 }
 
 /** 앱 시작 시 1회 — refresh 쿠키로 세션 복원. 성공: user, 실패(비로그인): null. */
-export function bootstrap() {
+export function bootstrap(): Promise<AuthUser | null> {
   return doRefresh();
 }
 
 // 동시 401들이 refresh를 중복 호출하지 않게 진행 중 Promise를 공유한다 (single-flight).
-function doRefresh() {
+function doRefresh(): Promise<AuthUser | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
@@ -42,7 +44,7 @@ function doRefresh() {
  * 먼저 도착한 쪽이 이기고 나머지는 정리된다. 팝업 차단 시 전체 리다이렉트 폴백.
  * 반환값은 리스너 해제 함수.
  */
-export function login({ onComplete }) {
+export function login({ onComplete }: { onComplete: (user: AuthUser | null, error: string | null) => void }): () => void {
   const url = '/api/oauth2/authorization/google';
   const popup = window.open(url, 'ymc-auth', 'width=480,height=640');
   if (!popup) {
@@ -50,7 +52,7 @@ export function login({ onComplete }) {
     return () => {};
   }
 
-  let channel = null;
+  let channel: BroadcastChannel | null = null;
   let done = false;
 
   const cleanup = () => {
@@ -61,7 +63,7 @@ export function login({ onComplete }) {
     }
   };
 
-  const finish = async (error) => {
+  const finish = async (error: string | null) => {
     if (done) return;
     done = true;
     cleanup();
@@ -73,7 +75,7 @@ export function login({ onComplete }) {
     onComplete(user, user ? null : 'refresh_failed');
   };
 
-  const onWindowMessage = (event) => {
+  const onWindowMessage = (event: MessageEvent) => {
     if (event.origin !== window.location.origin) return;
     if (!event.data || event.data.type !== 'auth:complete') return;
     finish(event.data.error ?? null);
@@ -90,7 +92,7 @@ export function login({ onComplete }) {
   return cleanup;
 }
 
-export async function logout() {
+export async function logout(): Promise<void> {
   try {
     await fetch('/api/auth/logout', { method: 'POST' });
   } finally {
@@ -103,7 +105,7 @@ export async function logout() {
  * 그래도 401이면 원 응답을 돌려주고 onSessionExpired로 통지한다.
  * S3 presigned 요청(uploadToS3)에는 쓰지 않는다.
  */
-export async function authFetch(url, opts = {}) {
+export async function authFetch(url: string, opts: RequestInit = {}): Promise<Response> {
   const res = await doFetch(url, opts);
   if (res.status !== 401) return res;
   const user = await doRefresh();
@@ -114,14 +116,14 @@ export async function authFetch(url, opts = {}) {
   return doFetch(url, opts);
 }
 
-function doFetch(url, opts) {
-  const headers = { ...(opts.headers || {}) };
+function doFetch(url: string, opts: RequestInit): Promise<Response> {
+  const headers: Record<string, string> = { ...(opts.headers as Record<string, string> || {}) };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   return fetch(url, { ...opts, headers });
 }
 
 /** 테스트 전용 — 모듈 상태 초기화. */
-export function _resetForTest() {
+export function _resetForTest(): void {
   accessToken = null;
   refreshPromise = null;
   sessionExpiredHandler = null;

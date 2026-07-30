@@ -3,7 +3,7 @@
 // style="{{ x }}"→style={x} 로 기계적 전사(DESIGN.md D1~D7 표).
 // 상태 모델은 DESIGN.md D4.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPaper, uploadToS3, completeUpload, getStatus, getDownloadUrl, listPapers } from './api';
+import { createPaper, uploadToS3, completeUpload, getStatus, getDownloadUrl, listPapers } from './api/papers';
 import ChatPanel from './chat/ChatPanel.jsx';
 
 // 행 표시는 서버 status가 정한다 (FT-002 Story 3 매핑, DESIGN.md D4).

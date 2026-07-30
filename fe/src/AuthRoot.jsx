@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import App from './App.jsx';
 import Landing from './Landing.jsx';
-import { bootstrap, logout, onSessionExpired } from './auth';
+import { bootstrap, logout, onSessionExpired } from './api/auth';
 
 export default function AuthRoot() {
   const [auth, setAuth] = useState({ status: 'loading', user: null });

@@ -2,7 +2,7 @@
 // 따르고(api.js·auth.js), 인증은 authFetch(Bearer + 401 refresh 재시도)를 그대로 탄다.
 // POST + 인증 헤더 때문에 EventSource가 아니라 fetch ReadableStream이다 (계약 명시).
 
-import { authFetch } from '../auth';
+import { authFetch } from '../api/auth';
 import { createSseParser } from './sseParser';
 
 /**

@@ -1,6 +1,6 @@
 // 랜딩(WF-001/002) + 인증 모달(WF-003). 와이어프레임 수준 구현 — 시안 확정 시 표현만 교체한다.
 import { useRef, useState } from 'react';
-import { login } from './auth';
+import { login } from './api/auth';
 
 const center = {
   minHeight: '100vh', display: 'flex', flexDirection: 'column',
