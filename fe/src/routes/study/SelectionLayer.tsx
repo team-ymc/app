@@ -6,7 +6,7 @@
 // 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated) | askChoice.
 // translating/translated/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
 // 버튼 클릭으로 브라우저 selection이 collapse되어도(mousedown 기본 동작) 캡처값은 영향받지 않는다.
-import { useEffect, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { ArrowBendUpLeft, ChatCircleText, NotePencil, Translate, X } from '@phosphor-icons/react';
 import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
@@ -37,6 +37,7 @@ function truncate(text: string, n: number): string {
 export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
+  const popupRef = useRef<HTMLDivElement>(null);
 
   // 선택이 생기면 toolbar로, 사라지면(그리고 지금 toolbar 단계일 때만) idle로 — translating 이후
   // 단계는 캡처값으로 독립 운영되므로 브라우저 selection 변화에 영향받지 않는다.
@@ -65,6 +66,40 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     return () => el.removeEventListener('scroll', handleScroll);
   }, [viewerRef]);
 
+  // 바깥 클릭 dismiss — 목업 handleDocMouseDown(L360-370) 1:1 이식. 팝업이 열려 있을 때만 등록한다.
+  // 판별 순서(목업과 동일): 팝업 내부 클릭 무시 → 뷰어 내부 클릭 무시(새 선택은 useTextSelection이
+  // 처리) → 그 외는 dismiss. 열려 있던 모든 phase(toolbar/translating/translated/askChoice)를
+  // idle로 되돌리고, 기존 닫기 버튼과 동일하게 clear()로 원문 읽기 상태를 복원한다.
+  useEffect(() => {
+    if (layer.phase === 'idle') return;
+    const { clear } = layer;
+    function handleDocMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (popupRef.current && popupRef.current.contains(target)) return;
+      if (viewerRef.current && viewerRef.current.contains(target)) return;
+      clear();
+      setLayer({ phase: 'idle' });
+    }
+    document.addEventListener('mousedown', handleDocMouseDown, true);
+    return () => document.removeEventListener('mousedown', handleDocMouseDown, true);
+  }, [layer, viewerRef]);
+
+  // 번역 요청 — 'translating' 단계 진입에 반응해 실행하고, effect cleanup에서 cancelled 플래그를
+  // 세운다. 팝업을 일찍 닫거나(바깥 클릭 포함) 다른 선택으로 새 번역을 시작해 layer가 바뀌면 cleanup이
+  // 먼저 실행되므로, 뒤늦게 도착하는 이전 요청의 응답이 최신 상태를 덮어쓰지 않는다.
+  useEffect(() => {
+    if (layer.phase !== 'translating') return;
+    const { text, rect, clear } = layer;
+    let cancelled = false;
+    translateSelection(text).then(({ translation }) => {
+      if (cancelled) return;
+      setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, translation } : prev));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [layer]);
+
   if (layer.phase === 'idle') return null;
 
   const container = viewerRef.current?.getBoundingClientRect() ?? new DOMRect();
@@ -73,9 +108,6 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     if (layer.phase !== 'toolbar') return;
     const { text, rect, clear } = layer;
     setLayer({ phase: 'translating', text, rect, clear });
-    translateSelection(text).then(({ translation }) => {
-      setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, translation } : prev));
-    });
   }
 
   function handleAsk() {
@@ -103,6 +135,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     const pos = computeToolbarPosition(layer.rect, container, TOOLBAR_POPUP_SIZE);
     return (
       <div
+        ref={popupRef}
         style={{
           position: 'absolute',
           top: pos.top,
@@ -127,6 +160,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     const pos = computeToolbarPosition(layer.rect, container, TRANSLATION_POPUP_SIZE);
     return (
       <div
+        ref={popupRef}
         style={{
           position: 'absolute',
           top: pos.top,
@@ -184,6 +218,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
   const pos = computeToolbarPosition(layer.rect, container, ASK_POPUP_SIZE);
   return (
     <div
+      ref={popupRef}
       style={{
         position: 'absolute',
         top: pos.top,
