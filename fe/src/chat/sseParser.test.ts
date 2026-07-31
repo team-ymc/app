@@ -3,7 +3,7 @@ import { createSseParser } from './sseParser';
 
 const enc = new TextEncoder();
 
-function frame(event, dataObj) {
+function frame(event: string, dataObj: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(dataObj)}\n\n`;
 }
 
@@ -27,7 +27,7 @@ describe('sseParser — 계약 x-stream-handling.frontend의 파싱 규칙', () 
     const cut = 10; // "event: mes" 중간
     expect(p.push(enc.encode(whole.slice(0, cut)))).toEqual([]);
     const events = p.push(enc.encode(whole.slice(cut)));
-    expect(events[0].data.content).toBe('끝');
+    expect((events[0].data as { content: string }).content).toBe('끝');
   });
 
   it('한글 UTF-8 바이트가 chunk 중간에서 잘려도 깨지지 않는다', () => {
@@ -39,7 +39,7 @@ describe('sseParser — 계약 x-stream-handling.frontend의 파싱 규칙', () 
     expect(hanFirstByte).toBeGreaterThan(-1);
     expect(p.push(bytes.slice(0, hanFirstByte + 1))).toEqual([]);
     const events = p.push(bytes.slice(hanFirstByte + 1));
-    expect(events[0].data.delta).toBe('한글');
+    expect((events[0].data as { delta: string }).delta).toBe('한글');
   });
 
   it('CRLF 줄 끝(\\r\\n)으로 온 frame도 파싱한다 (SSE 표준)', () => {
@@ -57,7 +57,7 @@ describe('sseParser — 계약 x-stream-handling.frontend의 파싱 규칙', () 
     const afterFirstCr = raw.indexOf('\r') + 1; // 첫 \r 바로 뒤(\n 앞)에서 분할
     expect(p.push(bytes.slice(0, afterFirstCr))).toEqual([]);
     const events = p.push(bytes.slice(afterFirstCr));
-    expect(events[0].data.delta).toBe('y');
+    expect((events[0].data as { delta: string }).delta).toBe('y');
   });
 
   it('heartbeat frame도 그대로 반환한다 (무시는 상위 계층 몫)', () => {

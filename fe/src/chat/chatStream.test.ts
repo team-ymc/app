@@ -3,7 +3,7 @@ import { streamChatMessage } from './chatStream';
 
 const enc = new TextEncoder();
 
-function sseBody(...frames) {
+function sseBody(...frames: string[]): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
       for (const f of frames) controller.enqueue(enc.encode(f));
@@ -12,24 +12,24 @@ function sseBody(...frames) {
   });
 }
 
-function frame(event, dataObj) {
+function frame(event: string, dataObj: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(dataObj)}\n\n`;
 }
 
-function mockStreamFetch(frames, { status = 200 } = {}) {
-  global.fetch = vi.fn().mockResolvedValue({
+function mockStreamFetch(frames: string[], { status = 200 } = {}) {
+  globalThis.fetch = vi.fn().mockResolvedValue({
     ok: status === 200, status, body: sseBody(...frames),
     json: async () => ({}),
-  });
+  }) as unknown as typeof fetch;
 }
 
-async function collect(overrides = {}) {
-  const actions = [];
+async function collect(overrides: Record<string, unknown> = {}) {
+  const actions: unknown[] = [];
   await streamChatMessage({
     paperId: 'p-1', sessionId: null, clientMessageId: 'c-1', content: '질문',
     onEvent: (a) => actions.push(a), ...overrides,
-  });
-  return actions;
+  } as Parameters<typeof streamChatMessage>[0]);
+  return actions as { type: string; [key: string]: unknown }[];
 }
 
 describe('chatStream — 스트림 소비와 종결 판정', () => {
@@ -50,7 +50,8 @@ describe('chatStream — 스트림 소비와 종결 판정', () => {
   it('요청 바디·헤더가 계약과 일치한다 (Accept, sessionId 생략)', async () => {
     mockStreamFetch([frame('message.completed', { type: 'message.completed', content: 'x', status: 'COMPLETED' })]);
     await collect();
-    const [url, opts] = global.fetch.mock.calls[0];
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const [url, opts] = mockFetch.mock.calls[0];
     expect(url).toBe('/api/papers/p-1/chat/messages');
     expect(opts.headers.Accept).toBe('text/event-stream');
     const body = JSON.parse(opts.body);
@@ -76,25 +77,25 @@ describe('chatStream — 스트림 소비와 종결 판정', () => {
   });
 
   it('409 DUPLICATE_MESSAGE: duplicate 액션으로 콜백한다', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false, status: 409, body: null,
       json: async () => ({ code: 'DUPLICATE_MESSAGE', message: '중복', sessionId: 's-9', messageId: 'm-9', status: 'GENERATING' }),
-    });
+    }) as unknown as typeof fetch;
     const actions = await collect();
     expect(actions.at(-1)).toMatchObject({ type: 'duplicate', sessionId: 's-9', status: 'GENERATING' });
   });
 
   it('그 외 HTTP 오류: code를 담은 확인된 실패로 콜백한다', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false, status: 409, body: null,
       json: async () => ({ code: 'CHAT_RUN_IN_PROGRESS', message: '이미 생성 중' }),
-    });
+    }) as unknown as typeof fetch;
     const actions = await collect();
     expect(actions.at(-1)).toMatchObject({ type: 'failed', confirmed: true, code: 'CHAT_RUN_IN_PROGRESS' });
   });
 
   it('네트워크 예외: 결과 미상 실패로 콜백한다', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new TypeError('network error'));
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('network error')) as unknown as typeof fetch;
     const actions = await collect();
     expect(actions.at(-1)).toMatchObject({ type: 'failed', confirmed: false });
   });

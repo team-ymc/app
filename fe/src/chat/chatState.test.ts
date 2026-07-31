@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { initialChatState, chatReducer } from './chatState';
+import { describe, it, test, expect } from 'vitest';
+import { initialChatState, chatReducer, type ChatAction } from './chatState';
 
-function reduceAll(actions) {
+function reduceAll(actions: ChatAction[]) {
   return actions.reduce(chatReducer, initialChatState);
 }
 
 describe('chatState — 스트림 이벤트를 화면 상태로', () => {
-  const send = { type: 'send', clientMessageId: 'c-1', content: '질문' };
-  const started = { type: 'started', sessionId: 's-1', messageId: 'm-1' };
+  const send: ChatAction = { type: 'send', clientMessageId: 'c-1', content: '질문' };
+  const started: ChatAction = { type: 'started', sessionId: 's-1' };
 
   it('send: user 메시지와 GENERATING placeholder를 추가하고 입력을 잠근다', () => {
     const s = reduceAll([send]);
@@ -49,7 +49,7 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
 
   it('409 DUPLICATE(GENERATING): 안내로 교체하고 sessionId를 회수한다', () => {
     const s = reduceAll([send,
-      { type: 'duplicate', sessionId: 's-9', messageId: 'm-9', status: 'GENERATING' }]);
+      { type: 'duplicate', sessionId: 's-9', status: 'GENERATING' }]);
     expect(s.sessionId).toBe('s-9');
     expect(s.messages[1].status).toBe('GENERATING');
     expect(s.streaming).toBe(false); // 스트림은 없다 — 완료를 받을 채널이 없음을 안내
@@ -63,5 +63,11 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     expect(s.messages).toHaveLength(2); // user·assistant 그대로, placeholder만 리셋
     expect(s.messages[1]).toMatchObject({ status: 'GENERATING', content: '' });
     expect(s.streaming).toBe(true);
+  });
+
+  test('reset은 초기 상태로 돌아간다', () => {
+    let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문' });
+    s = chatReducer(s, { type: 'reset' });
+    expect(s).toEqual(initialChatState);
   });
 });

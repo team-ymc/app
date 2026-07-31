@@ -2,13 +2,18 @@
 // 경계와 일치한다고 가정하지 않는다 — TextDecoder(stream)와 내부 버퍼가 경계를 흡수한다.
 // 줄 끝은 SSE 표준(LF·CRLF·CR)을 모두 허용한다 — 우리 BE는 LF지만 표준 방어다.
 
-export function createSseParser() {
+export interface SseFrame {
+  event: string;
+  data: unknown;
+}
+
+export function createSseParser(): { push(chunk: Uint8Array): SseFrame[] } {
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let eventName = 'message'; // SSE 기본 event 이름
-  let dataLines = [];
+  let dataLines: string[] = [];
 
-  function finishFrame() {
+  function finishFrame(): SseFrame | null {
     if (dataLines.length === 0) {
       eventName = 'message';
       return null;
@@ -20,7 +25,7 @@ export function createSseParser() {
     return { event: name, data: JSON.parse(data) };
   }
 
-  function handleLine(line) {
+  function handleLine(line: string): void {
     if (line.startsWith('event:')) {
       eventName = line.slice('event:'.length).trim();
     } else if (line.startsWith('data:')) {
@@ -31,9 +36,9 @@ export function createSseParser() {
 
   return {
     /** 바이트 chunk를 넣고, 이번 chunk로 완성된 frame들을 {event, data} 배열로 받는다. */
-    push(chunk) {
+    push(chunk: Uint8Array): SseFrame[] {
       buffer += decoder.decode(chunk, { stream: true });
-      const events = [];
+      const events: SseFrame[] = [];
       for (;;) {
         const lineEnd = /\r\n|\r|\n/.exec(buffer);
         if (!lineEnd) break;

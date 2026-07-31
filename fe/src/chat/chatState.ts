@@ -2,7 +2,33 @@
 // ChatPanel은 useReducer로 이것만 감싼다. pending은 "결과를 모르는 재전송" 대상이다:
 // 성공·확인된 실패에서 비우고, 스트림 중단(결과 미상)에서만 유지한다.
 
-export const initialChatState = {
+export type ChatMessageStatus = 'GENERATING' | 'COMPLETED' | 'FAILED'; // 계약 ChatMessageStatus
+
+export interface ChatMessage {
+  key: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status: ChatMessageStatus;
+  error: { code: string; message?: string; retryable: boolean } | null;
+}
+
+export interface ChatState {
+  sessionId: string | null;
+  messages: ChatMessage[];
+  streaming: boolean;
+  pending: { clientMessageId: string; content: string } | null;
+}
+
+export type ChatAction =
+  | { type: 'send'; clientMessageId: string; content: string; resend?: boolean }
+  | { type: 'started'; sessionId: string }
+  | { type: 'delta'; delta: string }
+  | { type: 'completed'; content: string }
+  | { type: 'failed'; confirmed: boolean; code: string; message?: string; retryable: boolean }
+  | { type: 'duplicate'; sessionId: string; status: ChatMessageStatus }
+  | { type: 'reset' }; // 새 대화(ask popup의 '새 대화에서') — initialChatState로 복귀
+
+export const initialChatState: ChatState = {
   sessionId: null,
   messages: [], // {key, role: 'user'|'assistant', content, status, error}
   streaming: false,
@@ -10,12 +36,12 @@ export const initialChatState = {
 };
 
 let keySeq = 0;
-function nextKey(prefix) {
+function nextKey(prefix: string): string {
   keySeq += 1;
   return `${prefix}-${keySeq}`;
 }
 
-export function chatReducer(state, action) {
+export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'send': {
       if (action.resend) {
@@ -80,12 +106,14 @@ export function chatReducer(state, action) {
         })),
       };
     }
+    case 'reset':
+      return initialChatState;
     default:
       return state;
   }
 }
 
-function updateLastAssistant(messages, update) {
+function updateLastAssistant(messages: ChatMessage[], update: (m: ChatMessage) => ChatMessage): ChatMessage[] {
   const lastIndex = messages.length - 1;
   return messages.map((m, i) => (i === lastIndex && m.role === 'assistant' ? update(m) : m));
 }
