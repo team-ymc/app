@@ -1,0 +1,23 @@
+.pt-markdown { font-family: var(--font-serif); color: var(--color-text-body); line-height: 1.8; }
+.pt-markdown h1, .pt-markdown h2, .pt-markdown h3 { color: var(--color-text-heading); line-height: 1.4; }
+.pt-markdown .katex-display { overflow-x: auto; padding: var(--space-xs) 0; }
+
+.pt-figure { margin: var(--space-lg) 0; }
+.pt-figure img {
+  display: block; max-width: 100%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-structural);
+  padding: var(--space-sm);
+  box-sizing: border-box;
+}
+.pt-figure img.pt-figure-broken { min-height: 80px; }
+.pt-figure figcaption {
+  margin-top: var(--space-xs); font-family: var(--font-sans);
+  font-size: 13px; color: var(--color-text-muted);
+}
+
+.pt-table-scroll { overflow-x: auto; margin: var(--space-md) 0; }
+.pt-markdown table { border-collapse: collapse; font-size: 14px; }
+.pt-markdown th, .pt-markdown td { border: 1px solid var(--color-border); padding: var(--space-xs) var(--space-sm); }
+.pt-markdown th { font-family: var(--font-sans); font-weight: 600; background: var(--color-bg-surface); }
