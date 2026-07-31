@@ -24,6 +24,15 @@ export function PaperMarkdown({ children }: { children: string }) {
           table(props) {
             return <div className="pt-table-scroll"><table {...props} /></div>;
           },
+          p({ node, children, ...props }) {
+            const kids = node?.children?.filter(
+              (c) => !(c.type === 'text' && /^\s*$/.test(c.value)),
+            );
+            if (kids?.length === 1 && kids[0].type === 'element' && kids[0].tagName === 'img') {
+              return <>{children}</>;
+            }
+            return <p {...props}>{children}</p>;
+          },
         }}
       >
         {children}

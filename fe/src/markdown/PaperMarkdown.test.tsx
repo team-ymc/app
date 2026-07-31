@@ -22,5 +22,6 @@ describe('PaperMarkdown', () => {
     const { container } = render(<PaperMarkdown>{'![그림 1: 캡션](/x.svg)'}</PaperMarkdown>);
     expect(container.querySelector('figure.pt-figure img')?.getAttribute('src')).toBe('/x.svg');
     expect(container.querySelector('figcaption')?.textContent).toBe('그림 1: 캡션');
+    expect(container.querySelector('p figure')).toBeNull(); // figure가 p 안에 있으면 안 된다
   });
 });
