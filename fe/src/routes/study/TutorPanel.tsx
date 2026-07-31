@@ -111,6 +111,9 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   // ask popup "새 채팅"(mode:'new') 지원 — 같은 pendingContext 객체에 대해 한 번만 reset한다.
   // 참조 구현(mockup newConversation의 clearInterval)처럼 진행 중 스트림부터 끊고 reset한다 —
   // 그러지 않으면 이전 스트림의 delta/completed가 초기화된 state에 뒤늦게 dispatch될 수 있다.
+  // SelectionLayer의 "AI에게 질문"이 pendingContext를 세팅하면 입력창에 포커스한다(FT-006 Story 4).
+  // StudyPage가 같은 이벤트 핸들러에서 collapsed도 함께 해제하므로, 이 effect가 실행되는 시점에는
+  // 이미 펼쳐진 상태로 커밋되어 textareaRef가 존재한다.
   useEffect(() => {
     setContextTooltipOpen(false);
     if (pendingContext && pendingContext.mode === 'new' && lastResetContextRef.current !== pendingContext) {
@@ -118,6 +121,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
       dispatch({ type: 'reset' });
     }
     lastResetContextRef.current = pendingContext;
+    if (pendingContext) textareaRef.current?.focus();
   }, [pendingContext]);
 
   function run(clientMessageId: string, content: string, resend: boolean) {

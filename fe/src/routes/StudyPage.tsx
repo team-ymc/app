@@ -1,7 +1,7 @@
 // 이식: project-docs/design/v1/Paper Study Page.dc.html — R1 top bar / R2 work area / R3 TOC nav rail /
-// R4 Paper viewer / Resizable splitter / R5 AI chat panel(TutorPanel, Task 13). Selection/Ask/Translation
-// popup은 이번 태스크 범위 밖(Task 14 소유) — pendingContext state는 여기서 배선만 하고 지금은 null로 둔다.
-// sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사 (플랜 공통 변환표, Task 9·10과 동일).
+// R4 Paper viewer / Resizable splitter / R5 AI chat panel(TutorPanel, Task 13) / Selection·Ask·Translation
+// popup(SelectionLayer, Task 14). sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사
+// (플랜 공통 변환표, Task 9·10과 동일).
 //
 // Night mode 토글: 이 목업 파일 자체에는 스위치 UI가 없다 (디자인 시스템 readme에서만 "Night Study Mode
 // toggle"로 언급). brief Step 3가 명시적으로 요구하는 기능이라 R1 우측 존에 아이콘 버튼을 새로 추가했다
@@ -15,6 +15,7 @@ import { IconButton } from '../design/components/IconButton';
 import { getStatus } from '../api/papers';
 import { getPaperContent } from '../markdown/paperContent';
 import { PaperViewer } from './study/PaperViewer';
+import { SelectionLayer } from './study/SelectionLayer';
 import { TocRail } from './study/TocRail';
 import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
 import { useScrollSpy } from './study/useScrollSpy';
@@ -76,7 +77,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  // Task 14(인라인 액션)의 "질문하기"가 채운다 — 지금은 항상 null (brief).
+  // SelectionLayer의 "AI에게 질문" → Ask popup 선택으로 채워진다 (FT-006 Story 4).
   const [pendingContext, setPendingContext] = useState<TutorPanelPendingContext | null>(null);
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +100,13 @@ function StudyPageContent({ paperId }: { paperId: string }) {
 
   function handleJump(blockId: string) {
     document.getElementById(blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // SelectionLayer의 Ask popup에서 "현재 채팅"/"새 채팅"을 고르면 호출된다 — pendingContext를 세팅하고
+  // 챗 패널이 접혀 있으면 펼친다(TutorPanel이 pendingContext 변화에 반응해 입력창에 포커스한다).
+  function handleAsk(text: string, mode: 'current' | 'new') {
+    setPendingContext({ text, mode });
+    setChatCollapsed(false);
   }
 
   function handleSplitterPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -245,9 +253,11 @@ function StudyPageContent({ paperId }: { paperId: string }) {
               minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
+              position: 'relative',
             }}
           >
             <PaperViewer blocks={blocks} containerRef={viewerRef} />
+            <SelectionLayer viewerRef={viewerRef} onAsk={handleAsk} />
           </div>
 
           {/* Resizable splitter */}
