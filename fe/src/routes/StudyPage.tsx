@@ -6,7 +6,7 @@
 // Night mode 토글: 이 목업 파일 자체에는 스위치 UI가 없다 (디자인 시스템 readme에서만 "Night Study Mode
 // toggle"로 언급). brief Step 3가 명시적으로 요구하는 기능이라 R1 우측 존에 아이콘 버튼을 새로 추가했다
 // (report에 기록) — 목업에 없는 요소이므로 기존 변환표 밖 판단.
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, User } from '@phosphor-icons/react';
@@ -80,7 +80,9 @@ function StudyPageContent({ paperId }: { paperId: string }) {
 
   const blocks = contentQuery.data?.blocks ?? [];
   const toc = contentQuery.data?.toc ?? [];
-  const tocOrder = toc.map((t) => t.blockId);
+  // toc.map()이 렌더마다 새 배열을 만들면 useScrollSpy의 effect deps가 매번 바뀌어
+  // IntersectionObserver가 불필요하게 재구축된다(스플리터 드래그 중 pointermove마다 리렌더되면 특히 심함) — 메모이즈.
+  const tocOrder = useMemo(() => toc.map((t) => t.blockId), [toc]);
   const activeId = useScrollSpy(viewerRef, tocOrder);
 
   useEffect(() => {
