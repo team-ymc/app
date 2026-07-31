@@ -9,6 +9,8 @@ import {
   NotePencil,
   SidebarSimple,
   PaperPlaneTilt,
+  Moon,
+  Sun,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -22,6 +24,8 @@ export const ICONS: Record<string, Icon> = {
   'note-pencil': NotePencil,
   'sidebar-simple': SidebarSimple,
   'paper-plane-tilt': PaperPlaneTilt,
+  moon: Moon,
+  sun: Sun,
 };
 
 export function iconComponent(kebab: string): Icon | undefined {

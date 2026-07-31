@@ -1,6 +1,32 @@
 .pt-markdown { font-family: var(--font-serif); color: var(--color-text-body); line-height: 1.8; }
-.pt-markdown h1, .pt-markdown h2, .pt-markdown h3 { color: var(--color-text-heading); line-height: 1.4; }
-.pt-markdown .katex-display { overflow-x: auto; padding: var(--space-xs) 0; }
+.pt-markdown h1, .pt-markdown h2, .pt-markdown h3, .pt-markdown h4 { color: var(--color-text-heading); margin: 0; }
+/* Task 12: Paper Study Page 목업 R4의 block.isHeading/isSubheading 값 그대로.
+   paperContent.classify()가 depth<=2를 'heading', depth>2를 'subheading'으로 묶는 것과 대응시킨다. */
+.pt-markdown h1, .pt-markdown h2 {
+  font-family: var(--font-serif);
+  font-size: var(--heading-size);
+  font-weight: var(--heading-weight);
+  line-height: var(--heading-line);
+  letter-spacing: var(--heading-tracking);
+}
+.pt-markdown h3, .pt-markdown h4 {
+  font-family: var(--font-serif);
+  font-size: var(--subheading-size);
+  font-weight: var(--subheading-weight);
+  line-height: var(--subheading-line);
+  letter-spacing: var(--subheading-tracking);
+}
+.pt-markdown p { margin: 0; }
+/* Task 12: Paper Study Page 목업 R4 block.isEquation 래퍼(배경/보더/패딩) 그대로.
+   수식 번호("(1)")는 목업 더미 데이터일 뿐 실제 파싱 결과에 없어 이식하지 않는다 (report 기록). */
+.pt-markdown .katex-display {
+  overflow-x: auto;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-structural);
+  padding: 22px 24px;
+  margin: 0;
+}
 
 .pt-figure { margin: var(--space-lg) 0; }
 .pt-figure img {
@@ -17,7 +43,20 @@
   font-size: 13px; color: var(--color-text-muted);
 }
 
+/* Task 12: Paper Study Page 목업 R4 block.isTable cell.style 값 그대로 (border-bottom만, header는 배경 없이 굵게). */
 .pt-table-scroll { overflow-x: auto; margin: var(--space-md) 0; }
-.pt-markdown table { border-collapse: collapse; font-size: 14px; }
-.pt-markdown th, .pt-markdown td { border: 1px solid var(--color-border); padding: var(--space-xs) var(--space-sm); }
-.pt-markdown th { font-family: var(--font-sans); font-weight: 600; background: var(--color-bg-surface); }
+.pt-markdown table { border-collapse: collapse; width: 100%; }
+.pt-markdown th, .pt-markdown td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-body);
+}
+.pt-markdown th {
+  border-bottom: 2px solid var(--color-border);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-heading);
+}

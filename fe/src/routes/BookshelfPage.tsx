@@ -2,7 +2,7 @@
 // R5 페이지네이션 / Profile dropdown / Custom top bar overlay / Toast). Upload dialog는 Task 11 소유 — 자리만 남긴다.
 // sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사 (플랜 공통 변환표).
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import {
   Books,
   MagnifyingGlass,
@@ -43,6 +43,7 @@ function formatDate(iso: string): string {
 export default function BookshelfPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data, isPending, isError, error } = usePapersQuery();
 
   const [keyword, setKeyword] = useState('');
@@ -77,6 +78,16 @@ export default function BookshelfPage() {
     setToast(text);
     toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION_MS);
   }
+
+  // StudyPage 진입 가드(비-COMPLETED → /library) 등, 다른 라우트가 라우터 state로 넘긴 토스트 메시지를 표시한다.
+  // 표시 후 state를 비워 뒤로가기/새로고침에서 재노출되지 않게 한다 (Task 12).
+  useEffect(() => {
+    const routedToast = (location.state as { toast?: string } | null)?.toast;
+    if (!routedToast) return;
+    showToast(routedToast);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
     setKeyword(e.target.value);
