@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { CSSProperties, MouseEventHandler, ReactNode } from 'react';
-import * as PhosphorIcons from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
+import { iconComponent } from './icons';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'landing' | 'text';
 
@@ -65,18 +64,6 @@ const HOVER: Record<ButtonVariant, string> = {
   landing: 'var(--color-primary-subtle)',
   text: 'var(--color-primary-subtle)',
 };
-
-// Phosphor CDN webfont classes (`ph ph-<icon>`) in the original design system are
-// replaced with @phosphor-icons/react components. `icon` stays a kebab-case string
-// prop (as in the original), resolved to the matching PascalCase icon component.
-function iconComponent(name: string): Icon | undefined {
-  const pascal = name
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-  return (PhosphorIcons as unknown as Record<string, Icon>)[pascal];
-}
 
 export function Button({
   variant = 'primary',
