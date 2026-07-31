@@ -124,6 +124,10 @@ react-markdown + remark-gfm + remark-math + rehype-katex. 커스텀 컴포넌트
 1. **파싱 진행률 바**: 계약 `PaperStatusResponse`에 progress 없음 → 불확정 애니메이션 (기존 D2 승계).
 2. **챗 히스토리 패널**: 과거 세션·메시지 목록을 조회할 계약이 없다 → 이번 범위에서 패널 생략,
    현재 세션 대화만 표시. 계약 확정 시 복원 (Jira 백로그).
+3. **Bookshelf 빈 상태**: 목업(`Paper Bookshelf Page.dc.html`)에는 "검색 결과 없음" 블록 1종만 있다(전체 서재가 빈 상태의 별도 일러스트는 없음). 새 시각 디자인을 지어내지 않기 위해 같은 블록을 재사용하고 텍스트만 `papers.length === 0` 여부로 분기했다 (Task 10).
+4. **Bookshelf 행의 시각 텍스트**: 목업 더미 데이터는 "마지막 열람: 3일 전"(최근 열람 시각)이지만 계약 `Paper`에는 그런 필드가 없다(`createdAt`/`updatedAt`만 존재). 가장 가까운 실데이터인 "등록일 · {createdAt 포맷}"으로 대체했다 (Task 10).
+5. **Night mode 토글 버튼**: `Paper Study Page.dc.html`에는 Night 토글 UI가 없다(디자인 시스템 문서에서만 언급). §5 Study 요구를 만족시키려 R1 우측 존에 `IconButton`(moon/sun)을 새로 추가했다 — 목업에 없는 마크업 (Task 12).
+6. **Study 문서 제목**: `PaperStatusResponse`·`PaperContent` 어디에도 논문 제목 필드가 없다(계약 미확정). 첫 heading 블록의 텍스트로 대체 표시한다 — 별도 title 필드가 생기면 교체 (Task 12).
 
 ## 9. 테스트
 

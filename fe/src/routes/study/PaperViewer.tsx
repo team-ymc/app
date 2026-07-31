@@ -11,16 +11,12 @@ import type { PaperBlock } from '../../markdown/paperContent';
 export interface PaperViewerProps {
   blocks: PaperBlock[];
   containerRef: Ref<HTMLDivElement>;
-  onMouseUp?: () => void;
-  onScroll?: () => void;
 }
 
-export function PaperViewer({ blocks, containerRef, onMouseUp, onScroll }: PaperViewerProps) {
+export function PaperViewer({ blocks, containerRef }: PaperViewerProps) {
   return (
     <div
       ref={containerRef}
-      onMouseUp={onMouseUp}
-      onScroll={onScroll}
       style={{
         flex: 1,
         minWidth: 0,
