@@ -128,6 +128,8 @@ react-markdown + remark-gfm + remark-math + rehype-katex. 커스텀 컴포넌트
 4. **Bookshelf 행의 시각 텍스트**: 목업 더미 데이터는 "마지막 열람: 3일 전"(최근 열람 시각)이지만 계약 `Paper`에는 그런 필드가 없다(`createdAt`/`updatedAt`만 존재). 가장 가까운 실데이터인 "등록일 · {createdAt 포맷}"으로 대체했다 (Task 10).
 5. **Night mode 토글 버튼**: `Paper Study Page.dc.html`에는 Night 토글 UI가 없다(디자인 시스템 문서에서만 언급). §5 Study 요구를 만족시키려 R1 우측 존에 `IconButton`(moon/sun)을 새로 추가했다 — 목업에 없는 마크업 (Task 12).
 6. **Study 문서 제목**: `PaperStatusResponse`·`PaperContent` 어디에도 논문 제목 필드가 없다(계약 미확정). 첫 heading 블록의 텍스트로 대체 표시한다 — 별도 title 필드가 생기면 교체 (Task 12).
+7. **Bookshelf 실패 행 UI**: `FAILED`/`EXPIRED` 행의 와이어프레임이 없다(FT-002 Open Questions에 WF 미정 명시). 기존 `--color-danger` 토큰과 행 레이아웃만으로 최소 구성했다 — WF 확정 시 재정렬 (Task 10).
+8. **프로필 드롭다운 사용자 정보 행**: 목업 드롭다운에는 사용자 정보 표시가 없다. `useAuth().user` 표시 요구를 충족하려 정보 행 마크업을 새로 추가했다 — 목업에 없는 마크업 (Task 10).
 
 ## 9. 테스트
 
