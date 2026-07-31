@@ -18,6 +18,7 @@ import { IconButton } from '../design/components/IconButton';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { usePapersQuery } from './bookshelf/usePapersQuery';
 import { filterPapers, paginate } from './bookshelf/paperFilters';
+import UploadDialog from './bookshelf/UploadDialog';
 import type { Paper, PaperStatus } from '../api/types';
 
 const PAGE_SIZE = 10;
@@ -370,7 +371,13 @@ export default function BookshelfPage() {
         </div>
       </div>
 
-      {uploadOpen && <>{/* Task 11: UploadDialog */}</>}
+      {uploadOpen && (
+        <UploadDialog
+          open
+          onClose={() => setUploadOpen(false)}
+          onUploaded={() => showToast('등록되었습니다 — 분석이 시작됩니다')}
+        />
+      )}
 
       {/* Toast — 업로드 외에도 학습 진입 거부 등에 재사용된다 */}
       {toast && (
