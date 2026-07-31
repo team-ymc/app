@@ -1,6 +1,6 @@
 // 이식: project-docs/design/v1/Paper Study Page.dc.html — R1 top bar / R2 work area / R3 TOC nav rail /
-// R4 Paper viewer / Resizable splitter. R5 AI chat panel과 Selection/Ask/Translation popup은 이번 태스크
-// 범위 밖(Task 13·14 소유) — 챗 패널 자리는 스플리터 오른쪽 빈 컨테이너 + 주석으로만 남긴다.
+// R4 Paper viewer / Resizable splitter / R5 AI chat panel(TutorPanel, Task 13). Selection/Ask/Translation
+// popup은 이번 태스크 범위 밖(Task 14 소유) — pendingContext state는 여기서 배선만 하고 지금은 null로 둔다.
 // sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사 (플랜 공통 변환표, Task 9·10과 동일).
 //
 // Night mode 토글: 이 목업 파일 자체에는 스위치 UI가 없다 (디자인 시스템 readme에서만 "Night Study Mode
@@ -16,6 +16,7 @@ import { getStatus } from '../api/papers';
 import { getPaperContent } from '../markdown/paperContent';
 import { PaperViewer } from './study/PaperViewer';
 import { TocRail } from './study/TocRail';
+import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
 import { useScrollSpy } from './study/useScrollSpy';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
@@ -74,6 +75,9 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   });
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  // Task 14(인라인 액션)의 "질문하기"가 채운다 — 지금은 항상 null (brief).
+  const [pendingContext, setPendingContext] = useState<TutorPanelPendingContext | null>(null);
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const splitRegionRef = useRef<HTMLDivElement>(null);
@@ -235,7 +239,14 @@ function StudyPageContent({ paperId }: { paperId: string }) {
 
         <div ref={splitRegionRef} style={{ flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden' }}>
           {/* R4 Paper viewer */}
-          <div style={{ width: `${splitPct}%`, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{
+              width: chatCollapsed ? 'calc(100% - 44px - 6px)' : `${splitPct}%`,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <PaperViewer blocks={blocks} containerRef={viewerRef} />
           </div>
 
@@ -255,20 +266,24 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             <div style={{ position: 'absolute', top: 0, bottom: 0, left: '2px', width: '1px', background: 'var(--color-border)' }} />
           </div>
 
-          {/* Task 13: TutorPanel */}
+          {/* R5 AI chat panel */}
           <div
             style={{
-              width: `${100 - splitPct}%`,
+              width: chatCollapsed ? '44px' : `${100 - splitPct}%`,
               minWidth: 0,
               boxSizing: 'border-box',
               flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--color-bg-paper)',
-              borderLeft: '1px solid var(--color-border)',
               overflow: 'hidden',
             }}
-          />
+          >
+            <TutorPanel
+              paperId={paperId}
+              pendingContext={pendingContext}
+              onContextConsumed={() => setPendingContext(null)}
+              collapsed={chatCollapsed}
+              onToggleCollapse={() => setChatCollapsed((v) => !v)}
+            />
+          </div>
         </div>
       </div>
     </div>

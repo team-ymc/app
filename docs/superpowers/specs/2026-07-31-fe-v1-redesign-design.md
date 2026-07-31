@@ -122,7 +122,8 @@ react-markdown + remark-gfm + remark-math + rehype-katex. 커스텀 컴포넌트
 ## 8. 목업 픽션 조정 기록
 
 1. **파싱 진행률 바**: 계약 `PaperStatusResponse`에 progress 없음 → 불확정 애니메이션 (기존 D2 승계).
-2. (추가 발견 시 여기에 기록)
+2. **챗 히스토리 패널**: 과거 세션·메시지 목록을 조회할 계약이 없다 → 이번 범위에서 패널 생략,
+   현재 세션 대화만 표시. 계약 확정 시 복원 (Jira 백로그).
 
 ## 9. 테스트
 
