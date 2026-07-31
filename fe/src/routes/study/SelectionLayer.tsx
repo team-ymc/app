@@ -136,6 +136,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     return (
       <div
         ref={popupRef}
+        onMouseDown={(e) => e.preventDefault()}
         style={{
           position: 'absolute',
           top: pos.top,
@@ -161,6 +162,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
     return (
       <div
         ref={popupRef}
+        onMouseDown={(e) => e.preventDefault()}
         style={{
           position: 'absolute',
           top: pos.top,
@@ -219,6 +221,7 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
   return (
     <div
       ref={popupRef}
+      onMouseDown={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
         top: pos.top,

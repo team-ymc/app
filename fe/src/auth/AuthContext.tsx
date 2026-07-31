@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { bootstrap, login, logout, onSessionExpired } from '../api/auth';
 import type { AuthUser } from '../api/types';
 
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Pick<AuthContextValue, 'status' | 'user'>>({ status: 'loading', user: null });
   const [initialError, setInitialError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -22,11 +24,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.history.replaceState(null, '', '/');
       setInitialError('로그인에 실패했습니다. 다시 시도해 주세요.');
     }
-    onSessionExpired(() => setState({ status: 'guest', user: null }));
+    // 세션 만료 시 이전 사용자 캐시가 다음 로그인 사용자에게 노출되지 않도록 정리한다.
+    onSessionExpired(() => {
+      queryClient.clear();
+      setState({ status: 'guest', user: null });
+    });
     bootstrap()
       .then((user) => setState({ status: user ? 'authed' : 'guest', user }))
       .catch(() => setState({ status: 'guest', user: null }));
-  }, []);
+  }, [queryClient]);
 
   const startLogin = useCallback(() => {
     login({
@@ -39,8 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try { await logout(); } catch { /* 로컬 세션은 정리 — 쿠키는 다음 refresh 실패로 소멸 */ }
+    // 재로그인 시 이전 사용자 캐시 노출 방지.
+    queryClient.clear();
     setState({ status: 'guest', user: null });
-  }, []);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ ...state, initialError, startLogin, signOut }}>
