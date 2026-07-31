@@ -109,9 +109,12 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   }, [state.messages]);
 
   // ask popup "새 채팅"(mode:'new') 지원 — 같은 pendingContext 객체에 대해 한 번만 reset한다.
+  // 참조 구현(mockup newConversation의 clearInterval)처럼 진행 중 스트림부터 끊고 reset한다 —
+  // 그러지 않으면 이전 스트림의 delta/completed가 초기화된 state에 뒤늦게 dispatch될 수 있다.
   useEffect(() => {
     setContextTooltipOpen(false);
     if (pendingContext && pendingContext.mode === 'new' && lastResetContextRef.current !== pendingContext) {
+      abortRef.current?.abort();
       dispatch({ type: 'reset' });
     }
     lastResetContextRef.current = pendingContext;
@@ -160,13 +163,22 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   }
 
   function handleNewConversation() {
+    abortRef.current?.abort(); // 목업 newConversation의 clearInterval과 같은 결 — reset 전에 진행 중 스트림을 끊는다
     dispatch({ type: 'reset' });
   }
 
-  // 멱등 재시도 계약(설계 §3): pending(결과 미상)이 있을 때만 같은 clientMessageId로 재전송한다.
+  // 재시도 계약(설계 §3, openapi ChatStreamErrorDetail): retryable=true는 항상 재시도 가능하다.
+  // - 결과 미상 실패(pending 유지): 같은 clientMessageId로 재전송(멱등).
+  // - 확인된 실패(pending 비워짐, 예: AI_RUN_FAILED): 새 clientMessageId로 재시도 — 마지막 user
+  //   메시지 content를 재사용한다.
   function handleRetry() {
-    if (state.streaming || !state.pending) return;
-    run(state.pending.clientMessageId, state.pending.content, true);
+    if (state.streaming) return;
+    if (state.pending) {
+      run(state.pending.clientMessageId, state.pending.content, true);
+      return;
+    }
+    const lastUser = [...state.messages].reverse().find((m) => m.role === 'user');
+    if (lastUser) run(crypto.randomUUID(), lastUser.content, true);
   }
 
   if (collapsed) {
@@ -180,12 +192,13 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   }
 
   const lastMessage = state.messages[state.messages.length - 1];
+  // retryable=true면 pending 유무와 무관하게 재시도 가능(계약 ChatStreamErrorDetail) — confirmed
+  // 실패(pending 비워짐)는 handleRetry가 새 clientMessageId로 처리한다.
   const canRetry =
     !!lastMessage &&
     lastMessage.role === 'assistant' &&
     lastMessage.status === 'FAILED' &&
-    lastMessage.error?.retryable !== false &&
-    !!state.pending;
+    lastMessage.error?.retryable !== false;
 
   const composer = (
     <div style={{ position: 'relative' }}>

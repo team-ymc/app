@@ -65,6 +65,14 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     expect(s.streaming).toBe(true);
   });
 
+  test('resend는 pending을 새 clientMessageId로 갱신한다', () => {
+    let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문' });
+    s = chatReducer(s, { type: 'failed', confirmed: true, code: 'AI_RUN_FAILED', retryable: true });
+    s = chatReducer(s, { type: 'send', clientMessageId: 'c2', content: '질문', resend: true });
+    expect(s.pending).toEqual({ clientMessageId: 'c2', content: '질문' });
+    expect(s.messages).toHaveLength(2); // 말풍선 재사용, 추가 없음
+  });
+
   test('reset은 초기 상태로 돌아간다', () => {
     let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문' });
     s = chatReducer(s, { type: 'reset' });

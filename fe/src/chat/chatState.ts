@@ -45,10 +45,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'send': {
       if (action.resend) {
-        // 같은 clientMessageId 재전송 — 기존 말풍선을 유지하고 placeholder만 초기화
+        // 재전송 — 기존 말풍선을 유지하고 placeholder만 초기화. clientMessageId는 같을 수도(결과
+        // 미상 재시도) 다를 수도(확인된 실패 후 새 UUID 재시도) 있으므로 pending을 매번 갱신한다 —
+        // 그래야 이 재전송이 다시 중단됐을 때 올바른 id로 후속 재시도가 가능하다.
         return {
           ...state,
           streaming: true,
+          pending: { clientMessageId: action.clientMessageId, content: action.content },
           messages: state.messages.map((m, i) =>
             i === state.messages.length - 1 && m.role === 'assistant'
               ? { ...m, content: '', status: 'GENERATING', error: null }
