@@ -10,7 +10,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Quotes, X } from '@phosphor-icons/react';
 import { chatReducer, initialChatState } from '../../chat/chatState';
 import { streamChatMessage } from '../../chat/chatStream';
-import { listChatSessions, listChatSessionMessages } from '../../api/chatSessions';
+import { listChatSessions, listChatSessionMessages, deleteChatSession } from '../../api/chatSessions';
+import type { ChatSessionSummary } from '../../api/chatSessions';
 import { ApiError } from '../../api/types';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import { TutorNotebook } from '../../design/components/TutorNotebook';
@@ -124,6 +125,83 @@ function HistoryItemButton({ title, onClick }: { title: string; onClick: () => v
   );
 }
 
+// 목업에 없는 마크업(AC 요구 기능) — x IconButton(size 28)·인라인 삭제 확인. 별도 모달 없이
+// 드롭다운 항목 자리에서 그대로 전환한다 (brief Step 1, YAGNI).
+function HistorySessionRow({
+  session,
+  confirming,
+  deleting,
+  errorMessage,
+  onSelect,
+  onRequestDelete,
+  onConfirmDelete,
+  onCancelDelete,
+}: {
+  session: ChatSessionSummary;
+  confirming: boolean;
+  deleting: boolean;
+  errorMessage: string | null;
+  onSelect: () => void;
+  onRequestDelete: () => void;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
+}) {
+  if (confirming) {
+    return (
+      <div style={{ padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-text-body)' }}>
+          이 대화를 삭제할까요? 되돌릴 수 없습니다.
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            onClick={onConfirmDelete}
+            disabled={deleting}
+            style={{
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              color: 'var(--color-danger)',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              opacity: deleting ? 0.5 : 1,
+            }}
+          >
+            삭제
+          </button>
+          <button
+            onClick={onCancelDelete}
+            disabled={deleting}
+            style={{
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              color: 'var(--color-text-muted)',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              opacity: deleting ? 0.5 : 1,
+            }}
+          >
+            취소
+          </button>
+        </div>
+        {errorMessage ? (
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--color-danger)' }}>{errorMessage}</div>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <HistoryItemButton title={session.title} onClick={onSelect} />
+      </div>
+      <IconButton icon="x" label="대화 삭제" size={28} onClick={onRequestDelete} />
+    </div>
+  );
+}
+
 function dotStyle(delay: number): CSSProperties {
   return {
     width: 6,
@@ -149,6 +227,9 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   const [contextTooltipOpen, setContextTooltipOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{ id: string; message: string } | null>(null);
 
   const queryClient = useQueryClient();
   // 드롭다운이 열릴 때만 조회 — 열 때마다 refetchOnMount 기본값으로 신선하게 받는다.
@@ -209,7 +290,29 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
 
   function handleToggleHistory() {
     setHistoryLoadError(null);
+    setConfirmDeleteId(null);
+    setDeleteError(null);
     setHistoryOpen((v) => !v);
+  }
+
+  // 계약상 GENERATING 중에도 삭제 허용(409 없음) — 특수 처리 없이 그대로 호출한다.
+  async function handleConfirmDeleteSession(sessionId: string) {
+    setDeletingId(sessionId);
+    setDeleteError(null);
+    try {
+      await deleteChatSession(paperId, sessionId);
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions', paperId] });
+      if (state.sessionId === sessionId) {
+        historyLoadSeq.current += 1; // 진행 중인 히스토리 로드를 무효화 — reset 후 stale 응답이 덮어쓰지 못하게
+        abortRef.current?.abort();
+        dispatch({ type: 'reset' });
+      }
+      setConfirmDeleteId(null);
+    } catch (e) {
+      setDeleteError({ id: sessionId, message: e instanceof ApiError ? e.message : '대화를 삭제하지 못했습니다.' });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function handleSelectHistorySession(sessionId: string) {
@@ -413,7 +516,23 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
                   <div style={historyStatusStyle}>저장된 대화가 없습니다</div>
                 ) : (
                   sessionsQuery.data?.map((s) => (
-                    <HistoryItemButton key={s.sessionId} title={s.title} onClick={() => handleSelectHistorySession(s.sessionId)} />
+                    <HistorySessionRow
+                      key={s.sessionId}
+                      session={s}
+                      confirming={confirmDeleteId === s.sessionId}
+                      deleting={deletingId === s.sessionId}
+                      errorMessage={deleteError?.id === s.sessionId ? deleteError.message : null}
+                      onSelect={() => handleSelectHistorySession(s.sessionId)}
+                      onRequestDelete={() => {
+                        setDeleteError(null);
+                        setConfirmDeleteId(s.sessionId);
+                      }}
+                      onConfirmDelete={() => handleConfirmDeleteSession(s.sessionId)}
+                      onCancelDelete={() => {
+                        setDeleteError(null);
+                        setConfirmDeleteId(null);
+                      }}
+                    />
                   ))
                 )}
                 {historyLoadError ? (
