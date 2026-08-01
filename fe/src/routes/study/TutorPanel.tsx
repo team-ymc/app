@@ -101,23 +101,25 @@ const historyStatusStyle: CSSProperties = {
   color: 'var(--color-text-muted)',
 };
 
-function HistoryItemButton({ title, onClick }: { title: string; onClick: () => void }) {
+function HistoryItemButton({ title, onClick, disabled = false }: { title: string; onClick: () => void; disabled?: boolean }) {
   const [hover, setHover] = useState(false);
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         textAlign: 'left',
         padding: '9px 10px',
         border: 'none',
-        background: hover ? 'var(--color-primary-subtle)' : 'transparent',
+        background: !disabled && hover ? 'var(--color-primary-subtle)' : 'transparent',
         borderRadius: 6,
         fontFamily: 'var(--font-sans)',
         fontSize: 13,
-        color: 'var(--color-text-body)',
-        cursor: 'pointer',
+        color: disabled ? 'var(--color-text-muted)' : 'var(--color-text-body)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       {title}
@@ -195,9 +197,9 @@ function HistorySessionRow({
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <HistoryItemButton title={session.title} onClick={onSelect} />
+        <HistoryItemButton title={session.title} onClick={onSelect} disabled={deleting} />
       </div>
-      <IconButton icon="x" label="대화 삭제" size={28} onClick={onRequestDelete} />
+      <IconButton icon="x" label="대화 삭제" size={28} onClick={onRequestDelete} disabled={deleting} />
     </div>
   );
 }
@@ -302,8 +304,10 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
     try {
       await deleteChatSession(paperId, sessionId);
       queryClient.invalidateQueries({ queryKey: ['chat-sessions', paperId] });
+      // 무조건 세대를 올린다 — 삭제 대상이 아직 state.sessionId로 반영되지 않은(로드 진행 중인)
+      // 세션일 수도 있으므로, "열려 있던 세션" 가드만으로는 그 로드가 삭제 후 상태를 덮어쓰는 걸 막지 못한다.
+      historyLoadSeq.current += 1;
       if (state.sessionId === sessionId) {
-        historyLoadSeq.current += 1; // 진행 중인 히스토리 로드를 무효화 — reset 후 stale 응답이 덮어쓰지 못하게
         abortRef.current?.abort();
         dispatch({ type: 'reset' });
       }
