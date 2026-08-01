@@ -273,6 +273,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   }, [pendingContext]);
 
   function run(clientMessageId: string, content: string, resend: boolean) {
+    historyLoadSeq.current += 1; // 전송(첫 전송·재시도 모두) 시작 — 진행 중인 히스토리 로드를 무효화
     dispatch({ type: 'send', clientMessageId, content, resend });
     const controller = new AbortController();
     abortRef.current = controller;
@@ -357,7 +358,6 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
     const content = buildContent(pendingContext, question);
     setInput('');
     resetComposerHeight();
-    historyLoadSeq.current += 1; // 전송 시작 — 진행 중인 히스토리 로드를 무효화
     run(crypto.randomUUID(), content, false);
     if (pendingContext) onContextConsumed();
   }
