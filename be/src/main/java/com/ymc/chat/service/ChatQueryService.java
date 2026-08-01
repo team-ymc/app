@@ -45,7 +45,7 @@ public class ChatQueryService {
         paperChatAccessValidator.validateOwned(paperId, ownerId);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(ChatQueryService::sessionNotFound);
-        if (!session.getOwnerId().equals(ownerId) || !session.getPaperId().equals(paperId)) {
+        if (!session.belongsTo(ownerId, paperId)) {
             throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
         }
         return chatMessageRepository.findAllBySessionIdOrderBySeqAsc(sessionId);

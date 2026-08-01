@@ -102,8 +102,7 @@ public class ChatCommandService {
             return;
         }
         ChatSession existingSession = existingUser.get().getSession();
-        if (!existingSession.getOwnerId().equals(ownerId)
-                || !existingSession.getPaperId().equals(paperId)) {
+        if (!existingSession.belongsTo(ownerId, paperId)) {
             // 타인·다른 논문의 재사용 — 기존 실행의 식별자를 노출하지 않고 거부한다
             throw new ApiException(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT,
                     "clientMessageId가 다른 요청에 이미 사용되었습니다.");
@@ -128,7 +127,7 @@ public class ChatCommandService {
         }
         ChatSession session = chatSessionRepository.findWithLockById(sessionIdOrNull)
                 .orElseThrow(this::sessionNotFound);
-        if (!session.getOwnerId().equals(ownerId) || !session.getPaperId().equals(paperId)) {
+        if (!session.belongsTo(ownerId, paperId)) {
             throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
         }
         return session;
@@ -149,7 +148,7 @@ public class ChatCommandService {
         paperChatAccessValidator.validateOwned(paperId, ownerId);
         ChatSession session = chatSessionRepository.findWithLockById(sessionId)
                 .orElseThrow(this::sessionNotFound);
-        if (!session.getOwnerId().equals(ownerId) || !session.getPaperId().equals(paperId)) {
+        if (!session.belongsTo(ownerId, paperId)) {
             throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
         }
         chatMessageRepository.deleteBySessionId(sessionId);

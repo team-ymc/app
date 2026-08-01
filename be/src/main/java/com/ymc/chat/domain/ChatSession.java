@@ -74,6 +74,14 @@ public class ChatSession {
         this.lastMessageAt = now;
     }
 
+    /**
+     * 이 세션이 해당 사용자·논문 소속인지 — 접근 검증 술어. 조회·삭제·시작 경로가 공유하며,
+     * 불일치 시 호출부는 존재를 숨기고 CHAT_SESSION_NOT_FOUND(404)를 낸다 (계약).
+     */
+    public boolean belongsTo(UUID ownerId, UUID paperId) {
+        return this.ownerId.equals(ownerId) && this.paperId.equals(paperId);
+    }
+
     /** surrogate pair를 반 자르지 않도록 코드포인트 기준으로 절단한다. */
     private static String truncateTitle(String firstQuestion) {
         if (firstQuestion.codePointCount(0, firstQuestion.length()) <= TITLE_MAX_CODE_POINTS) {
