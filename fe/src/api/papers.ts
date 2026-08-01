@@ -58,7 +58,7 @@ export async function listPapers(): Promise<{ papers: Paper[] }> {
   return res.json(); // { papers: [{ paperId, filename, status, createdAt, updatedAt }] }
 }
 
-async function apiError(res: Response): Promise<ApiError> {
+export async function apiError(res: Response): Promise<ApiError> {
   let body: { code?: string; message?: string } = {};
   try { body = await res.json(); } catch { /* 비-JSON 응답 */ }
   return new ApiError(body.message || `HTTP ${res.status}`, body.code, res.status);

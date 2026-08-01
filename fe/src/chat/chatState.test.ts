@@ -1,5 +1,6 @@
 import { describe, it, test, expect } from 'vitest';
 import { initialChatState, chatReducer, type ChatAction } from './chatState';
+import type { ChatMessageItem } from '../api/chatSessions';
 
 function reduceAll(actions: ChatAction[]) {
   return actions.reduce(chatReducer, initialChatState);
@@ -77,5 +78,53 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문' });
     s = chatReducer(s, { type: 'reset' });
     expect(s).toEqual(initialChatState);
+  });
+});
+
+const item = (over: Partial<ChatMessageItem>): ChatMessageItem => ({
+  messageId: 'm-1', role: 'USER', content: '질문', status: 'COMPLETED',
+  seq: 1, createdAt: '2026-08-01T00:00:00Z', ...over,
+});
+
+describe('historyLoaded', () => {
+  test('서버 항목을 로컬 메시지로 매핑하고 sessionId를 세팅한다', () => {
+    const s = chatReducer(initialChatState, {
+      type: 'historyLoaded', sessionId: 's-1',
+      items: [
+        item({ messageId: 'm-1', role: 'USER', content: '질문', seq: 1 }),
+        item({ messageId: 'm-2', role: 'ASSISTANT', content: '**답변**', seq: 2 }),
+      ],
+    });
+    expect(s.sessionId).toBe('s-1');
+    expect(s.streaming).toBe(false);
+    expect(s.pending).toBeNull();
+    expect(s.messages).toEqual([
+      { key: 'm-1', role: 'user', content: '질문', status: 'COMPLETED', error: null },
+      { key: 'm-2', role: 'assistant', content: '**답변**', status: 'COMPLETED', error: null },
+    ]);
+  });
+
+  test('GENERATING assistant는 content 빈 문자열 + 상태 보존', () => {
+    const s = chatReducer(initialChatState, {
+      type: 'historyLoaded', sessionId: 's-1',
+      items: [item({ messageId: 'm-3', role: 'ASSISTANT', content: null, status: 'GENERATING', seq: 2 })],
+    });
+    expect(s.messages[0]).toEqual({ key: 'm-3', role: 'assistant', content: '', status: 'GENERATING', error: null });
+  });
+
+  test('FAILED assistant는 retryable=false 에러로 매핑된다 — 과거 실패에 재시도 미노출', () => {
+    const s = chatReducer(initialChatState, {
+      type: 'historyLoaded', sessionId: 's-1',
+      items: [item({ messageId: 'm-4', role: 'ASSISTANT', content: null, status: 'FAILED', seq: 2 })],
+    });
+    expect(s.messages[0].status).toBe('FAILED');
+    expect(s.messages[0].error).toEqual({ code: 'HISTORY_FAILED', message: '응답 생성에 실패했습니다.', retryable: false });
+  });
+
+  test('기존 대화 상태를 통째로 대체한다', () => {
+    let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '기존 질문' });
+    s = chatReducer(s, { type: 'historyLoaded', sessionId: 's-9', items: [item({})] });
+    expect(s.messages).toHaveLength(1);
+    expect(s.pending).toBeNull();
   });
 });

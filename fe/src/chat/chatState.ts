@@ -2,6 +2,8 @@
 // ChatPanel은 useReducer로 이것만 감싼다. pending은 "결과를 모르는 재전송" 대상이다:
 // 성공·확인된 실패에서 비우고, 스트림 중단(결과 미상)에서만 유지한다.
 
+import type { ChatMessageItem } from '../api/chatSessions';
+
 export type ChatMessageStatus = 'GENERATING' | 'COMPLETED' | 'FAILED'; // 계약 ChatMessageStatus
 
 export interface ChatMessage {
@@ -26,6 +28,7 @@ export type ChatAction =
   | { type: 'completed'; content: string }
   | { type: 'failed'; confirmed: boolean; code: string; message?: string; retryable: boolean }
   | { type: 'duplicate'; sessionId: string; status: ChatMessageStatus }
+  | { type: 'historyLoaded'; sessionId: string; items: ChatMessageItem[] }
   | { type: 'reset' }; // 새 대화(ask popup의 '새 대화에서') — initialChatState로 복귀
 
 export const initialChatState: ChatState = {
@@ -109,6 +112,22 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         })),
       };
     }
+    case 'historyLoaded':
+      // 재방문 로드 — 서버 항목으로 대화를 통째로 대체한다. 진행 중 스트림은 호출부가 먼저 abort.
+      return {
+        sessionId: action.sessionId,
+        streaming: false,
+        pending: null,
+        messages: action.items.map((it) => ({
+          key: it.messageId,
+          role: it.role === 'USER' ? 'user' as const : 'assistant' as const,
+          content: it.content ?? '',
+          status: it.status,
+          error: it.status === 'FAILED'
+            ? { code: 'HISTORY_FAILED', message: '응답 생성에 실패했습니다.', retryable: false }
+            : null,
+        })),
+      };
     case 'reset':
       return initialChatState;
     default:
