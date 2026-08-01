@@ -162,6 +162,9 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastResetContextRef = useRef<TutorPanelPendingContext | null>(null);
+  // 히스토리 로드 레이스 가드 — reset·전송 시작이 세대를 올려서, 그 이후 도착하는 stale
+  // listChatSessionMessages 응답(성공/실패 모두)이 새 상태를 덮어쓰지 못하게 한다.
+  const historyLoadSeq = useRef(0);
 
   useEffect(() => () => abortRef.current?.abort(), []); // 언마운트 — BE는 저장을 완주한다
 
@@ -178,6 +181,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   useEffect(() => {
     setContextTooltipOpen(false);
     if (pendingContext && pendingContext.mode === 'new' && lastResetContextRef.current !== pendingContext) {
+      historyLoadSeq.current += 1; // 진행 중인 히스토리 로드를 무효화 — reset 후 stale 응답이 덮어쓰지 못하게
       abortRef.current?.abort();
       dispatch({ type: 'reset' });
     }
@@ -210,13 +214,22 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
 
   async function handleSelectHistorySession(sessionId: string) {
     setHistoryLoadError(null);
+    const wasStreaming = state.streaming; // abort는 dispatch를 하지 않으므로 클릭 시점에 미리 잡아둔다
     abortRef.current?.abort();
+    const gen = ++historyLoadSeq.current;
     try {
       const items = await listChatSessionMessages(paperId, sessionId);
+      if (gen !== historyLoadSeq.current) return; // stale — 그 사이 reset·새 전송이 있었음
       dispatch({ type: 'historyLoaded', sessionId, items });
       setHistoryOpen(false);
     } catch (e) {
+      if (gen !== historyLoadSeq.current) return; // stale — 이미 다른 상호작용이 상태를 대체함
       setHistoryLoadError(e instanceof ApiError ? e.message : '대화를 불러오지 못했습니다.');
+      if (wasStreaming) {
+        // abort만으로는 streaming=true가 풀리지 않는다 — 결과 미상 실패로 명시해 입력창 고착을 막고
+        // pending을 유지한다(재시도 가능, 기존 STREAM_INTERRUPTED 의미론과 동일).
+        dispatch({ type: 'failed', confirmed: false, code: 'STREAM_INTERRUPTED', message: '연결이 중단되었습니다.', retryable: true });
+      }
     }
   }
 
@@ -237,6 +250,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
     const content = buildContent(pendingContext, question);
     setInput('');
     resetComposerHeight();
+    historyLoadSeq.current += 1; // 전송 시작 — 진행 중인 히스토리 로드를 무효화
     run(crypto.randomUUID(), content, false);
     if (pendingContext) onContextConsumed();
   }
@@ -249,6 +263,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   }
 
   function handleNewConversation() {
+    historyLoadSeq.current += 1; // 진행 중인 히스토리 로드를 무효화 — reset 후 stale 응답이 덮어쓰지 못하게
     abortRef.current?.abort(); // 목업 newConversation의 clearInterval과 같은 결 — reset 전에 진행 중 스트림을 끊는다
     dispatch({ type: 'reset' });
   }
@@ -435,8 +450,11 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
 
             // 바운스는 "streaming 중 + 이 메시지가 아직 델타를 못 받은 GENERATING"일 때만. 그 외
             // GENERATING(히스토리에서 로드된, resume 미지원 — 계약 상태 보존)은 muted 안내 텍스트.
+            // content===''을 함께 요구해 duplicate 안내문(GENERATING+안내 텍스트, reducer 'duplicate'
+            // 분기)이나 스트리밍 중 델타 수신분(GENERATING+부분 텍스트)이 히스토리 문구로 오분류되지
+            // 않게 한다 — 히스토리 로드분만 content가 비어 있다(계약: GENERATING은 partial 저장 안 함).
             const bouncing = m.status === 'GENERATING' && m.content === '' && state.streaming;
-            const historyGenerating = m.status === 'GENERATING' && !state.streaming;
+            const historyGenerating = m.status === 'GENERATING' && m.content === '' && !state.streaming;
             return (
               <div key={m.key}>
                 {bouncing ? (
