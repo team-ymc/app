@@ -76,7 +76,7 @@ class ChatCommandServiceTest extends IntegrationTest {
     void rejectsForeignSession() {
         Paper paper = givenCompletedPaper();
         ChatSession otherOwners = chatSessionRepository.save(
-                ChatSession.open(UUID.randomUUID(), paper.getId(), Instant.now()));
+                ChatSession.open(UUID.randomUUID(), paper.getId(), "질문", Instant.now()));
 
         assertThatThrownBy(() -> chatCommandService.start(
                 TEST_USER_ID, paper.getId(), otherOwners.getId(), UUID.randomUUID(), "질문"))
@@ -212,5 +212,56 @@ class ChatCommandServiceTest extends IntegrationTest {
                 TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT));
+    }
+
+    @Test
+    @DisplayName("연속 두 질문이면 seq가 1,2,3,4로 단조 증가한다")
+    void seqIncreasesMonotonically() {
+        Paper paper = givenCompletedPaper();
+
+        ChatStartResult first = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답1");
+
+        chatCommandService.start(
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
+
+        var seqs = chatMessageRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparingInt(ChatMessage::getSeq))
+                .map(m -> m.getSeq() + ":" + m.getRole())
+                .toList();
+        assertThat(seqs).containsExactly(
+                "1:USER", "2:ASSISTANT", "3:USER", "4:ASSISTANT");
+    }
+
+    @Test
+    @DisplayName("새 세션은 첫 질문 앞 120자(코드포인트)를 title로 저장하고 lastMessageAt을 기록한다")
+    void newSessionStoresTitleAndActivity() {
+        Paper paper = givenCompletedPaper();
+        String longQuestion = "가".repeat(150);
+
+        ChatStartResult result = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), longQuestion);
+
+        ChatSession session = chatSessionRepository.findById(result.sessionId()).orElseThrow();
+        assertThat(session.getTitle()).isEqualTo("가".repeat(120));
+        assertThat(session.getLastMessageAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("기존 세션에 질문을 이어가면 lastMessageAt이 갱신된다")
+    void followUpUpdatesLastMessageAt() {
+        Paper paper = givenCompletedPaper();
+        ChatStartResult first = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+        Instant firstActivity = chatSessionRepository.findById(first.sessionId())
+                .orElseThrow().getLastMessageAt();
+        chatMessageTransitions.complete(first.assistantMessageId(), "답");
+
+        chatCommandService.start(
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
+
+        assertThat(chatSessionRepository.findById(first.sessionId()).orElseThrow()
+                .getLastMessageAt()).isAfter(firstActivity);
     }
 }

@@ -211,7 +211,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
     void foreignSession() throws Exception {
         Paper paper = givenCompletedPaper();
         var foreign = chatSessionRepository.save(com.ymc.chat.domain.ChatSession.open(
-                UUID.randomUUID(), paper.getId(), Instant.now()));
+                UUID.randomUUID(), paper.getId(), "질문", Instant.now()));
 
         mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
                         .with(userJwt())

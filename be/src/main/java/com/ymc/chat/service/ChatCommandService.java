@@ -63,7 +63,7 @@ public class ChatCommandService {
         paperChatAccessValidator.validateChatReady(paperId, ownerId);
         rejectDuplicate(ownerId, paperId, clientMessageId, content);
 
-        ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull);
+        ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
 
         if (chatMessageRepository.existsBySessionIdAndStatus(
                 session.getId(), ChatMessageStatus.GENERATING)) {
@@ -71,12 +71,14 @@ public class ChatCommandService {
         }
 
         Instant now = Instant.now();
+        int userSeq = chatMessageRepository.findMaxSeqBySessionId(session.getId()).orElse(0) + 1;
+        session.recordActivity(now);
         ChatMessage assistant;
         try {
             chatMessageRepository.save(
-                    ChatMessage.userMessage(session, clientMessageId, content, now));
+                    ChatMessage.userMessage(session, clientMessageId, content, userSeq, now));
             assistant = chatMessageRepository.saveAndFlush(
-                    ChatMessage.assistantGenerating(session, clientMessageId, now));
+                    ChatMessage.assistantGenerating(session, clientMessageId, userSeq + 1, now));
         } catch (DataIntegrityViolationException e) {
             // 사전 조회를 나란히 통과한 동시 재전송 — 유니크 제약이 최후 방어선 (paper design D4 준용).
             // PG는 제약 위반 후 같은 트랜잭션의 추가 쿼리를 거부하므로(aborted, 25P02)
@@ -100,8 +102,7 @@ public class ChatCommandService {
             return;
         }
         ChatSession existingSession = existingUser.get().getSession();
-        if (!existingSession.getOwnerId().equals(ownerId)
-                || !existingSession.getPaperId().equals(paperId)) {
+        if (!existingSession.belongsTo(ownerId, paperId)) {
             // 타인·다른 논문의 재사용 — 기존 실행의 식별자를 노출하지 않고 거부한다
             throw new ApiException(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT,
                     "clientMessageId가 다른 요청에 이미 사용되었습니다.");
@@ -118,16 +119,40 @@ public class ChatCommandService {
                 assistant.getSession().getId(), assistant.getId(), assistant.getStatus());
     }
 
-    private ChatSession resolveSession(UUID ownerId, UUID paperId, UUID sessionIdOrNull) {
+    private ChatSession resolveSession(
+            UUID ownerId, UUID paperId, UUID sessionIdOrNull, String content) {
         if (sessionIdOrNull == null) {
-            return chatSessionRepository.save(ChatSession.open(ownerId, paperId, Instant.now()));
+            return chatSessionRepository.save(
+                    ChatSession.open(ownerId, paperId, content, Instant.now()));
         }
         ChatSession session = chatSessionRepository.findWithLockById(sessionIdOrNull)
                 .orElseThrow(this::sessionNotFound);
-        if (!session.getOwnerId().equals(ownerId) || !session.getPaperId().equals(paperId)) {
+        if (!session.belongsTo(ownerId, paperId)) {
             throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
         }
         return session;
+    }
+
+    /**
+     * 세션과 소속 메시지를 삭제한다 (설계 §1·§3). GENERATING 중이어도 삭제한다 — 진행 중이던
+     * relay의 조건부 UPDATE(markCompleted/markFailed)는 0행으로 끝나며 무해하다.
+     *
+     * <p>{@code findWithLockById}로 start와 직렬화한다 — 잠금 없이 bulk delete와 start의
+     * 메시지 insert가 교차하면 삭제된 세션을 참조하는 insert가 FK 위반으로 5xx가 된다.
+     *
+     * @throws ApiException PAPER_NOT_FOUND / FORBIDDEN — 논문 검증 실패
+     * @throws ApiException CHAT_SESSION_NOT_FOUND — 세션 없음·소유/논문 불일치
+     */
+    @Transactional
+    public void deleteSession(UUID ownerId, UUID paperId, UUID sessionId) {
+        paperChatAccessValidator.validateOwned(paperId, ownerId);
+        ChatSession session = chatSessionRepository.findWithLockById(sessionId)
+                .orElseThrow(this::sessionNotFound);
+        if (!session.belongsTo(ownerId, paperId)) {
+            throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
+        }
+        chatMessageRepository.deleteBySessionId(sessionId);
+        chatSessionRepository.delete(session);
     }
 
     private ApiException sessionNotFound() {

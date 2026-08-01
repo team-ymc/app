@@ -10,7 +10,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -27,18 +26,21 @@ import lombok.Getter;
  *
  * <p>clientMessageId는 user·assistant 두 행에 같이 저장한다 — 재전송 멱등 판정(user 행)과
  * DUPLICATE_MESSAGE 응답의 messageId·status 조회(assistant 행)를 한 인덱스로 해결한다.
- * 유니크는 (client_message_id, role)이다.
+ * 유니크는 (client_message_id, role)이다. (session_id, seq)도 유니크 — 채번 안전망 겸 정렬 인덱스.
  */
 @Getter
 @Entity
 @Table(
         name = "chat_message",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_chat_message_client_id_role",
-                columnNames = {"client_message_id", "role"}),
-        indexes = @Index(
-                name = "ix_chat_message_session_created",
-                columnList = "session_id, created_at"))
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_chat_message_client_id_role",
+                        columnNames = {"client_message_id", "role"}),
+                // 앱 채번(max+1)의 DB 안전망 — 잠금 없이 insert하는 미래 코드가 중복 seq를
+                // 조용히 저장하지 못하게 한다. 유니크 인덱스가 히스토리 정렬 조회도 겸한다.
+                @UniqueConstraint(
+                        name = "uk_chat_message_session_seq",
+                        columnNames = {"session_id", "seq"})})
 public class ChatMessage {
 
     @Id
@@ -64,6 +66,10 @@ public class ChatMessage {
     @Column(name = "client_message_id", nullable = false, updatable = false)
     private UUID clientMessageId;
 
+    /** 세션 내 단조 증가 순번 — 히스토리 정렬 키. 세션 행 잠금 하에서 부여된다 (YMC-260 설계 §2). */
+    @Column(name = "seq", nullable = false, updatable = false)
+    private int seq;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,29 +81,30 @@ public class ChatMessage {
     }
 
     private ChatMessage(ChatSession session, ChatMessageRole role, String content,
-            ChatMessageStatus status, UUID clientMessageId, Instant now) {
+            ChatMessageStatus status, UUID clientMessageId, int seq, Instant now) {
         this.id = UUID.randomUUID();
         this.session = session;
         this.role = role;
         this.content = content;
         this.status = status;
         this.clientMessageId = clientMessageId;
+        this.seq = seq;
         this.createdAt = now;
         this.completedAt = status == ChatMessageStatus.COMPLETED ? now : null;
     }
 
     /** 사용자 질문. 저장 즉시 COMPLETED다. */
     public static ChatMessage userMessage(
-            ChatSession session, UUID clientMessageId, String content, Instant now) {
+            ChatSession session, UUID clientMessageId, String content, int seq, Instant now) {
         Objects.requireNonNull(content, "content");
         return new ChatMessage(session, ChatMessageRole.USER, content,
-                ChatMessageStatus.COMPLETED, clientMessageId, now);
+                ChatMessageStatus.COMPLETED, clientMessageId, seq, now);
     }
 
     /** 생성 중인 assistant 답변 자리. content는 완료 시 조건부 UPDATE로 채운다. */
     public static ChatMessage assistantGenerating(
-            ChatSession session, UUID clientMessageId, Instant now) {
+            ChatSession session, UUID clientMessageId, int seq, Instant now) {
         return new ChatMessage(session, ChatMessageRole.ASSISTANT, null,
-                ChatMessageStatus.GENERATING, clientMessageId, now);
+                ChatMessageStatus.GENERATING, clientMessageId, seq, now);
     }
 }

@@ -11,10 +11,14 @@
 --   user 메시지는 생성 즉시 COMPLETED.
 
 create table chat_session (
-    id         uuid                        not null,
-    owner_id   uuid                        not null,
-    paper_id   uuid                        not null,
-    created_at timestamp(6) with time zone not null,
+    id              uuid                        not null,
+    owner_id        uuid                        not null,
+    paper_id        uuid                        not null,
+    -- 목록 표시용 — 첫 user 질문의 앞 120자(코드포인트 기준). 생성 시 1회 저장, 불변 (YMC-260).
+    title           varchar(120)                not null,
+    created_at      timestamp(6) with time zone not null,
+    -- 마지막 메시지 저장 시각 — 세션 목록 정렬 키. 메시지 쌍 저장 시 갱신 (YMC-260).
+    last_message_at timestamp(6) with time zone not null,
 
     primary key (id)
 );
@@ -28,6 +32,9 @@ create table chat_message (
     status            varchar(16)                 not null
         check (status in ('GENERATING', 'COMPLETED', 'FAILED')),
     client_message_id uuid                        not null,
+    -- 세션 내 단조 증가 순번 — 히스토리 정렬 키. user·assistant 쌍이 같은 created_at으로
+    -- 저장되므로 정렬은 seq로 한다. 앱이 세션 행 잠금 하에 max+1로 채번한다 (YMC-260).
+    seq               integer                     not null,
     created_at        timestamp(6) with time zone not null,
     completed_at      timestamp(6) with time zone,
 
@@ -37,8 +44,9 @@ create table chat_message (
 
     -- 재전송 멱등(DUPLICATE_MESSAGE·CLIENT_MESSAGE_ID_CONFLICT)의 최종 방어선.
     -- user·assistant 두 행이 같은 clientMessageId를 나눠 가지므로 (client_message_id, role) 단위다.
-    constraint uk_chat_message_client_id_role unique (client_message_id, role)
-);
+    constraint uk_chat_message_client_id_role unique (client_message_id, role),
 
--- 세션 내 메시지 정렬 조회(히스토리 조회 YMC-260 대비)와 GENERATING 존재 검증용.
-create index ix_chat_message_session_created on chat_message (session_id, created_at);
+    -- 앱 채번의 DB 안전망 — 잠금 없이 insert하는 코드가 중복 seq를 조용히 저장하지 못하게 한다.
+    -- 이 유니크 인덱스가 세션 내 히스토리 정렬 조회와 GENERATING 존재 검증도 겸한다 (YMC-260).
+    constraint uk_chat_message_session_seq unique (session_id, seq)
+);
