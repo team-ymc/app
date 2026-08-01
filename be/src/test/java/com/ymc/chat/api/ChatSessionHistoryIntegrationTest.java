@@ -1,7 +1,9 @@
 // test/java/com/ymc/chat/api/ChatSessionHistoryIntegrationTest.java
 package com.ymc.chat.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -148,5 +150,58 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("세션 삭제 — 204 후 세션·소속 메시지가 모두 사라지고 다른 세션은 남는다")
+    void deleteSessionCascadesMessages() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult target = givenCompletedExchange(TEST_USER_ID, paper, null, "지울 세션");
+        ChatStartResult keep = givenCompletedExchange(TEST_USER_ID, paper, null, "남길 세션");
+
+        mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",
+                        paper.getId(), target.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNoContent());
+
+        assertThat(chatSessionRepository.findById(target.sessionId())).isEmpty();
+        assertThat(chatMessageRepository.findAll())
+                .allMatch(m -> m.getSession().getId().equals(keep.sessionId()));
+        assertThat(chatSessionRepository.findById(keep.sessionId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("GENERATING assistant가 있어도 삭제된다")
+    void deleteSessionWhileGenerating() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+        // markCompleted 하지 않음 — assistant는 GENERATING인 채다
+
+        mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",
+                        paper.getId(), started.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNoContent());
+
+        assertThat(chatSessionRepository.count()).isZero();
+        assertThat(chatMessageRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("타인 세션 삭제는 404 CHAT_SESSION_NOT_FOUND — 데이터는 남는다")
+    void deleteOthersSessionNotFound() throws Exception {
+        Paper othersPaper = givenCompletedPaper(OTHER_USER_ID, "others.pdf");
+        ChatStartResult othersSession =
+                givenCompletedExchange(OTHER_USER_ID, othersPaper, null, "남의 질문");
+        Paper myPaper = givenCompletedPaper(TEST_USER_ID, "mine.pdf");
+
+        mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",
+                        myPaper.getId(), othersSession.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+
+        assertThat(chatSessionRepository.findById(othersSession.sessionId())).isPresent();
+        assertThat(chatMessageRepository.count()).isEqualTo(2);
     }
 }

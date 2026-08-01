@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,5 +83,16 @@ public class ChatController {
         return chatQueryService.listMessages(ownerId, paperId, sessionId).stream()
                 .map(ChatMessageItemResponse::from)
                 .toList();
+    }
+
+    /** 계약 deleteChatSession — 세션·소속 메시지 삭제. */
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<Void> deleteSession(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID paperId,
+            @PathVariable UUID sessionId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        chatCommandService.deleteSession(ownerId, paperId, sessionId);
+        return ResponseEntity.noContent().build();
     }
 }
