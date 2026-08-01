@@ -1,13 +1,17 @@
-// 이식: project-docs/design/v1/Paper Study Page.dc.html — R5 AI chat panel.
-// history 관련 마크업(historyOpen/toggleHistory/historyList)은 이식하지 않는다 — 과거 세션·메시지
-// 목록을 조회할 계약이 없다 (픽션 조정 2호, spec §8). "새 대화" 버튼만 남긴다.
+// 이식: project-docs/design/v1/Paper Study Page.dc.html — R5 AI chat panel, history 드롭다운 포함
+// (clock-counter-clockwise IconButton + historyOpen 드롭다운, L138-146). 목업 handleDocMouseDown(L360-370)은
+// selectionToolbar/translationPopup/askPopup만 닫고 historyOpen은 다루지 않는다 — 그대로 이식해 바깥 클릭
+// 자동 닫힘을 추가하지 않는다(YMC-260 T2 brief).
 // wiring은 구 fe/src/chat/ChatPanel.jsx(삭제 예정, 참조용)의 useReducer(chatReducer)/streamChatMessage/
 // AbortController 언마운트 처리·재시도 로직을 그대로 따르되, TS화된 ../../chat/chatState·chatStream(Task 4)을 쓴다.
 import { useEffect, useRef, useState, useReducer } from 'react';
 import type { CSSProperties } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Quotes, X } from '@phosphor-icons/react';
 import { chatReducer, initialChatState } from '../../chat/chatState';
 import { streamChatMessage } from '../../chat/chatStream';
+import { listChatSessions, listChatSessionMessages } from '../../api/chatSessions';
+import { ApiError } from '../../api/types';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import { TutorNotebook } from '../../design/components/TutorNotebook';
 import { NotebookSection } from '../../design/components/NotebookSection';
@@ -73,6 +77,53 @@ const contextTooltipStyle: CSSProperties = {
   zIndex: 90,
 };
 
+const historyDropdownStyle: CSSProperties = {
+  position: 'absolute',
+  top: 42,
+  left: 0,
+  width: 220,
+  background: 'var(--color-bg-paper)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 8,
+  boxShadow: 'var(--shadow-menu)',
+  padding: 6,
+  zIndex: 10,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+};
+
+const historyStatusStyle: CSSProperties = {
+  padding: '9px 10px',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  color: 'var(--color-text-muted)',
+};
+
+function HistoryItemButton({ title, onClick }: { title: string; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        textAlign: 'left',
+        padding: '9px 10px',
+        border: 'none',
+        background: hover ? 'var(--color-primary-subtle)' : 'transparent',
+        borderRadius: 6,
+        fontFamily: 'var(--font-sans)',
+        fontSize: 13,
+        color: 'var(--color-text-body)',
+        cursor: 'pointer',
+      }}
+    >
+      {title}
+    </button>
+  );
+}
+
 function dotStyle(delay: number): CSSProperties {
   return {
     width: 6,
@@ -96,6 +147,16 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   const [input, setInput] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
   const [contextTooltipOpen, setContextTooltipOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  // 드롭다운이 열릴 때만 조회 — 열 때마다 refetchOnMount 기본값으로 신선하게 받는다.
+  const sessionsQuery = useQuery({
+    queryKey: ['chat-sessions', paperId],
+    queryFn: () => listChatSessions(paperId),
+    enabled: historyOpen,
+  });
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -134,8 +195,29 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
       clientMessageId,
       content,
       signal: controller.signal,
-      onEvent: dispatch,
+      onEvent: (e) => {
+        // 전송 완료 시 세션 목록을 무효화 — 새 세션이 다음에 드롭다운을 열 때 반영되게 한다.
+        if (e.type === 'completed') queryClient.invalidateQueries({ queryKey: ['chat-sessions', paperId] });
+        dispatch(e);
+      },
     });
+  }
+
+  function handleToggleHistory() {
+    setHistoryLoadError(null);
+    setHistoryOpen((v) => !v);
+  }
+
+  async function handleSelectHistorySession(sessionId: string) {
+    setHistoryLoadError(null);
+    abortRef.current?.abort();
+    try {
+      const items = await listChatSessionMessages(paperId, sessionId);
+      dispatch({ type: 'historyLoaded', sessionId, items });
+      setHistoryOpen(false);
+    } catch (e) {
+      setHistoryLoadError(e instanceof ApiError ? e.message : '대화를 불러오지 못했습니다.');
+    }
   }
 
   function resetComposerHeight() {
@@ -301,7 +383,32 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
           flexShrink: 0,
         }}
       >
-        <IconButton icon="note-pencil" label="새 대화" size={36} onClick={handleNewConversation} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <div style={{ position: 'relative' }}>
+            <IconButton icon="clock-counter-clockwise" label="이전 대화 기록" size={36} onClick={handleToggleHistory} />
+            {historyOpen ? (
+              <div style={historyDropdownStyle}>
+                {sessionsQuery.isLoading ? (
+                  <div style={historyStatusStyle}>불러오는 중…</div>
+                ) : sessionsQuery.isError ? (
+                  <div style={{ ...historyStatusStyle, color: 'var(--color-danger)' }}>
+                    {sessionsQuery.error instanceof ApiError ? sessionsQuery.error.message : '대화 목록을 불러오지 못했습니다.'}
+                  </div>
+                ) : sessionsQuery.data && sessionsQuery.data.length === 0 ? (
+                  <div style={historyStatusStyle}>저장된 대화가 없습니다</div>
+                ) : (
+                  sessionsQuery.data?.map((s) => (
+                    <HistoryItemButton key={s.sessionId} title={s.title} onClick={() => handleSelectHistorySession(s.sessionId)} />
+                  ))
+                )}
+                {historyLoadError ? (
+                  <div style={{ ...historyStatusStyle, color: 'var(--color-danger)' }}>{historyLoadError}</div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <IconButton icon="note-pencil" label="새 대화" size={36} onClick={handleNewConversation} />
+        </div>
         <IconButton icon="sidebar-simple" label="AI 튜터 접기" size={36} onClick={onToggleCollapse} />
       </div>
 
@@ -326,14 +433,21 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
               );
             }
 
-            const loading = m.status === 'GENERATING' && m.content === '';
+            // 바운스는 "streaming 중 + 이 메시지가 아직 델타를 못 받은 GENERATING"일 때만. 그 외
+            // GENERATING(히스토리에서 로드된, resume 미지원 — 계약 상태 보존)은 muted 안내 텍스트.
+            const bouncing = m.status === 'GENERATING' && m.content === '' && state.streaming;
+            const historyGenerating = m.status === 'GENERATING' && !state.streaming;
             return (
               <div key={m.key}>
-                {loading ? (
+                {bouncing ? (
                   <div style={{ display: 'flex', gap: 4, padding: '6px 0' }}>
                     <span style={dotStyle(0)} />
                     <span style={dotStyle(0.15)} />
                     <span style={dotStyle(0.3)} />
+                  </div>
+                ) : historyGenerating ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '6px 0' }}>
+                    답변을 생성하던 중이던 메시지입니다 — 잠시 후 다시 열어 확인해 주세요.
                   </div>
                 ) : (
                   <div style={{ borderLeft: '2px solid var(--color-accent-brass)', paddingLeft: 12 }}>
