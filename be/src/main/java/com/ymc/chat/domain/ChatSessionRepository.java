@@ -1,5 +1,6 @@
 package com.ymc.chat.domain;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,6 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
 
 public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> {
+
+    /** 목록 조회 (계약 listChatSessions). 정렬 키는 비정규화된 lastMessageAt. */
+    List<ChatSession> findAllByOwnerIdAndPaperIdOrderByLastMessageAtDesc(UUID ownerId, UUID paperId);
 
     /**
      * 세션 행을 PESSIMISTIC_WRITE로 잠근다 (SELECT ... FOR UPDATE).

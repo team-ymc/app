@@ -1,6 +1,7 @@
 package com.ymc.chat.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,4 +45,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     /** 세션의 현재 최대 seq. start 트랜잭션이 세션 행을 잠근 상태에서만 호출한다 — 경쟁 없음. */
     @Query("select max(m.seq) from ChatMessage m where m.session.id = :sessionId")
     Optional<Integer> findMaxSeqBySessionId(UUID sessionId);
+
+    /** 히스토리 조회 (계약 listChatSessionMessages). 정렬 키는 seq — ix_chat_message_session_seq. */
+    List<ChatMessage> findAllBySessionIdOrderBySeqAsc(UUID sessionId);
 }

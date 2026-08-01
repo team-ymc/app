@@ -32,15 +32,30 @@ public class PaperChatAccessValidator {
      */
     @Transactional(readOnly = true)
     public void validateChatReady(UUID paperId, UUID ownerId) {
-        Paper paper = paperRepository.findById(paperId).orElseThrow(
-                () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
-
-        if (!paper.getOwnerId().equals(ownerId)) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
-        }
+        Paper paper = getOwned(paperId, ownerId);
         if (paper.getStatus() != PaperStatus.COMPLETED) {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
                     "논문이 아직 학습 가능한 상태가 아닙니다: " + paper.getStatus());
         }
+    }
+
+    /**
+     * 소유만 검증한다 — 세션 히스토리 조회·삭제는 논문 파싱 상태와 무관하다 (YMC-260 설계 §3).
+     *
+     * @throws ApiException PAPER_NOT_FOUND(404) — 논문 없음
+     * @throws ApiException FORBIDDEN(403) — 소유자가 아님
+     */
+    @Transactional(readOnly = true)
+    public void validateOwned(UUID paperId, UUID ownerId) {
+        getOwned(paperId, ownerId);
+    }
+
+    private Paper getOwned(UUID paperId, UUID ownerId) {
+        Paper paper = paperRepository.findById(paperId).orElseThrow(
+                () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
+        if (!paper.getOwnerId().equals(ownerId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
+        }
+        return paper;
     }
 }
