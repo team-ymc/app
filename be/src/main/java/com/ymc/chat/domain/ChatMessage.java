@@ -10,7 +10,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -27,18 +26,21 @@ import lombok.Getter;
  *
  * <p>clientMessageId는 user·assistant 두 행에 같이 저장한다 — 재전송 멱등 판정(user 행)과
  * DUPLICATE_MESSAGE 응답의 messageId·status 조회(assistant 행)를 한 인덱스로 해결한다.
- * 유니크는 (client_message_id, role)이다.
+ * 유니크는 (client_message_id, role)이다. (session_id, seq)도 유니크 — 채번 안전망 겸 정렬 인덱스.
  */
 @Getter
 @Entity
 @Table(
         name = "chat_message",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_chat_message_client_id_role",
-                columnNames = {"client_message_id", "role"}),
-        indexes = @Index(
-                name = "ix_chat_message_session_seq",
-                columnList = "session_id, seq"))
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_chat_message_client_id_role",
+                        columnNames = {"client_message_id", "role"}),
+                // 앱 채번(max+1)의 DB 안전망 — 잠금 없이 insert하는 미래 코드가 중복 seq를
+                // 조용히 저장하지 못하게 한다. 유니크 인덱스가 히스토리 정렬 조회도 겸한다.
+                @UniqueConstraint(
+                        name = "uk_chat_message_session_seq",
+                        columnNames = {"session_id", "seq"})})
 public class ChatMessage {
 
     @Id
