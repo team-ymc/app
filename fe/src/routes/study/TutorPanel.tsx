@@ -107,9 +107,12 @@ function HistoryItemButton({ title, onClick, disabled = false }: { title: string
     <button
       onClick={onClick}
       disabled={disabled}
+      title={title} // 말줄임된 전체 제목은 네이티브 툴팁으로
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
+        display: 'block',
+        width: '100%',
         textAlign: 'left',
         padding: '9px 10px',
         border: 'none',
@@ -120,6 +123,9 @@ function HistoryItemButton({ title, onClick, disabled = false }: { title: string
         color: disabled ? 'var(--color-text-muted)' : 'var(--color-text-body)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
       }}
     >
       {title}
