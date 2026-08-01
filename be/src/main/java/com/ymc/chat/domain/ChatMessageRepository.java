@@ -40,4 +40,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
                and m.status = com.ymc.chat.domain.ChatMessageStatus.GENERATING
             """)
     int markFailed(UUID id, Instant now);
+
+    /** 세션의 현재 최대 seq. start 트랜잭션이 세션 행을 잠근 상태에서만 호출한다 — 경쟁 없음. */
+    @Query("select max(m.seq) from ChatMessage m where m.session.id = :sessionId")
+    Optional<Integer> findMaxSeqBySessionId(UUID sessionId);
 }

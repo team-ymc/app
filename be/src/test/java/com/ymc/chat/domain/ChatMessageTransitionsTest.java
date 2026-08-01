@@ -21,9 +21,9 @@ class ChatMessageTransitionsTest extends IntegrationTest {
 
     private ChatMessage givenGeneratingAssistant() {
         ChatSession session = chatSessionRepository.save(
-                ChatSession.open(TEST_USER_ID, UUID.randomUUID(), Instant.now()));
+                ChatSession.open(TEST_USER_ID, UUID.randomUUID(), "질문", Instant.now()));
         return chatMessageRepository.save(
-                ChatMessage.assistantGenerating(session, UUID.randomUUID(), Instant.now()));
+                ChatMessage.assistantGenerating(session, UUID.randomUUID(), 1, Instant.now()));
     }
 
     @Test
@@ -58,13 +58,13 @@ class ChatMessageTransitionsTest extends IntegrationTest {
     @DisplayName("같은 clientMessageId·같은 role은 유니크 제약에 걸린다")
     void clientMessageIdUniquePerRole() {
         ChatSession session = chatSessionRepository.save(
-                ChatSession.open(TEST_USER_ID, UUID.randomUUID(), Instant.now()));
+                ChatSession.open(TEST_USER_ID, UUID.randomUUID(), "질문", Instant.now()));
         UUID clientMessageId = UUID.randomUUID();
         chatMessageRepository.saveAndFlush(
-                ChatMessage.userMessage(session, clientMessageId, "질문", Instant.now()));
+                ChatMessage.userMessage(session, clientMessageId, "질문", 1, Instant.now()));
 
         assertThatThrownBy(() -> chatMessageRepository.saveAndFlush(
-                ChatMessage.userMessage(session, clientMessageId, "질문", Instant.now())))
+                ChatMessage.userMessage(session, clientMessageId, "질문", 2, Instant.now())))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

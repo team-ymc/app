@@ -63,7 +63,7 @@ public class ChatCommandService {
         paperChatAccessValidator.validateChatReady(paperId, ownerId);
         rejectDuplicate(ownerId, paperId, clientMessageId, content);
 
-        ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull);
+        ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
 
         if (chatMessageRepository.existsBySessionIdAndStatus(
                 session.getId(), ChatMessageStatus.GENERATING)) {
@@ -71,12 +71,14 @@ public class ChatCommandService {
         }
 
         Instant now = Instant.now();
+        int userSeq = chatMessageRepository.findMaxSeqBySessionId(session.getId()).orElse(0) + 1;
+        session.recordActivity(now);
         ChatMessage assistant;
         try {
             chatMessageRepository.save(
-                    ChatMessage.userMessage(session, clientMessageId, content, now));
+                    ChatMessage.userMessage(session, clientMessageId, content, userSeq, now));
             assistant = chatMessageRepository.saveAndFlush(
-                    ChatMessage.assistantGenerating(session, clientMessageId, now));
+                    ChatMessage.assistantGenerating(session, clientMessageId, userSeq + 1, now));
         } catch (DataIntegrityViolationException e) {
             // 사전 조회를 나란히 통과한 동시 재전송 — 유니크 제약이 최후 방어선 (paper design D4 준용).
             // PG는 제약 위반 후 같은 트랜잭션의 추가 쿼리를 거부하므로(aborted, 25P02)
@@ -118,9 +120,11 @@ public class ChatCommandService {
                 assistant.getSession().getId(), assistant.getId(), assistant.getStatus());
     }
 
-    private ChatSession resolveSession(UUID ownerId, UUID paperId, UUID sessionIdOrNull) {
+    private ChatSession resolveSession(
+            UUID ownerId, UUID paperId, UUID sessionIdOrNull, String content) {
         if (sessionIdOrNull == null) {
-            return chatSessionRepository.save(ChatSession.open(ownerId, paperId, Instant.now()));
+            return chatSessionRepository.save(
+                    ChatSession.open(ownerId, paperId, content, Instant.now()));
         }
         ChatSession session = chatSessionRepository.findWithLockById(sessionIdOrNull)
                 .orElseThrow(this::sessionNotFound);
