@@ -55,6 +55,7 @@ public class ParseResultListener {
         }
 
         // 여기서부터의 예외(DB 장애 등)는 삼키지 않는다 — 전파해야 재전달된다.
-        parseResultService.apply(message.paperId(), message.terminalStatus(), message.errorCode());
+        parseResultService.apply(message.paperId(), message.terminalStatus(), message.errorCode(),
+                message.manifestKey());
     }
 }
