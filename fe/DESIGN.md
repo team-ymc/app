@@ -1,5 +1,7 @@
 # DESIGN — BE 검증용 임시 업로드 UI
 
+> **대체됨** — 이 문서가 설명하는 임시 UI는 폐기되었다. 현행 설계: docs/superpowers/specs/2026-07-31-fe-v1-redesign-design.md
+
 Source: project-docs/features/FT-003-논문-등록-분석.md / Jira: YMC-221 (에픽 YMC-179)
 Decision: project-docs/decisions/ADR-001-pdf-upload-presigned-url.md
 

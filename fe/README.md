@@ -1,60 +1,60 @@
-# app/fe — 임시 업로드 UI (BE 검증용)
+# app/fe — Paper Teacher 프론트엔드
 
-> ⚠️ **이건 진짜 FE가 아니다.** FT-003 백엔드가 브라우저에서 실제로 도는지 확인하려고 만든 **버릴 개발 도구**다. 진짜 FE 착수 시 이 폴더째 삭제한다.
->
-> - **실행법** → [`app/README.md`](../README.md) (환경 → be → fe 순서). 여기엔 fe에만 해당하는 것만 적는다.
-> - **왜 이렇게 만들었나**(설계 결정) → [`DESIGN.md`](./DESIGN.md)
-> - Jira: [YMC-221](https://geunhh.atlassian.net/browse/YMC-221) · 기반 목업: `temp/논문 등록 처리 UI.html`
+Jira 에픽: [YMC-289](https://geunhh.atlassian.net/browse/YMC-289) · 설계: [`docs/superpowers/specs/2026-07-31-fe-v1-redesign-design.md`](../docs/superpowers/specs/2026-07-31-fe-v1-redesign-design.md) · 왜 이렇게 만들었나(구 임시 UI 이력): [`DESIGN.md`](./DESIGN.md)
 
-## 무엇을 검증하나
+React 19 + TypeScript(Vite) SPA. 페이지 3개 — Landing(`/`) · Bookshelf(`/library`) · Study(`/papers/:id`).
 
-브라우저에서 PDF를 올려 `POST /api/papers` → S3 presigned PUT → `complete` → `status` 폴링이 **실제로** 도는지 눈으로 확인한다. 서버 간 테스트로는 안 잡히던 두 가지가 핵심이다:
+## 설치
 
-- **S3 버킷 CORS** — 브라우저의 presigned PUT은 CORS를 탄다. (`infra`의 `bootstrap.sh`가 버킷 CORS를 넣는다)
-- **presign의 Content-Type 서명** — PUT의 `Content-Type`이 서명값과 어긋나면 `SignatureDoesNotMatch`.
+```bash
+npm i
+```
 
-## 실행 중 알아둘 것
+## 실행
 
-### `PROCESSING`에서 멈추는 건 정상이다
+```bash
+npm run dev
+```
 
-AI 파싱 워커가 아직 없어서, 업로드가 끝나면 논문은 `PROCESSING`에 머문다. **버그가 아니다.** 파싱 결과를 손으로 발행해 완료시킨다:
+BE(Spring Boot)와 LocalStack이 함께 떠 있어야 로그인·업로드·챗이 동작한다. `infra/local`을 참조.
+
+```bash
+cd ../../infra/local && ./up.sh          # LocalStack + PostgreSQL
+cd ../../app/be && ./gradlew bootRun     # 또는 docker compose up --build -d
+```
+
+파싱 워커가 없으므로 업로드한 논문은 `PROCESSING`에서 멈춘다. 수동으로 완료/실패 처리:
 
 ```bash
 cd ../../infra/local
-./publish-parse-result.sh <paperId> COMPLETED   # 완료 행으로 전환
-./publish-parse-result.sh <paperId> FAILED      # 실패 행 + error.code
+./publish-parse-result.sh <paperId> COMPLETED
+./publish-parse-result.sh <paperId> FAILED
 ```
 
-`<paperId>`는 업로드 후 화면 또는 `POST /api/papers` 응답에서 얻는다. (진짜 FE에는 이 단계가 없다 — 그땐 AI 워커가 결과를 발행한다.)
+## 테스트
 
-### 새로고침해도 서재가 유지된다
+```bash
+npm test
+```
 
-`GET /api/papers`(FT-002, BE는 YMC-223)가 이제 있다. `src/api.js`의 `listPapers()`가 마운트 시 실제 목록을 받아오므로 새로고침해도 서재가 비지 않는다. DESIGN.md D3("로컬 상태로 들고 있는다")는 이 엔드포인트가 생기며 폐기됐다 — `listPapers()` 접점은 그대로 두고 내부만 실제 `fetch`로 교체됐다.
+## 타입체크
 
-### presigned URL은 10분 뒤 만료된다
+```bash
+npm run typecheck
+```
 
-파일 선택 후 오래 두면 PUT이 403난다. 화면에 에러가 그대로 뜬다. 자동 재발급은 하지 않는다.
+## 빌드
 
-### 완료 논문은 원본 PDF를 다운로드할 수 있다
+```bash
+npm run build
+```
 
-서재 행이 `COMPLETED`면 다운로드 버튼이 뜬다. `GET /api/papers/{id}/download`로 presigned GET URL(`downloadUrl`)을 받아 `<a download>` 네비게이션으로 받는다 — 파일명은 서버의 `Content-Disposition`이 정한다(브라우저가 임의로 붙이지 않는다). `PROCESSING`/`FAILED` 행에는 버튼이 없다(FT-002 Story 5).
+## 계약 미확정 구간
 
-## 검증 시나리오
+BE 계약(`project-docs/contracts/`)이 아직 정하지 않은 두 곳은 어댑터로 격리해 두었다. 계약이 확정되면 아래 함수 내부만 교체하면 된다 — 소비하는 컴포넌트(뷰어, 인라인 액션)는 그대로 둔다.
 
-`DESIGN.md`의 Verification 6개 + 다운로드 단계를 손으로 훑는다:
-
-1. 업로드 → S3 객체 확인(`awslocal s3 ls s3://ymc-documents --recursive`) → 서재 행이 "진행 중"
-2. `GET /{paperId}/status` → `PROCESSING`, 큐 메시지 확인(`awslocal sqs receive-message`)
-3. 수동 발행으로 완료 전환:
-   ```bash
-   cd ../../infra/local
-   ./publish-parse-result.sh <paperId> COMPLETED
-   ```
-   서재 행이 "완료"로 바뀌고 다운로드 버튼이 뜬다.
-4. **다운로드 버튼 클릭 → 원본 파일명(예: attention.pdf)으로 저장되는지 확인** (핵심 시나리오)
-5. `./publish-parse-result.sh <다른paperId> FAILED` → 실패 행, 다운로드 버튼 없음
-6. complete 전(`UPLOAD_PENDING`) paperId로 `curl http://localhost:8080/api/papers/<id>/download` → 409 `UPLOAD_NOT_FOUND`
-7. 같은 파일명 재업로드 → `409 DUPLICATE_FILENAME`이 화면에 노출
+- **`getPaperContent`** (`src/markdown/paperContent.ts`) — 논문 본문 구조(`DocumentParseResponse`)가 미확정이라 `src/fixtures/sample-paper.md` 픽스처를 반환한다.
+- **`translateSelection`** (`src/api/translate.ts`) — 인라인 선택 번역 엔드포인트가 없어 지연 후 더미 문자열을 돌려주는 목이다.
 
 ## 원칙
 

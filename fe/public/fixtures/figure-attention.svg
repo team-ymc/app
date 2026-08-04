@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280">
+  <rect width="480" height="280" fill="#FAF6EF"/>
+  <g fill="none" stroke="#1F3552" stroke-width="1.5">
+    <rect x="60" y="40" width="140" height="200" rx="4"/>
+    <rect x="280" y="40" width="140" height="200" rx="4"/>
+    <line x1="200" y1="140" x2="280" y2="140"/>
+    <rect x="80" y="70" width="100" height="30" rx="2"/>
+    <rect x="80" y="120" width="100" height="30" rx="2"/>
+    <rect x="80" y="170" width="100" height="30" rx="2"/>
+    <rect x="300" y="70" width="100" height="30" rx="2"/>
+    <rect x="300" y="120" width="100" height="30" rx="2"/>
+    <rect x="300" y="170" width="100" height="30" rx="2"/>
+  </g>
+  <text x="130" y="260" text-anchor="middle" font-family="serif" font-size="12" fill="#1F3552">Encoder</text>
+  <text x="350" y="260" text-anchor="middle" font-family="serif" font-size="12" fill="#1F3552">Decoder</text>
+</svg>
