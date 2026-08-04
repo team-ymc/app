@@ -24,4 +24,10 @@ public interface FileStorage {
      * 브라우저가 원본 파일명으로 저장하게 한다.
      */
     PresignedDownload presignDownload(String fileKey, String filename);
+
+    /** 패키지 파일(manifest·document.json·tex·html)을 UTF-8 문자열로 읽는다. */
+    String readUtf8(String fileKey);
+
+    /** 이미지·차트 asset의 인라인 표시용 presigned GET. 다운로드용과 달리 Content-Disposition을 싣지 않는다. */
+    PresignedDownload presignAssetGet(String fileKey);
 }
