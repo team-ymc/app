@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "document_id": "fixture",
+  "page_count": 2,
+  "pages": [],
+  "blocks": [],
+  "assets": {
+    "image_0": {"kind": "image", "media_type": "image/jpeg", "path": "assets/images/image_0.jpg", "source_block_id": "p0001-b0002"},
+    "image_1": {"kind": "image", "media_type": "image/png", "path": "assets/images/image_1.png", "source_block_id": "p0001-b0004"},
+    "formula_0": {"kind": "formula", "media_type": "application/x-tex", "path": "assets/formulas/formula_0.tex", "source_block_id": "p0001-b0000"},
+    "table_0": {"kind": "table", "media_type": "text/html", "path": "assets/tables/table_0.html", "source_block_id": "p0001-b0001"}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 1,
+  "document_id": "fixture",
+  "page_count": 2,
+  "parser": {"provider": "paddleocr", "model": "PaddleOCR-VL-1.6"},
+  "artifacts": {
+    "source_pdf": {"path": "original.pdf", "media_type": "application/pdf"},
+    "structure_document": {"path": "structure/document.json", "media_type": "application/json", "schema_version": 2},
+    "frontend_document": {"path": "frontend/document.json", "media_type": "application/json", "schema_version": 1},
+    "ai_document": {"path": "ai/document.md", "media_type": "text/markdown"}
+  },
+  "assets": {"path": "assets", "registry": "structure_document"}
+}
