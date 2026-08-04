@@ -93,9 +93,6 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate            # 운영은 스키마 자동변경 금지
 
 aws:
   endpoint: ${AWS_ENDPOINT_URL:}    # 미지정 → 실제 AWS 엔드포인트
@@ -105,3 +102,24 @@ auth:
   jwt-secret: ${AUTH_JWT_SECRET}    # prod는 기본값 없음 — 미설정 시 기동 실패가 맞다
   fe-origin: ${FE_ORIGIN}
   cookie-secure: true
+
+---
+# ================= dev 전용 =================
+# 마이그레이션 도구 도입 전까지 dev만 스키마를 엔티티에서 생성한다.
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+---
+# ================= prod 전용 =================
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate            # 운영은 스키마 자동변경 금지
