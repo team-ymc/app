@@ -28,6 +28,9 @@ import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.domain.Paper;
+import com.ymc.paper.domain.PaperContentAssetRepository;
+import com.ymc.paper.domain.PaperContentBlockRepository;
+import com.ymc.paper.domain.PaperContentRepository;
 import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.service.PaperTransitions;
 import com.ymc.paper.service.port.FileStorage;
@@ -79,6 +82,15 @@ public abstract class IntegrationTest {
     protected PaperRepository paperRepository;
 
     @Autowired
+    protected PaperContentRepository paperContentRepository;
+
+    @Autowired
+    protected PaperContentBlockRepository paperContentBlockRepository;
+
+    @Autowired
+    protected PaperContentAssetRepository paperContentAssetRepository;
+
+    @Autowired
     protected UserRepository userRepository;
 
     @Autowired
@@ -124,6 +136,9 @@ public abstract class IntegrationTest {
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+        paperContentBlockRepository.deleteAll();
+        paperContentAssetRepository.deleteAll();
+        paperContentRepository.deleteAll();
         paperRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
@@ -157,6 +172,36 @@ public abstract class IntegrationTest {
                         .contentType("application/pdf")
                         .build(),
                 RequestBody.fromBytes("%PDF-1.4\n%fake pdf for test\n".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /** 클래스패스의 축소판 파서 패키지를 LocalStack S3의 주어진 prefix로 올린다. */
+    protected String givenPackageOnS3(UUID paperId) {
+        String prefix = "papers/" + paperId + "/";
+        for (String relative : List.of(
+                "manifest.json",
+                "frontend/document.json",
+                "structure/document.json",
+                "assets/formulas/formula_0.tex",
+                "assets/tables/table_0.html")) {
+            byte[] body = readFixture("/fixtures/paper-package/" + relative);
+            s3.putObject(PutObjectRequest.builder()
+                            .bucket(awsProperties.s3().bucket())
+                            .key(prefix + relative)
+                            .build(),
+                    RequestBody.fromBytes(body));
+        }
+        return prefix + "manifest.json";
+    }
+
+    private static byte[] readFixture(String resource) {
+        try (java.io.InputStream in = IntegrationTest.class.getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IllegalStateException("픽스처 없음: " + resource);
+            }
+            return in.readAllBytes();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     protected Paper reload(UUID paperId) {
