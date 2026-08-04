@@ -3,6 +3,9 @@
 - Jira: YMC-298 (BE, 에픽 YMC-231) · YMC-299 (FE) / 선행 머지: YMC-289 (PR #28)
 - 계약: `project-docs/contracts/frontend-backend/openapi.yaml`의 `getPaperContent` **초안**
   (YMC-293, project-docs 로컬 미커밋 — 신규 operation이므로 구현으로 검증 후 PR·확정한다)
+- 메시지 계약: `project-docs/contracts/backend-ai/sqs/messaging.yml` **0.2.0 확정** (YMC-229,
+  2026-08-05 main 머지) — snake_case wire·status 소문자·completed에 `manifest_key`+`message` 필수.
+  현행 BE 메시지 코드(camelCase)는 구계약이라 **0.2.0 동기화가 Stage 1 범위에 포함**된다.
 - 파서 산출물: ai repo `docs/S3_BUCKET_STRUCTURE_KO.md` · 샘플 패키지 `docs/0.0v3/`
 
 ## 1. 목적과 범위
@@ -31,10 +34,10 @@ lazy는 계약 서술과 어긋나고 결국 적재로 회귀(이중작업), 수
 ### 3.1 흐름
 
 ```
-SQS parse-results (COMPLETED + manifestKey)     S3 papers/{paperId}/
+SQS parse-results (completed + manifest_key)    S3 papers/{paperId}/
         │                                        (manifest · frontend/document.json · assets)
         ▼                                              │
-ParseResultService ──manifestKey 있으면──▶ PaperContentIngestService ◀─읽기─┘
+ParseResultService ──completed면──▶ PaperContentIngestService ◀─읽기─┘
   (상태 전이)                                (수식·표 인라인 → DB 적재)
                                                        │
                                                        ▼
@@ -67,9 +70,13 @@ dev는 ddl-auto update(YMC-272)라 JPA 엔티티로 정의한다. 모두 `paper_
   조회 시 S3 접근은 이미지 presigned 발급뿐.
 - 재적재 멱등: 기존 행 삭제 후 삽입.
 - 리스너와 분리된 서비스 — SQS 외 경로(검증 스크립트·추후 어드민)에서도 호출 가능.
-- 리스너 연결: `ParseResultService.apply()`가 COMPLETED 전이 성공 시 메시지에 `manifestKey`가
-  있으면 적재 호출. **없으면 기존대로 상태 전이만**(하위호환 — `messaging.yml` 반영 전 메시지도
-  정상 소비). 적재 실패는 예외를 올려 SQS 재전달에 태운다.
+- **메시지 계약 0.2.0 동기화** (YMC-229 확정 반영): `ParseResultMessage`를 snake_case·소문자
+  status·`manifest_key`(completed 필수)로 재작성하고, 발행 측 `ParseRequestMessage`도
+  `paper_id`/`file_key`로 맞춘다. 구형 형식 메시지는 계약 위반으로 폐기(기존 ack 규칙).
+  실제 발행 주체가 아직 검증 스크립트뿐이라 클린 컷오버가 가능하다.
+- 리스너 연결: `ParseResultService.apply()`가 completed 수신 시 적재 호출. 적재 판정은 전이
+  성공 여부와 독립 — "COMPLETED 상태 + 미적재"면 적재하므로, 전이 커밋 후 적재만 실패해
+  재전달된 메시지도 복구된다. 적재 실패는 예외를 올려 SQS 재전달(5회 후 DLQ)에 태운다.
 
 ### 3.4 조회 — `GET /api/papers/{paperId}/content`
 
@@ -110,7 +117,8 @@ dev는 ddl-auto update(YMC-272)라 JPA 엔티티로 정의한다. 모두 `paper_
 
 - BE 단위: 파서 샘플 `frontend/document.json` 픽스처 → 블록 매핑·인라인·재적재 멱등.
 - BE 통합(LocalStack, 기존 패턴): 200 조립·404/403/409·presigned 발급.
-  리스너 하위호환: manifestKey 無 → 전이만(기존 테스트 유지), 有 → 적재.
+  리스너: 0.2.0 형식 completed → 전이+적재, failed → 전이만, `manifest_key` 누락 completed·
+  구형 형식 → 계약 위반 폐기. 기존 소비 테스트는 0.2.0 wire 형식으로 이관.
 - FE 단위: 어댑터 label 전 종류 매핑·표 정화·미지 label 방어. 기존 뷰어 테스트가
   무수정 통과하는 것 자체가 "뷰어 안 건드림" 검증.
 - Stage 1 완료 기준: 샘플 패키지 S3 시딩 → `publish-parse-result.sh`(manifestKey 추가) →
@@ -120,7 +128,7 @@ dev는 ddl-auto update(YMC-272)라 JPA 엔티티로 정의한다. 모두 `paper_
 
 ## 6. 리스크·후속 (이번 범위 밖)
 
-- `messaging.yml` manifestKey 반영 — AI 담당자 조율. 하위호환 설계라 블로킹 아님.
+- ~~`messaging.yml` manifestKey 반영~~ — **해소** (YMC-229, sqs/messaging.yml 0.2.0 main 머지).
 - `openapi.yaml` getPaperContent 확정 PR — Stage 2 검증 후. yaml `0.2.5` ↔ README "0.3.0" 표기
   어긋남도 이때 정리.
 - AI 워커의 실제 SQS 발행 — AI 소유, 별도 티켓.
