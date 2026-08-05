@@ -12,9 +12,10 @@ import type { PaperBlock } from '../../markdown/paperContent';
 export interface PaperViewerProps {
   blocks: PaperBlock[];
   containerRef: Ref<HTMLDivElement>;
+  onImageError?: () => void;
 }
 
-export function PaperViewer({ blocks, containerRef }: PaperViewerProps) {
+export function PaperViewer({ blocks, containerRef, onImageError }: PaperViewerProps) {
   return (
     <div
       ref={containerRef}
@@ -36,7 +37,7 @@ export function PaperViewer({ blocks, containerRef }: PaperViewerProps) {
                 {b.type === 'table' && b.tableHtml != null ? (
                   <SanitizedHtmlTable html={b.tableHtml} />
                 ) : (
-                  <PaperMarkdown>{b.markdown ?? ''}</PaperMarkdown>
+                  <PaperMarkdown onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
                 )}
               </section>
             ))}
