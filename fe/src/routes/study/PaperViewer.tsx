@@ -6,6 +6,7 @@
 import type { Ref } from 'react';
 import { PaperSheet } from '../../design/components/PaperSheet';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
+import { SanitizedHtmlTable } from '../../markdown/SanitizedHtmlTable';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 export interface PaperViewerProps {
@@ -32,7 +33,11 @@ export function PaperViewer({ blocks, containerRef }: PaperViewerProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {blocks.map((b) => (
               <section key={b.id} data-block-id={b.id} id={b.id} style={{ scrollMarginTop: '24px' }}>
-                <PaperMarkdown>{b.markdown}</PaperMarkdown>
+                {b.type === 'table' && b.tableHtml != null ? (
+                  <SanitizedHtmlTable html={b.tableHtml} />
+                ) : (
+                  <PaperMarkdown>{b.markdown ?? ''}</PaperMarkdown>
+                )}
               </section>
             ))}
           </div>
