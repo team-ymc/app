@@ -71,8 +71,8 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         assertThat(published).hasSize(1);
 
         JsonNode body = objectMapper.readTree(published.get(0).body());
-        assertThat(body.get("paperId").asText()).isEqualTo(paper.getId().toString());
-        assertThat(body.get("fileKey").asText()).isEqualTo(paper.getFileKey());
+        assertThat(body.get("paper_id").asText()).isEqualTo(paper.getId().toString());
+        assertThat(body.get("file_key").asText()).isEqualTo(paper.getFileKey());
         // 계약(messaging.yml ParseRequest)은 additionalProperties: false — 필드가 딱 둘이어야 한다
         assertThat(body.properties()).hasSize(2);
     }

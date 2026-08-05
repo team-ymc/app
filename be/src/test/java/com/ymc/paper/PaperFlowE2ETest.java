@@ -55,15 +55,21 @@ class PaperFlowE2ETest extends IntegrationTest {
         List<Message> requests = receive(parseRequestQueueUrl(), 5);
         assertThat(requests).hasSize(1);
         JsonNode request = objectMapper.readTree(requests.get(0).body());
-        assertThat(request.get("paperId").asText()).isEqualTo(paperId.toString());
-        assertThat(request.get("fileKey").asText()).isEqualTo(fileKey);
+        assertThat(request.get("paper_id").asText()).isEqualTo(paperId.toString());
+        assertThat(request.get("file_key").asText()).isEqualTo(fileKey);
 
         // 워커가 파싱을 마치고 결과를 돌려준다
+        String manifestKey = givenPackageOnS3(paperId);
         publishParseResult("""
-                {"paperId": "%s", "status": "COMPLETED", "result": {"markdownKey": "papers/%s/parsed.md"}}
-                """.formatted(paperId, paperId));
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paperId, manifestKey));
 
         awaitStatus(paperId, PaperStatus.COMPLETED);
+
+        mockMvc.perform(get("/api/papers/{paperId}/content", paperId).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Fixture Paper Title"))
+                .andExpect(jsonPath("$.blocks.length()").value(10));
     }
 
     @Test
@@ -77,12 +83,12 @@ class PaperFlowE2ETest extends IntegrationTest {
                 .andExpect(status().isOk());
 
         publishParseResult("""
-                {"paperId": "%s", "status": "FAILED", "error": {"code": "PDF_UNREADABLE"}}
+                {"paper_id":"%s","status":"failed","error":{"code":"PARSE_RETRIES_EXHAUSTED","message":"재시도 소진"}}
                 """.formatted(paperId));
 
         awaitStatus(paperId, PaperStatus.FAILED);
         // 실패 코드는 저장하되 사용자에게는 노출하지 않는다 (MVP)
-        assertThat(reload(paperId).getErrorCode()).isEqualTo("PDF_UNREADABLE");
+        assertThat(reload(paperId).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
     }
 
     private JsonNode createPaper(String filename) throws Exception {

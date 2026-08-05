@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ymc.paper.api.dto.CreatePaperRequest;
+import com.ymc.paper.api.dto.PaperContentResponse;
 import com.ymc.paper.api.dto.PaperCreated;
 import com.ymc.paper.api.dto.PaperDownloadResponse;
 import com.ymc.paper.api.dto.PaperListResponse;
 import com.ymc.paper.api.dto.PaperStatusResponse;
+import com.ymc.paper.service.PaperContentQueryService;
 import com.ymc.paper.service.PaperDownloadService;
 import com.ymc.paper.service.PaperListService;
 import com.ymc.paper.service.PaperRegistrationService;
@@ -39,6 +41,7 @@ public class PaperController {
     private final PaperStatusService statusService;
     private final PaperDownloadService downloadService;
     private final PaperListService listService;
+    private final PaperContentQueryService contentQueryService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. 소유자는 인증 주체다 (YMC-215). */
     @PostMapping
@@ -73,6 +76,13 @@ public class PaperController {
     public PaperListResponse list(@AuthenticationPrincipal Jwt jwt) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         return PaperListResponse.from(listService.list(ownerId));
+    }
+
+    /** 파싱된 논문 본문 조회. */
+    @GetMapping("/{paperId}/content")
+    public PaperContentResponse content(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return PaperContentResponse.from(contentQueryService.getContent(paperId, ownerId));
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {

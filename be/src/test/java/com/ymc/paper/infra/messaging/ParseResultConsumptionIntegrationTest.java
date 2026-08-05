@@ -31,10 +31,11 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
     @DisplayName("파싱 성공 수신: PROCESSING → COMPLETED")
     void appliesCompletedResult() {
         Paper paper = givenProcessingPaper("success.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
 
         publishParseResult("""
-                {"paperId": "%s", "status": "COMPLETED"}
-                """.formatted(paper.getId()));
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKey));
 
         awaitStatus(paper.getId(), PaperStatus.COMPLETED);
         assertThat(reload(paper.getId()).getErrorCode()).isNull();
@@ -45,27 +46,31 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
     void appliesResultArrivingBeforeProcessing() {
         Paper paper = givenPendingPaper("early-result.pdf");
         paperTransitions.markUploaded(paper.getId());
+        String manifestKey = givenPackageOnS3(paper.getId());
 
         publishParseResult("""
-                {"paperId": "%s", "status": "COMPLETED"}
-                """.formatted(paper.getId()));
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKey));
 
         awaitStatus(paper.getId(), PaperStatus.COMPLETED);
         assertThat(reload(paper.getId()).getErrorCode()).isNull();
     }
 
     @Test
-    @DisplayName("파싱 성공 수신: result 본문이 있어도 해석하지 않고 상태만 전이한다")
+    @DisplayName("파싱 성공 수신: 계약에 없는 필드가 있어도 무시하고 상태만 전이한다")
     void ignoresResultBody() {
         Paper paper = givenProcessingPaper("with-result.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
 
         publishParseResult("""
                 {
-                  "paperId": "%s",
-                  "status": "COMPLETED",
+                  "paper_id": "%s",
+                  "status": "completed",
+                  "message": "ok",
+                  "manifest_key": "%s",
                   "result": {"markdownKey": "papers/x/parsed.md", "media": ["a.png"]}
                 }
-                """.formatted(paper.getId()));
+                """.formatted(paper.getId(), manifestKey));
 
         awaitStatus(paper.getId(), PaperStatus.COMPLETED);
     }
@@ -76,20 +81,21 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("failure.pdf");
 
         publishParseResult("""
-                {"paperId": "%s", "status": "FAILED", "error": {"code": "PDF_UNREADABLE"}}
+                {"paper_id":"%s","status":"failed","error":{"code":"PARSE_RETRIES_EXHAUSTED","message":"재시도 소진"}}
                 """.formatted(paper.getId()));
 
         awaitStatus(paper.getId(), PaperStatus.FAILED);
-        assertThat(reload(paper.getId()).getErrorCode()).isEqualTo("PDF_UNREADABLE");
+        assertThat(reload(paper.getId()).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
     }
 
     @Test
     @DisplayName("중복 결과 수신: 이미 COMPLETED인 레코드는 변하지 않고 메시지는 정상 소비된다")
     void duplicateResultLeavesRecordUnchanged() {
         Paper paper = givenProcessingPaper("duplicate.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
         String message = """
-                {"paperId": "%s", "status": "COMPLETED"}
-                """.formatted(paper.getId());
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKey);
 
         publishParseResult(message);
         awaitStatus(paper.getId(), PaperStatus.COMPLETED);
@@ -106,9 +112,11 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("알 수 없는 paperId: 상태 변경 없이 정상 소비된다")
     void unknownPaperIdIsConsumed() {
+        UUID unknownId = UUID.randomUUID();
+
         publishParseResult("""
-                {"paperId": "%s", "status": "COMPLETED"}
-                """.formatted(UUID.randomUUID()));
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"papers/%s/manifest.json"}
+                """.formatted(unknownId, unknownId));
 
         awaitConsumed(parseResultQueueUrl());
         assertThat(paperRepository.count()).isZero();
@@ -120,7 +128,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("no-error-code.pdf");
 
         publishParseResult("""
-                {"paperId": "%s", "status": "FAILED"}
+                {"paper_id":"%s","status":"failed"}
                 """.formatted(paper.getId()));
 
         awaitConsumed(parseResultQueueUrl());
@@ -129,11 +137,11 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
 
     @ParameterizedTest(name = "비복구 입력이라 소비만 한다: {0}")
     @ValueSource(strings = {
-            "{\"paperId\": \"%s\", \"status\": \"PROCESSING\"}",   // 파싱 서버가 낼 수 없는 status
-            "{\"paperId\": \"%s\", \"status\": \"BANANA\"}",       // 계약에 없는 status
-            "{\"paperId\": \"%s\"}",                               // status 누락
-            "{\"status\": \"COMPLETED\"}",                         // paperId 누락
-            "{\"paperId\": \"not-a-uuid\", \"status\": \"COMPLETED\"}",   // 역직렬화 실패
+            "{\"paper_id\": \"%s\", \"status\": \"PROCESSING\"}",   // 파싱 서버가 낼 수 없는 status
+            "{\"paper_id\": \"%s\", \"status\": \"BANANA\"}",       // 계약에 없는 status
+            "{\"paper_id\": \"%s\"}",                               // status 누락
+            "{\"status\": \"completed\"}",                          // paper_id 누락
+            "{\"paper_id\": \"not-a-uuid\", \"status\": \"completed\"}",   // 역직렬화 실패
             "{ this is not json",                                  // malformed JSON
     })
     @DisplayName("지원하지 않는 status·필수 필드 누락·malformed JSON은 상태 변경 없이 소비된다")
@@ -151,6 +159,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
     void transientDbFailureIsRedelivered() {
         // PROCESSING 상태 논문 생성
         Paper paper = givenProcessingPaper("transient.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
 
         // 첫 수신은 DB 타임아웃, 그 뒤로는 정상 — 예외가 리스너 밖으로 나가야 재전달된다
         doThrow(new QueryTimeoutException("DB 타임아웃"))       // 첫 호출에서 QueryTOE
@@ -159,8 +168,8 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
 
         // 메시지 발행
         publishParseResult("""
-                {"paperId": "%s", "status": "COMPLETED"}
-                """.formatted(paper.getId()));
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKey));
 
         awaitStatus(paper.getId(), PaperStatus.COMPLETED);
         verify(paperTransitions, atLeast(2)).markParsed(eq(paper.getId()), any(), any());

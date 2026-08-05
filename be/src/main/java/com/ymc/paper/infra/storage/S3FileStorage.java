@@ -86,4 +86,26 @@ public class S3FileStorage implements FileStorage {
             throw e; // 5xx : 서버 장애 전파
         }
     }
+
+    @Override
+    public String readUtf8(String fileKey) {
+        return s3.getObjectAsBytes(GetObjectRequest.builder()
+                        .bucket(props.s3().bucket())
+                        .key(fileKey)
+                        .build())
+                .asUtf8String();
+    }
+
+    @Override
+    public PresignedDownload presignAssetGet(String fileKey) {
+        PresignedGetObjectRequest presigned = presigner.presignGetObject(
+                GetObjectPresignRequest.builder()
+                        .signatureDuration(props.s3().presignExpiry())
+                        .getObjectRequest(GetObjectRequest.builder()
+                                .bucket(props.s3().bucket())
+                                .key(fileKey)
+                                .build())
+                        .build());
+        return new PresignedDownload(presigned.url().toString(), presigned.expiration());
+    }
 }

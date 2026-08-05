@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture",
+  "page_count": 2,
+  "pages": [],
+  "assets": {
+    "image_0": {"kind": "image", "media_type": "image/jpeg"},
+    "image_1": {"kind": "image", "media_type": "image/png"},
+    "formula_0": {"kind": "formula", "media_type": "application/x-tex"},
+    "table_0": {"kind": "table", "media_type": "text/html"}
+  },
+  "blocks": [
+    {"block_id": "p0000-b0000", "page_index": 0, "global_block_order": 0, "block_label": "doc_title", "heading_level": 1, "section_path": ["p0000-b0000"], "block_bbox": [1, 2, 3, 4], "block_content": {"format": "text", "text": "Fixture Paper Title"}},
+    {"block_id": "p0000-b0001", "global_block_order": 1, "block_label": "paragraph_title", "heading_level": 2, "section_path": ["p0000-b0000", "p0000-b0001"], "block_content": {"format": "text", "text": "Abstract"}},
+    {"block_id": "p0000-b0002", "global_block_order": 2, "block_label": "abstract", "heading_level": null, "section_path": ["p0000-b0000", "p0000-b0001"], "block_content": {"format": "text", "text": "요약 텍스트"}},
+    {"block_id": "p0000-b0003", "global_block_order": 3, "block_label": "text", "heading_level": null, "section_path": ["p0000-b0000", "p0000-b0001"], "block_content": {"format": "text", "text": "인라인 수식 $ x^{2} $ 포함 본문"}},
+    {"block_id": "p0001-b0000", "global_block_order": 4, "block_label": "display_formula", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "formula", "asset_key": "formula_0"}},
+    {"block_id": "p0001-b0001", "global_block_order": 5, "block_label": "table", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "table", "asset_key": "table_0"}},
+    {"block_id": "p0001-b0002", "global_block_order": 6, "block_label": "image", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "image", "asset_key": "image_0"}},
+    {"block_id": "p0001-b0003", "global_block_order": 7, "block_label": "figure_title", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "Figure 1: fixture"}},
+    {"block_id": "p0001-b0004", "global_block_order": 8, "block_label": "chart", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "image", "asset_key": "image_1"}},
+    {"block_id": "p0001-b0005", "global_block_order": 9, "block_label": "reference_content", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "[1] Fixture reference."}}
+  ]
+}
