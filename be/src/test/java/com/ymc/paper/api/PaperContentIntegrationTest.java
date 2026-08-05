@@ -93,12 +93,15 @@ class PaperContentIntegrationTest extends IntegrationTest {
         Paper paper = givenIngestedPaper();
 
         String first = mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String second = mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         String firstUrl = objectMapper.readTree(first).at("/assets/image_0/url").asText();
         String secondUrl = objectMapper.readTree(second).at("/assets/image_0/url").asText();
+        assertThat(firstUrl).isNotEmpty();
         assertThat(firstUrl).isEqualTo(secondUrl);
     }
 

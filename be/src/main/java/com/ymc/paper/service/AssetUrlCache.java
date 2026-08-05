@@ -20,8 +20,8 @@ import lombok.RequiredArgsConstructor;
  * 재조회 시 이미지 캐시 미스가 날 뿐이다. 계약도 재사용을 보장이 아니라 best-effort로 둔다.
  * 인스턴스 간 동일 URL이 필요해지면 공유 캐시를 별도로 검토한다.
  *
- * <p>인메모리 무한 캐시지만 키 수는 (논문 수 × 이미지 수)로 유계이고 값은 URL 문자열이라
- * MVP에서는 축출을 두지 않는다. 서버 재시작 시 비워지는 것도 무해하다 — 새 URL이 발급될 뿐이다.
+ * <p>키 수는 평상시 (논문 수 × 이미지 수)로 유계이지만, 개별 축출 없이 상한 초과 시
+ * 전체를 비우는 가드만 둔다. 서버 재시작이나 이 비움이 일어나도 무해하다 — 새 URL이 발급될 뿐이다.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,10 +30,17 @@ public class AssetUrlCache {
     /** 만료 임박 URL을 돌려주지 않기 위한 여유. 이 이하로 남으면 재발급한다. */
     private static final Duration REUSE_MARGIN = Duration.ofMinutes(1);
 
+    /** 이 개수를 넘으면 캐시를 통째로 비운다. */
+    private static final int MAX_ENTRIES = 10_000;
+
     private final FileStorage fileStorage;
     private final ConcurrentHashMap<String, PresignedDownload> cache = new ConcurrentHashMap<>();
 
     public PresignedDownload issue(String s3Key) {
+        // 상한 초과 시 통째로 비운다
+        if (cache.size() > MAX_ENTRIES) {
+            cache.clear();
+        }
         // compute로 만료 판정과 재발급을 키 단위 원자 구간에 묶는다 — 동시 요청이 같은 키에
         // 몰려도 한 스레드만 presign하고 나머지는 그 결과를 받는다.
         return cache.compute(s3Key, (key, cached) -> {

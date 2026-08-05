@@ -89,6 +89,24 @@ class PaperContentIngestIntegrationTest extends IntegrationTest {
         assertThat(assetRepository.findAllByPaperId(paper.getId())).isEmpty();
     }
 
+    @Test
+    void 재적재_실패는_기존_본문을_그대로_둔다() {
+        Paper paper = givenProcessingPaper("reingest-failure.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
+        ingestService.ingest(paper.getId(), manifestKey);
+
+        givenDuplicateBlockFrontendDocumentOnS3(paper.getId());
+
+        assertThatThrownBy(() -> ingestService.ingest(paper.getId(), manifestKey))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(ingestService.isIngested(paper.getId())).isTrue();
+        assertThat(contentRepository.findById(paper.getId()).orElseThrow().getTitle())
+                .isEqualTo("Fixture Paper Title");
+        assertThat(blockRepository.findAllByPaperIdOrderByGlobalOrderAsc(paper.getId())).hasSize(10);
+        assertThat(assetRepository.findAllByPaperId(paper.getId())).hasSize(2);
+    }
+
     /** block_id가 중복된 frontend 문서로 덮어써 삽입 단계(유니크 제약)에서 실패를 일으킨다. */
     private void givenDuplicateBlockFrontendDocumentOnS3(UUID paperId) {
         String duplicated = """

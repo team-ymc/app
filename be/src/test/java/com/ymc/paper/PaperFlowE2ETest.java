@@ -65,6 +65,11 @@ class PaperFlowE2ETest extends IntegrationTest {
                 """.formatted(paperId, manifestKey));
 
         awaitStatus(paperId, PaperStatus.COMPLETED);
+
+        mockMvc.perform(get("/api/papers/{paperId}/content", paperId).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Fixture Paper Title"))
+                .andExpect(jsonPath("$.blocks.length()").value(10));
     }
 
     @Test
