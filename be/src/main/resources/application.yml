@@ -1,4 +1,10 @@
 # ================= 공통 (모든 프로파일) =================
+server:
+  # CloudFront·ALB 뒤에서 X-Forwarded-Proto/Host로 원래 scheme·host를 복원한다.
+  # 없으면 OAuth redirect_uri({baseUrl} 템플릿)가 http://로 생성돼 콘솔 등록값과 어긋난다.
+  # 로컬 직접 접속·vite proxy에는 X-Forwarded 헤더가 없어 no-op.
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: ymc-api
