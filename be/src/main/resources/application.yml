@@ -1,4 +1,8 @@
 # ================= 공통 (모든 프로파일) =================
+server:
+  # CloudFront·ALB 뒤에서 X-Forwarded-Proto/Host로 원래 scheme·host를 복원
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: ymc-api
