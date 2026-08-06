@@ -9,7 +9,6 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
@@ -61,10 +60,8 @@ class PaperContentIntegrationTest extends IntegrationTest {
     @Test
     void 남의_논문은_403_FORBIDDEN() throws Exception {
         Paper paper = givenIngestedPaper();
-        var otherJwt = SecurityMockMvcRequestPostProcessors.jwt()
-                .jwt(j -> j.subject(UUID.randomUUID().toString()));
 
-        mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(otherJwt))
+        mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(otherUserJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }

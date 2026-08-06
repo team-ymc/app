@@ -1,5 +1,8 @@
 package com.ymc.paper.api;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,6 +57,18 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{id}/download", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("남의 논문: presigned URL을 발급하지 않고 403 FORBIDDEN")
+    void rejectsOtherUsersPaper() throws Exception {
+        Paper paper = givenProcessingPaper("someone-else.pdf");
+
+        mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(otherUserJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        verify(fileStorage, never()).presignDownload(any(), any());
     }
 
     @Test

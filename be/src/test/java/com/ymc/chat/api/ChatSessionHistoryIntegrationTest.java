@@ -14,8 +14,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
@@ -27,18 +25,11 @@ import com.ymc.support.IntegrationTest;
 /** 세션 목록·메시지 히스토리·삭제 (YMC-260). 계약 operation listChatSessions 외 2개. */
 class ChatSessionHistoryIntegrationTest extends IntegrationTest {
 
-    static final UUID OTHER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
-
     @Autowired
     ChatCommandService chatCommandService;
 
     @Autowired
     ChatMessageTransitions chatMessageTransitions;
-
-    RequestPostProcessor otherUserJwt() {
-        return SecurityMockMvcRequestPostProcessors.jwt()
-                .jwt(j -> j.subject(OTHER_USER_ID.toString()));
-    }
 
     Paper givenCompletedPaper(UUID ownerId, String filename) {
         Paper paper = paperRepository.save(Paper.register(ownerId, filename, Instant.now()));

@@ -42,10 +42,16 @@ public class PaperUploadCompletionService {
 
     /**
      * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId (S3는 조회하지 않는다)
+     * @throws ApiException {@code FORBIDDEN} — 소유자가 아님
      * @throws ApiException {@code UPLOAD_NOT_FOUND} — S3에 객체가 없음. 상태는 UPLOAD_PENDING 유지
      */
-    public PaperStatusView complete(UUID paperId) {
+    public PaperStatusView complete(UUID paperId, UUID ownerId) {
         Paper paper = find(paperId);
+
+        // 멱등 반환·HEAD·큐 발행 어느 것도 남의 논문에서 일어나면 안 되므로 가장 먼저 막는다.
+        if (!paper.getOwnerId().equals(ownerId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
+        }
 
         // 이미 전이된 레코드는 HEAD도 재발행도 하지 않고 현재 상태를 돌려준다. 객체의 사후 삭제나
         // S3 일시 장애가 이미 끝난 complete의 결과를 바꾸지 않게 한다 (계약의 멱등 규칙).

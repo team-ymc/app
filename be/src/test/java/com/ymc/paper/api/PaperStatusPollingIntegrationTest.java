@@ -76,6 +76,16 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("남의 논문: 403 FORBIDDEN")
+    void rejectsOtherUsersPaper() throws Exception {
+        Paper paper = givenProcessingPaper("someone-else.pdf");
+
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(otherUserJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
     @DisplayName("UUID가 아닌 paperId: 400 VALIDATION_ERROR")
     void rejectsMalformedPaperId() throws Exception {
         mockMvc.perform(get("/api/papers/{paperId}/status", "not-a-uuid").with(userJwt()))

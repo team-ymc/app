@@ -55,20 +55,23 @@ public class PaperController {
 
     /** S3 업로드 완료 통보 (파싱 트리거). 멱등 — 중복 호출은 재발행 없이 현재 상태를 돌려준다. */
     @PostMapping("/{paperId}/complete")
-    public PaperStatusResponse complete(@PathVariable UUID paperId) {
-        return toResponse(uploadCompletionService.complete(paperId));
+    public PaperStatusResponse complete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return toResponse(uploadCompletionService.complete(paperId, ownerId));
     }
 
     /** 처리 상태 조회 (폴링용). */
     @GetMapping("/{paperId}/status")
-    public PaperStatusResponse status(@PathVariable UUID paperId) {
-        return toResponse(statusService.getStatus(paperId));
+    public PaperStatusResponse status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return toResponse(statusService.getStatus(paperId, ownerId));
     }
 
     /** 원본 PDF 다운로드 URL 발급. */
     @GetMapping("/{paperId}/download")
-    public PaperDownloadResponse download(@PathVariable UUID paperId) {
-        return PaperDownloadResponse.from(downloadService.download(paperId));
+    public PaperDownloadResponse download(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return PaperDownloadResponse.from(downloadService.download(paperId, ownerId));
     }
 
     /** 서재 목록 조회. 인증 주체 소유 논문만 반환한다 (YMC-215). */
