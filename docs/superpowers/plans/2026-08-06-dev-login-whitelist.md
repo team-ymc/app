@@ -20,6 +20,7 @@
 - 빈 목록 = 게이트 off (prod·로컬 기본 동작). 이 규칙을 뒤집지 말 것.
 - `be/CLAUDE.md`: 빈 주입은 `@RequiredArgsConstructor` + `final` 필드가 기본. 생성자에서 작업이 필요할 때만 명시적 생성자.
 - 주석에 티켓 키·스펙 절 번호를 괄호로 인용하지 않는다. 제약의 내용만 적는다.
+- **주석은 핵심만 한두 줄.** 클래스 Javadoc에 배경·설계 근거·기각한 대안을 문단으로 나열하지 않는다 — 그건 설계 문서와 PR의 몫이다. 아래 태스크의 예시 코드에 긴 주석이 있어도 짧게 줄여서 쓴다.
 
 ## File Structure
 
@@ -444,14 +445,9 @@ import com.ymc.common.config.AuthProperties;
 import com.ymc.user.service.LoginWhitelist;
 
 /**
- * 허용 명단에 없는 계정을 인증 파이프라인 안에서 거부한다. 여기서 던지면
- * {@link OAuthLoginSuccessHandler}까지 가지 않으므로 User 행도 refresh 토큰도 생기지 않는다.
+ * 명단에 없는 계정을 userinfo 단계에서 거부한다. 여기서 던지면 User 행도 토큰도 생기지 않는다.
  *
- * <p>Google 등록 스코프에 openid가 있어 스프링은 OAuth2가 아니라 OIDC 컴포넌트를 쓴다.
- * 그래서 이 클래스는 OidcUserRequest/OidcUser 타입이어야 하고 oidcUserService로 등록해야 한다.
- *
- * <p>{@link OidcUserService}를 상속하지 않고 delegate로 갖는 이유는 테스트다 — 상속하면
- * userinfo HTTP 응답을 흉내내야 하지만, 위임이면 OidcUser를 바로 만들어 넘길 수 있다.
+ * <p>스코프에 openid가 있어 OIDC 경로를 탄다 — oidcUserService로 등록해야 호출된다.
  */
 @Component
 public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
@@ -466,12 +462,11 @@ public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserReq
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private final LoginWhitelist whitelist;
 
-    /** 생성자가 둘이라 스프링이 쓸 쪽을 명시해야 한다 — 없으면 후보 모호로 기동에 실패한다. */
+    /** 생성자가 둘이라 명시하지 않으면 스프링이 못 고른다. */
     @Autowired
     public WhitelistedOidcUserService(LoginWhitelist whitelist, AuthProperties props) {
         this(new OidcUserService(), whitelist);
-        // 설정만 넣고 배선을 빠뜨리면 게이트가 조용히 죽는다. 기동 로그에 상태를 남겨
-        // 배포 직후 로그만으로 켜졌는지 확인할 수 있게 한다. 이메일 자체는 남기지 않는다.
+        // 배선을 빠뜨려도 로그인은 성공하므로 상태를 로그로 남긴다. 이메일은 남기지 않는다.
         int size = props.loginWhitelist().size();
         if (size > 0) {
             log.info("로그인 화이트리스트 활성: 허용 {}건", size);

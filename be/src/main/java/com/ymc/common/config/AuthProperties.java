@@ -23,7 +23,7 @@ public record AuthProperties(
             throw new IllegalArgumentException(
                     "auth.jwt-secret은 32바이트 이상이어야 합니다 (HS256). 첫 토큰 발급이 아니라 기동에서 실패하게 한다.");
         }
-        // 비교 양쪽을 같은 규칙으로 맞춘다 — 여기서 한 번 정규화해두면 판정부는 입력만 정규화하면 된다.
+        // 비교 양쪽을 같은 규칙으로 맞춘다. 판정부는 입력만 정규화하면 된다.
         loginWhitelist = loginWhitelist == null ? Set.of()
                 : loginWhitelist.stream()
                         .map(email -> email.trim().toLowerCase(Locale.ROOT))
