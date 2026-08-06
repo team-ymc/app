@@ -1,6 +1,7 @@
 package com.ymc.common.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,5 +33,17 @@ class AuthPropertiesTest {
     void 빈_문자열_항목은_버린다() {
         AuthProperties props = withWhitelist(Set.copyOf(List.of("a@x.com", "   ")));
         assertThat(props.loginWhitelist()).containsExactly("a@x.com");
+    }
+
+    @Test
+    void 미해석_플레이스홀더는_기동_실패다() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> withWhitelist(Set.of("${LOGIN_WHITELIST}")));
+    }
+
+    @Test
+    void 골뱅이_없는_항목은_기동_실패다() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> withWhitelist(Set.of("not-an-email")));
     }
 }

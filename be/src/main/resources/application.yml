@@ -121,7 +121,8 @@ spring:
       ddl-auto: update
 
 auth:
-  # 기본값을 두지 않는다 — 미설정이면 첫 로그인이 아니라 기동에서 실패해야 한다.
+  # 기본값을 두지 않는다 — 미설정이면 미해석 플레이스홀더 문자열이 되어
+  # AuthProperties의 이메일 형식 검증에 걸려 기동이 실패한다.
   login-whitelist: ${LOGIN_WHITELIST}
 
 ---

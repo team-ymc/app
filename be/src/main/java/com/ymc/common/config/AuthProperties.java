@@ -29,5 +29,12 @@ public record AuthProperties(
                         .map(email -> email.trim().toLowerCase(Locale.ROOT))
                         .filter(email -> !email.isEmpty())
                         .collect(Collectors.toUnmodifiableSet());
+        // 미해석 플레이스홀더(env var 미설정)를 걸러낸다 — 첫 로그인이 아니라 기동에서 실패하게 한다.
+        for (String email : loginWhitelist) {
+            if (!email.contains("@")) {
+                throw new IllegalArgumentException(
+                        "auth.login-whitelist 항목이 이메일 형식이 아닙니다: " + email);
+            }
+        }
     }
 }
