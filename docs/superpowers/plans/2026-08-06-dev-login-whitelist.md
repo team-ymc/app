@@ -332,11 +332,13 @@ git commit -m "[YMC-310] feat(be): 로그인 허용 명단 판정 LoginWhitelist
 - Test: `be/src/test/java/com/ymc/user/infra/security/WhitelistedOidcUserServiceTest.java` (신규)
 
 **Interfaces:**
-- Consumes: `LoginWhitelist.isAllowed(String)` → `boolean` (Task 2)
+- Consumes: `LoginWhitelist.isAllowed(String)` → `boolean` (Task 2), `AuthProperties.loginWhitelist()` → `Set<String>` (Task 1, 기동 로그의 건수용)
 - Produces:
   - `WhitelistedOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser>`
   - `WhitelistedOidcUserService.NOT_ALLOWED_CODE` — package-private `static final String` = `"not_allowed"` (Task 4가 참조)
-  - 공개 생성자 `WhitelistedOidcUserService(LoginWhitelist)`, 테스트용 package-private 생성자 `WhitelistedOidcUserService(OAuth2UserService<OidcUserRequest, OidcUser>, LoginWhitelist)`
+  - 공개 생성자 `WhitelistedOidcUserService(LoginWhitelist, AuthProperties)`, 테스트용 package-private 생성자 `WhitelistedOidcUserService(OAuth2UserService<OidcUserRequest, OidcUser>, LoginWhitelist)`
+
+> **기동 로그를 넣는 이유:** 설정만 채우고 배선을 빠뜨리면 게이트가 조용히 죽는다 — 외부 리뷰가 정확히 이 위험을 지적했다. 기동 로그로 dev 배포 직후 상태를 눈으로 확인할 수 있게 한다. 다만 로그는 빈 생성만 증명하지 배선을 증명하지 않으므로, Task 7의 비허용 계정 차단 확인이 여전히 유일한 최종 검증이다. 이메일은 로그에 남기지 않고 건수만 남긴다.
 
 - [ ] **Step 1: 실패 테스트 작성**
 
@@ -427,6 +429,8 @@ Expected: FAIL — `cannot find symbol: class WhitelistedOidcUserService`
 ```java
 package com.ymc.user.infra.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
@@ -436,6 +440,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
+import com.ymc.common.config.AuthProperties;
 import com.ymc.user.service.LoginWhitelist;
 
 /**
@@ -453,6 +458,8 @@ public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserReq
 
     static final String NOT_ALLOWED_CODE = "not_allowed";
 
+    private static final Logger log = LoggerFactory.getLogger(WhitelistedOidcUserService.class);
+
     private static final OAuth2Error NOT_ALLOWED =
             new OAuth2Error(NOT_ALLOWED_CODE, "허용되지 않은 계정입니다.", null);
 
@@ -461,8 +468,16 @@ public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserReq
 
     /** 생성자가 둘이라 스프링이 쓸 쪽을 명시해야 한다 — 없으면 후보 모호로 기동에 실패한다. */
     @Autowired
-    public WhitelistedOidcUserService(LoginWhitelist whitelist) {
+    public WhitelistedOidcUserService(LoginWhitelist whitelist, AuthProperties props) {
         this(new OidcUserService(), whitelist);
+        // 설정만 넣고 배선을 빠뜨리면 게이트가 조용히 죽는다. 기동 로그에 상태를 남겨
+        // 배포 직후 로그만으로 켜졌는지 확인할 수 있게 한다. 이메일 자체는 남기지 않는다.
+        int size = props.loginWhitelist().size();
+        if (size > 0) {
+            log.info("로그인 화이트리스트 활성: 허용 {}건", size);
+        } else {
+            log.info("로그인 화이트리스트 비활성 — 모든 계정 로그인 허용");
+        }
     }
 
     WhitelistedOidcUserService(
