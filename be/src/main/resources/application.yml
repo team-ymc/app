@@ -40,6 +40,8 @@ auth:
   refresh-ttl: 14d
   fe-origin: http://localhost:5173
   cookie-secure: false
+  # 허용 이메일 명단. 비어 있으면 게이트 off — 로컬·prod 기본 동작이다.
+  login-whitelist: ""
 
 # FT-007 채팅 — AI 서버 연동과 스트림 타이머 (설계 §4)
 ai:
@@ -117,6 +119,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+auth:
+  # 기본값을 두지 않는다 — 미설정이면 미해석 플레이스홀더 문자열이 되어
+  # AuthProperties의 이메일 형식 검증에 걸려 기동이 실패한다.
+  login-whitelist: ${LOGIN_WHITELIST}
 
 ---
 # ================= prod 전용 =================

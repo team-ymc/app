@@ -3,6 +3,7 @@ package com.ymc.user.infra.security;
 import java.io.IOException;
 
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,12 @@ public class OAuthLoginFailureHandler implements AuthenticationFailureHandler {
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) throws IOException {
-        response.sendRedirect(props.feOrigin() + "/auth/popup-done.html?error=oauth_failed");
+        // 우리 코드만 통과시킨다. 스프링이 만든 오류 코드는 내부 사정을 담을 수 있어 URL로 흘리지 않는다.
+        String code = exception instanceof OAuth2AuthenticationException oauthFailure
+                && WhitelistedOidcUserService.NOT_ALLOWED_CODE.equals(
+                        oauthFailure.getError().getErrorCode())
+                ? WhitelistedOidcUserService.NOT_ALLOWED_CODE
+                : "oauth_failed";
+        response.sendRedirect(props.feOrigin() + "/auth/popup-done.html?error=" + code);
     }
 }

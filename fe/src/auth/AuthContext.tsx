@@ -11,6 +11,13 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
+/** BE가 popup-done.html?error=로 실어 보낸 코드를 사용자 문구로 바꾼다. */
+function loginErrorMessage(code: string): string {
+  return code === 'not_allowed'
+    ? '허용되지 않은 계정입니다. 관리자에게 문의해 주세요.'
+    : '로그인에 실패했습니다. 다시 시도해 주세요.';
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -20,9 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error')) {
+    const errorCode = params.get('error');
+    if (errorCode) {
       window.history.replaceState(null, '', '/');
-      setInitialError('로그인에 실패했습니다. 다시 시도해 주세요.');
+      setInitialError(loginErrorMessage(errorCode));
     }
     // 세션 만료 시 이전 사용자 캐시가 다음 로그인 사용자에게 노출되지 않도록 정리한다.
     onSessionExpired(() => {
@@ -38,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login({
       onComplete: (user, error) => {
         if (user) setState({ status: 'authed', user });
-        else if (error) setInitialError('로그인에 실패했습니다. 다시 시도해 주세요.');
+        else if (error) setInitialError(loginErrorMessage(error));
       },
     });
   }, []);

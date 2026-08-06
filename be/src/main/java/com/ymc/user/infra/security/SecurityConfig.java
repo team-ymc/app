@@ -40,12 +40,15 @@ public class SecurityConfig {
     @Order(1)
     SecurityFilterChain oauthLoginChain(HttpSecurity http,
             OAuthLoginSuccessHandler successHandler,
-            OAuthLoginFailureHandler failureHandler) throws Exception {
+            OAuthLoginFailureHandler failureHandler,
+            WhitelistedOidcUserService whitelistedOidcUserService) throws Exception {
         http
                 .securityMatcher("/api/oauth2/**", "/api/login/oauth2/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2
+                        // 스코프에 openid가 있어 OIDC 경로를 탄다 — userService가 아니라 oidcUserService다.
+                        .userInfoEndpoint(userInfo -> userInfo.oidcUserService(whitelistedOidcUserService))
                         .authorizationEndpoint(a -> a.baseUri("/api/oauth2/authorization"))
                         .redirectionEndpoint(r -> r.baseUri("/api/login/oauth2/code/*"))
                         .successHandler(successHandler)

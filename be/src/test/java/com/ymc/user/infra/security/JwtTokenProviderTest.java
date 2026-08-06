@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -20,7 +21,8 @@ class JwtTokenProviderTest {
 
     private final AuthProperties props = new AuthProperties(
             "test-secret-key-that-is-32-bytes-long!!",
-            Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false);
+            Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false,
+            Set.of());
 
     private final JwtTokenProvider provider = new JwtTokenProvider(props);
 

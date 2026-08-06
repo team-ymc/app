@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,8 @@ class OAuthLoginSuccessHandlerTest {
     // AuthProperties는 record(final)라 Mockito 대상이 아님 — 실객체로 조립한다.
     private final AuthProperties props = new AuthProperties(
             "test-secret-key-that-is-32-bytes-long!!",
-            Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false);
+            Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false,
+            Set.of());
 
     @Test
     void 성공_시_upsert_쿠키_브릿지_리다이렉트() throws Exception {
