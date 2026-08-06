@@ -134,7 +134,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         try (ExecutorService pool = Executors.newFixedThreadPool(attempts)) {
             List<Callable<PaperStatus>> calls = Collections.nCopies(attempts, () -> {
                 startLine.await();
-                return completionService.complete(paper.getId()).status();
+                return completionService.complete(paper.getId(), TEST_USER_ID).status();
             });
 
             List<Future<PaperStatus>> futures = calls.stream().map(pool::submit).toList();
@@ -176,6 +176,21 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("남의 논문: 전이도 발행도 없이 403 FORBIDDEN")
+    void rejectsOtherUsersPaper() throws Exception {
+        Paper paper = givenPendingPaper(FILENAME);
+        givenUploadedObject(paper);   // 객체는 있다 — 막는 것은 소유자 검증뿐이다
+
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(otherUserJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        verify(parseRequestPublisher, never()).publish(any(), anyString());
+        assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
+    }
+
+    @Test
     @DisplayName("큐 발행 실패: 예외가 나가고 레코드는 UPLOADED에 남으며, 정체가 WARN으로 관측된다")
     void publishFailureLeavesRecordUploaded(CapturedOutput output) throws Exception {
         Paper paper = givenPendingPaper(FILENAME);
@@ -183,7 +198,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         doThrow(new IllegalStateException("SQS 장애")).when(parseRequestPublisher)
                 .publish(any(), anyString());
 
-        assertThatThrownBy(() -> completionService.complete(paper.getId()))
+        assertThatThrownBy(() -> completionService.complete(paper.getId(), TEST_USER_ID))
                 .isInstanceOf(IllegalStateException.class);
 
         // 발행 실패가 CAS 커밋을 롤백시키지 않았다 (트랜잭션 경계 분리, tasks 4.3)
@@ -211,7 +226,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
         doThrow(new QueryTimeoutException("DB 타임아웃")).when(paperTransitions)
                 .markProcessing(paper.getId());
 
-        assertThatThrownBy(() -> completionService.complete(paper.getId()))
+        assertThatThrownBy(() -> completionService.complete(paper.getId(), TEST_USER_ID))
                 .isInstanceOf(QueryTimeoutException.class);
 
         assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOADED);

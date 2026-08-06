@@ -29,13 +29,18 @@ public class PaperDownloadService {
 
     /**
      * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId
+     * @throws ApiException {@code FORBIDDEN} — 소유자가 아님
      * @throws ApiException {@code UPLOAD_NOT_FOUND} — 원본 객체가 아직 없음(UPLOAD_PENDING/EXPIRED)
      */
     @Transactional(readOnly = true)
-    public PresignedDownload download(UUID paperId) {
+    public PresignedDownload download(UUID paperId, UUID ownerId) {
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId));
+        // presigned URL은 발급되면 BE를 거치지 않고 S3에서 직접 받아간다 — 발급 전이 유일한 검증 지점이다.
+        if (!paper.getOwnerId().equals(ownerId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
+        }
 
         PaperStatus status = paper.getStatus();
         if (status == PaperStatus.UPLOAD_PENDING || status == PaperStatus.EXPIRED) {

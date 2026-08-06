@@ -66,6 +66,10 @@ public abstract class IntegrationTest {
     protected static final UUID TEST_USER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000001");
 
+    /** TEST_USER_ID가 아닌 인증된 사용자. 소유자 검증 시나리오에서 요청자·픽스처 소유자로 쓴다. */
+    protected static final UUID OTHER_USER_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000002");
+
     @Autowired
     protected ChatMessageRepository chatMessageRepository;
 
@@ -147,6 +151,12 @@ public abstract class IntegrationTest {
     /** MockMvc 요청에 인증 principal 주입. 디코더를 거치지 않는 테스트 전용 JWT다. */
     protected RequestPostProcessor userJwt() {
         return SecurityMockMvcRequestPostProcessors.jwt().jwt(j -> j.subject(TEST_USER_ID.toString()));
+    }
+
+    /** 인증은 됐지만 테스트 데이터의 소유자가 아닌 사용자 — 소유자 검증(403) 검증용. */
+    protected RequestPostProcessor otherUserJwt() {
+        return SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(j -> j.subject(OTHER_USER_ID.toString()));
     }
 
     /** UPLOAD_PENDING 레코드. S3에는 아직 아무것도 없다. */
