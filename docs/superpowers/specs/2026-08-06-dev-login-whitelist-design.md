@@ -92,39 +92,46 @@ public class LoginWhitelist {
 }
 ```
 
-### 4.2 배선 — `user/infra/security/WhitelistedOAuth2UserService`
+### 4.2 배선 — `user/infra/security/WhitelistedOidcUserService`
 
-`DefaultOAuth2UserService`를 **상속하지 않고 delegate로 주입**한다. 상속하면
-`super.loadUser`가 Google로 실제 HTTP를 쳐서 테스트에서 바꿔치기할 수 없다.
+**OIDC 경로여야 한다.** `application.yml`의 Google 등록이 `scope: [openid, email, profile]`이라
+스프링이 `DefaultOAuth2UserService`가 아니라 `OidcUserService`를 쓴다 (레퍼런스 6.5,
+servlet/oauth2: openid 스코프가 있으면 OIDC 컴포넌트, 없으면 OAuth2 컴포넌트). 따라서
+`OAuth2UserService<OidcUserRequest, OidcUser>`를 구현하고 `.oidcUserService(...)`로 등록한다 —
+`.userService(...)`에 걸면 **호출되지 않아 게이트가 죽은 코드가 된다.**
+
+`OidcUserService`를 **상속하지 않고 delegate로 주입**한다. 상속해도
+`setRestOperations`로 HTTP를 목으로 바꿔 테스트할 수는 있지만, 그러면 테스트가 userinfo JSON
+응답을 흉내내야 한다. 위임이면 seam이 인터페이스 자체라 `OidcUser`를 바로 만들어 넘기면 된다.
 `FileStorage`·`AiAgentStreamPort`가 이미 쓰는 방식과 같다.
 
 ```java
 @Component
-public class WhitelistedOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
+public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
 
     static final String NOT_ALLOWED_CODE = "not_allowed";
     private static final OAuth2Error NOT_ALLOWED =
             new OAuth2Error(NOT_ALLOWED_CODE, "허용되지 않은 계정입니다.", null);
 
-    private final OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate;
+    private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private final LoginWhitelist whitelist;
 
     /** 생성자가 둘이라 스프링이 쓸 쪽을 명시해야 한다 — 없으면 후보 모호로 기동 실패한다. */
     @Autowired
-    public WhitelistedOAuth2UserService(LoginWhitelist whitelist) {
-        this(new DefaultOAuth2UserService(), whitelist);
+    public WhitelistedOidcUserService(LoginWhitelist whitelist) {
+        this(new OidcUserService(), whitelist);
     }
 
-    WhitelistedOAuth2UserService(
-            OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate, LoginWhitelist whitelist) {
+    WhitelistedOidcUserService(
+            OAuth2UserService<OidcUserRequest, OidcUser> delegate, LoginWhitelist whitelist) {
         this.delegate = delegate;
         this.whitelist = whitelist;
     }
 
     @Override
-    public OAuth2User loadUser(OAuth2UserRequest request) {
-        OAuth2User user = delegate.loadUser(request);
-        if (!whitelist.isAllowed(user.getAttribute("email"))) {
+    public OidcUser loadUser(OidcUserRequest request) {
+        OidcUser user = delegate.loadUser(request);
+        if (!whitelist.isAllowed(user.getEmail())) {   // OidcUser는 표준 클레임 접근자를 갖는다
             throw new OAuth2AuthenticationException(NOT_ALLOWED);
         }
         return user;
@@ -134,18 +141,24 @@ public class WhitelistedOAuth2UserService implements OAuth2UserService<OAuth2Use
 
 여기서 던지면 `OAuthLoginSuccessHandler`까지 가지 않으므로 **User 행도 refresh 토큰도 생기지 않는다.**
 
+`OidcUser`는 `OAuth2User`를 상속하므로 성공 핸들러의 기존 캐스팅·`getName()`은 그대로 동작한다
+(지금도 이미 OIDC 경로로 돌고 있다).
+
 ### 4.3 SecurityConfig
 
 `oauthLoginChain`의 `oauth2Login`에 한 줄 추가한다. 나머지는 그대로.
 
 ```java
 .oauth2Login(oauth2 -> oauth2
-        .userInfoEndpoint(u -> u.userService(whitelistedOAuth2UserService))
+        .userInfoEndpoint(u -> u.oidcUserService(whitelistedOidcUserService))
         .authorizationEndpoint(a -> a.baseUri("/api/oauth2/authorization"))
         .redirectionEndpoint(r -> r.baseUri("/api/login/oauth2/code/*"))
         .successHandler(successHandler)
         .failureHandler(failureHandler));
 ```
+
+**검증 함정:** 배선이 틀려도 로그인은 그냥 성공한다 (게이트만 안 걸릴 뿐). 그래서 dev 확인 시
+**비허용 계정이 실제로 막히는지**를 반드시 봐야 한다 — 허용 계정 성공만으로는 아무것도 증명 못 한다.
 
 ## 5. 거부 경로
 
@@ -155,8 +168,8 @@ public class WhitelistedOAuth2UserService implements OAuth2UserService<OAuth2Use
 
 ```java
 String code = exception instanceof OAuth2AuthenticationException e
-        && WhitelistedOAuth2UserService.NOT_ALLOWED_CODE.equals(e.getError().getErrorCode())
-        ? WhitelistedOAuth2UserService.NOT_ALLOWED_CODE
+        && WhitelistedOidcUserService.NOT_ALLOWED_CODE.equals(e.getError().getErrorCode())
+        ? WhitelistedOidcUserService.NOT_ALLOWED_CODE
         : "oauth_failed";
 response.sendRedirect(props.feOrigin() + "/auth/popup-done.html?error=" + code);
 ```
@@ -179,7 +192,7 @@ else if (error)
 |---|---|---|
 | `AuthProperties` 정규화 | 단위 | 대문자·앞뒤 공백·빈 항목 제거, null → `Set.of()` |
 | `LoginWhitelist` | 단위 | 빈 목록이면 전부 통과 / 일치 / 불일치 / email null / 대소문자·공백 무시 |
-| `WhitelistedOAuth2UserService` | 단위 (delegate 주입) | 허용 시 delegate 결과 그대로 반환 / 거부 시 `OAuth2AuthenticationException`에 `not_allowed` |
+| `WhitelistedOidcUserService` | 단위 (delegate 주입) | 허용 시 delegate 결과 그대로 반환 / 거부 시 `OAuth2AuthenticationException`에 `not_allowed` |
 | `OAuthLoginFailureHandler` | 단위 | `not_allowed`는 그대로, 그 외 예외는 `oauth_failed`로 뭉갬 |
 
 `OAuth2UserService`는 메서드가 하나뿐이라 delegate를 람다로 넣으면 HTTP 없이 끝난다.
@@ -195,7 +208,7 @@ else if (error)
    값 추가, `modules/environment`의 태스크 환경변수에 `LOGIN_WHITELIST` 배선
 3. 새 이미지 태그로 dev 배포 — 값을 빠뜨리면 `terraform apply`에서, 환경변수 배선을 빠뜨리면
    컨테이너 기동에서 각각 막힌다
-4. 허용/비허용 계정 각각 로그인해 확인
+4. 허용 계정 로그인 성공 + **비허용 계정 차단** 둘 다 확인 (후자가 진짜 검증이다)
 
 ## 8. 기각한 대안
 
@@ -207,4 +220,5 @@ else if (error)
 | Google Console 테스트 사용자 | 코드는 0줄이지만 dev·prod가 OAuth 클라이언트를 공유하면 prod까지 막힌다 |
 | 빈 목록 = 게이트 off만으로 처리 | dev에서 환경변수 이름 오타 시 조용히 열린 채 뜬다 (fail-open) |
 | `@Profile`로 빈 분기 | prod엔 게이트 코드가 없는 셈이라 기본 프로필 테스트로 검증 불가, 빈이 둘로 늘어남 |
+| `OidcUserService` 상속 | 테스트가 불가능하진 않다 (`setRestOperations`로 HTTP 목 주입 가능). 다만 userinfo JSON을 흉내내야 해 위임보다 seam이 낮다 |
 | 신규 가입만 차단 | 이미 dev DB에 들어온 계정이 계속 접근 가능 |
