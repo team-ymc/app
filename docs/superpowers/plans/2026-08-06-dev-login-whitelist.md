@@ -779,7 +779,7 @@ variable "login_whitelist" {
   login_whitelist   = var.login_whitelist
 ```
 
-`infra/deploy/dev/terraform.tfvars`의 `backend_image_tag` 줄 아래에 팀원 이메일을 넣어 추가한다. **실제 팀원 이메일로 채울 것** — 예시값을 그대로 두면 아무도 로그인하지 못한다:
+`infra/deploy/dev/terraform.tfvars`의 `backend_image_tag` 줄 아래에 추가한다. **실제 팀원 이메일로 채울 것** — 자리표시자를 그대로 두면 아무도 로그인하지 못한다. `terraform.tfvars`는 커밋되므로 넣기 전에 공개해도 되는 주소인지 확인한다:
 
 ```hcl
 login_whitelist = "팀원1@example.com, 팀원2@example.com"
