@@ -3,6 +3,7 @@ package com.ymc.user.infra.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -17,7 +18,8 @@ class OAuthLoginFailureHandlerTest {
     void 실패_시_error_쿼리를_실어_브릿지로_리다이렉트() throws Exception {
         AuthProperties props = new AuthProperties(
                 "test-secret-key-that-is-32-bytes-long!!",
-                Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false);
+                Duration.ofMinutes(30), Duration.ofDays(14), "http://localhost:5173", false,
+                Set.of());
         OAuthLoginFailureHandler handler = new OAuthLoginFailureHandler(props);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
