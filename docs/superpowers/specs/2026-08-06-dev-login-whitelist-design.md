@@ -28,9 +28,8 @@ Java 코드엔 프로필 분기를 넣지 않는다.**
 
 ## 3. 설정
 
-기본(로컬·테스트) 블록은 빈 값 → 게이트 off. dev 블록만 기본값 없는 플레이스홀더를 둔다 —
-prod의 `jwt-secret: ${AUTH_JWT_SECRET}`와 같은 패턴으로, 미설정 시 첫 로그인이 아니라
-**기동에서 실패**한다. prod 블록엔 적지 않으므로 빈 목록 → off.
+기본(로컬·테스트) 블록은 빈 값 → 게이트 off. dev 블록만 기본값 없는 플레이스홀더를 둔다.
+prod 블록엔 적지 않으므로 빈 목록 → off.
 
 ```yaml
 auth:
@@ -39,17 +38,22 @@ auth:
 ---
 # dev 블록
 auth:
-  login-whitelist: ${LOGIN_WHITELIST}    # 기본값 없음 → 미설정 시 기동 실패
+  login-whitelist: ${LOGIN_WHITELIST}    # 기본값 없음 (아래 검증과 함께 봐야 한다)
 ```
 
 `LOGIN_WHITELIST=a@x.com, b@y.com` 콤마 구분으로 바인딩된다. 값은 tfvars → ECS 태스크 환경변수로
 전달한다. 명단 변경은 태스크 재기동이 필요하다 (팀 규모에서 변경 빈도가 낮아 감수한다).
 
-**플레이스홀더가 막아주는 범위:** 환경변수가 **없으면** 해석 실패로 기동이 막히지만,
-`LOGIN_WHITELIST=""`처럼 **빈 값으로 있으면** 해석에 성공해 빈 목록 → 게이트 off로 조용히 뜬다.
-이 구멍은 Terraform 쪽에서 막는다 — `infra/deploy/dev/variables.tf`의 `login_whitelist`를
-default 없이 선언하면 값이 없을 때 `terraform apply`가 먼저 실패한다. 빈 문자열을 명시적으로
-넣는 것까지는 막지 않으며, 그건 의도된 비활성화로 본다.
+**플레이스홀더만으로는 기동이 막히지 않는다.** `ConfigurationPropertiesBinder`는
+`ignoreUnresolvablePlaceholders = true`로 동작해서, 환경변수가 없으면 예외 대신 미해석 리터럴
+`${LOGIN_WHITELIST}`가 그대로 명단 항목이 된다. 그러면 앱은 뜨고, 게이트는 켜진 채, 아무도
+로그인하지 못하며, 기동 로그는 "허용 1건"이라 정상처럼 보인다. 그래서 `AuthProperties`가
+정규화 후 각 항목에 `@`가 있는지 검사해 기동을 실패시킨다 — 이 검증이 설계가 의도한 보장을
+실제로 제공하는 유일한 장치다.
+
+`LOGIN_WHITELIST=""`처럼 **빈 값**이면 빈 목록 → 게이트 off로 조용히 뜬다. 이건 의도된
+비활성화로 보되, `infra/deploy/dev/variables.tf`의 `login_whitelist`를 default 없이 선언해
+값 누락이 `terraform apply`에서 먼저 걸리게 한다.
 
 `AuthProperties`에 컴포넌트를 추가하고 기존 `jwtSecret` 검증과 같은 자리에서 정규화한다.
 
@@ -67,6 +71,11 @@ public record AuthProperties(
                         .map(e -> e.trim().toLowerCase(Locale.ROOT))
                         .filter(e -> !e.isEmpty())
                         .collect(Collectors.toUnmodifiableSet());
+        for (String email : loginWhitelist) {
+            if (!email.contains("@")) {
+                throw new IllegalArgumentException(/* 미해석 플레이스홀더를 여기서 잡는다 */);
+            }
+        }
     }
 }
 ```
@@ -95,10 +104,13 @@ public class LoginWhitelist {
 ### 4.2 배선 — `user/infra/security/WhitelistedOidcUserService`
 
 **OIDC 경로여야 한다.** `application.yml`의 Google 등록이 `scope: [openid, email, profile]`이라
-스프링이 `DefaultOAuth2UserService`가 아니라 `OidcUserService`를 쓴다 (레퍼런스 6.5,
-servlet/oauth2: openid 스코프가 있으면 OIDC 컴포넌트, 없으면 OAuth2 컴포넌트). 따라서
-`OAuth2UserService<OidcUserRequest, OidcUser>`를 구현하고 `.oidcUserService(...)`로 등록한다 —
-`.userService(...)`에 걸면 **호출되지 않아 게이트가 죽은 코드가 된다.**
+스프링이 `DefaultOAuth2UserService`가 아니라 `OidcUserService`를 쓴다. 따라서
+`OAuth2UserService<OidcUserRequest, OidcUser>`를 구현하고 `.oidcUserService(...)`로 등록한다.
+
+배선 실수는 생각보다 잘 드러난다 — `.userService(...)`에 넘기면 제네릭 불일치로 컴파일 에러이고,
+등록 줄을 아예 빼도 스프링이 `ResolvableType`으로 이 빈을 찾아 물린다. **진짜 조용한 실패는
+`scope`에서 `openid`를 빼는 것이다** — 그러면 OIDC 컴포넌트를 안 써서 게이트가 컴파일·기동·로그
+어디에도 흔적 없이 죽는다. 이걸 막는 장치는 없으므로 스코프를 건드릴 때 함께 확인해야 한다.
 
 `OidcUserService`를 **상속하지 않고 delegate로 주입**한다. 상속해도
 `setRestOperations`로 HTTP를 목으로 바꿔 테스트할 수는 있지만, 그러면 테스트가 userinfo JSON
@@ -157,7 +169,7 @@ public class WhitelistedOidcUserService implements OAuth2UserService<OidcUserReq
         .failureHandler(failureHandler));
 ```
 
-**검증 함정:** 배선이 틀려도 로그인은 그냥 성공한다 (게이트만 안 걸릴 뿐). 그래서 dev 확인 시
+**검증 함정:** 자동 테스트는 게이트가 실제 핸드셰이크에서 호출되는지 증명하지 못한다. dev 확인 시
 **비허용 계정이 실제로 막히는지**를 반드시 봐야 한다 — 허용 계정 성공만으로는 아무것도 증명 못 한다.
 
 ## 5. 거부 경로
@@ -190,7 +202,7 @@ else if (error)
 
 | 대상 | 방식 | 케이스 |
 |---|---|---|
-| `AuthProperties` 정규화 | 단위 | 대문자·앞뒤 공백·빈 항목 제거, null → `Set.of()` |
+| `AuthProperties` 정규화·검증 | 단위 | 대문자·앞뒤 공백·빈 항목 제거, null → `Set.of()`, 미해석 플레이스홀더·비이메일 → 기동 실패 |
 | `LoginWhitelist` | 단위 | 빈 목록이면 전부 통과 / 일치 / 불일치 / email null / 대소문자·공백 무시 |
 | `WhitelistedOidcUserService` | 단위 (delegate 주입) | 허용 시 delegate 결과 그대로 반환 / 거부 시 `OAuth2AuthenticationException`에 `not_allowed` |
 | `OAuthLoginFailureHandler` | 단위 | `not_allowed`는 그대로, 그 외 예외는 `oauth_failed`로 뭉갬 |
@@ -207,8 +219,11 @@ else if (error)
 2. `infra/deploy/dev/variables.tf`에 `login_whitelist`를 default 없이 선언, `terraform.tfvars`에
    값 추가, `modules/environment`의 태스크 환경변수에 `LOGIN_WHITELIST` 배선
 3. 새 이미지 태그로 dev 배포 — 값을 빠뜨리면 `terraform apply`에서, 환경변수 배선을 빠뜨리면
-   컨테이너 기동에서 각각 막힌다
-4. 허용 계정 로그인 성공 + **비허용 계정 차단** 둘 다 확인 (후자가 진짜 검증이다)
+   미해석 플레이스홀더가 이메일 검증에 걸려 컨테이너 기동에서 각각 막힌다
+4. **dev DB 정리** — 이 브랜치 이전에 가입한 계정의 refresh 쿠키는 게이트를 거치지 않는다.
+   `/api/auth/refresh`는 permitAll이고 쿠키만으로 인증하며 갱신 때마다 TTL이 새로 붙어, 재로그인
+   없이 무기한 접근이 이어진다. 배포와 함께 dev의 `refresh_token` 전체와 비허용 `users` 행을 지운다.
+5. 허용 계정 로그인 성공 + **비허용 계정 차단** 둘 다 확인 (후자가 진짜 검증이다)
 
 ## 8. 기각한 대안
 

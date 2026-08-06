@@ -180,7 +180,8 @@ public record AuthProperties(
 
 ```yaml
 auth:
-  # 기본값을 두지 않는다 — 미설정이면 첫 로그인이 아니라 기동에서 실패해야 한다.
+  # 기본값을 두지 않는다 — 미설정이면 미해석 플레이스홀더 문자열이 되어
+  # AuthProperties의 이메일 형식 검증에 걸려 기동이 실패한다.
   login-whitelist: ${LOGIN_WHITELIST}
 ```
 
@@ -339,7 +340,7 @@ git commit -m "[YMC-310] feat(be): 로그인 허용 명단 판정 LoginWhitelist
   - `WhitelistedOidcUserService.NOT_ALLOWED_CODE` — package-private `static final String` = `"not_allowed"` (Task 4가 참조)
   - 공개 생성자 `WhitelistedOidcUserService(LoginWhitelist, AuthProperties)`, 테스트용 package-private 생성자 `WhitelistedOidcUserService(OAuth2UserService<OidcUserRequest, OidcUser>, LoginWhitelist)`
 
-> **기동 로그를 넣는 이유:** 설정만 채우고 배선을 빠뜨리면 게이트가 조용히 죽는다 — 외부 리뷰가 정확히 이 위험을 지적했다. 기동 로그로 dev 배포 직후 상태를 눈으로 확인할 수 있게 한다. 다만 로그는 빈 생성만 증명하지 배선을 증명하지 않으므로, Task 7의 비허용 계정 차단 확인이 여전히 유일한 최종 검증이다. 이메일은 로그에 남기지 않고 건수만 남긴다.
+> **기동 로그를 넣는 이유:** 배포 직후 게이트 상태를 로그만으로 확인하려는 것이다. 다만 로그는 빈 생성만 증명하지 배선을 증명하지 않으므로, Task 7의 비허용 계정 차단 확인이 여전히 유일한 최종 검증이다. 이메일은 남기지 않고 건수만 남긴다.
 
 - [ ] **Step 1: 실패 테스트 작성**
 
@@ -804,7 +805,21 @@ Expected: 백엔드 태스크 정의에 `LOGIN_WHITELIST` 환경변수가 추가
 cd infra && git add deploy/ && git commit -m "[YMC-310] feat(deploy): dev 백엔드에 LOGIN_WHITELIST 전달"
 ```
 
-- [ ] **Step 6: dev 배포 후 확인 — 이것이 진짜 검증이다**
+- [ ] **Step 6: dev DB 정리 — 빠뜨리면 게이트가 절반만 닫힌다**
+
+브랜치 배포 이전에 가입한 계정의 refresh 쿠키는 게이트를 거치지 않는다. `/api/auth/refresh`는
+permitAll이고 쿠키만으로 인증하며 갱신 때마다 TTL 14일이 새로 붙는다. FE가 페이지 로드마다
+갱신하므로 그 창은 닫히지 않고, 재로그인이 영영 일어나지 않아 게이트가 적용될 기회가 없다.
+
+```sql
+DELETE FROM refresh_token;
+DELETE FROM users WHERE lower(email) NOT IN ('허용1@x.com', '허용2@x.com');
+```
+
+`users` 삭제 전에 FK로 묶인 논문·채팅 데이터가 함께 지워지는지 확인한다. dev 데이터라 유실은
+문제되지 않지만, 제약 위반으로 DELETE가 막히면 자식 행부터 지워야 한다.
+
+- [ ] **Step 7: dev 배포 후 확인 — 이것이 진짜 검증이다**
 
 새 이미지 태그로 `backend_image_tag`를 올리고 apply한 뒤, 브라우저에서 두 계정으로 각각 로그인한다.
 
