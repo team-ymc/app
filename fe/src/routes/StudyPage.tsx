@@ -13,6 +13,7 @@ import { ArrowLeft, User } from '@phosphor-icons/react';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { IconButton } from '../design/components/IconButton';
 import { getStatus } from '../api/papers';
+import { ApiError } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
 import { PaperViewer } from './study/PaperViewer';
 import { SelectionLayer } from './study/SelectionLayer';
@@ -90,6 +91,16 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   const tocOrder = useMemo(() => toc.map((t) => t.blockId), [toc]);
   const activeId = useScrollSpy(viewerRef, tocOrder);
 
+  const expiredRefetched = useRef(false);
+  function handleImageError() {
+    const expiresAt = contentQuery.data?.assetExpiresAt;
+    if (!expiresAt || expiredRefetched.current) return; // 재조회는 1회만 — 무한 루프 방지
+    if (Date.now() > Date.parse(expiresAt)) {
+      expiredRefetched.current = true;
+      contentQuery.refetch();
+    }
+  }
+
   useEffect(() => {
     try {
       localStorage.setItem(NIGHT_STORAGE_KEY, nightMode ? '1' : '0');
@@ -127,8 +138,30 @@ function StudyPageContent({ paperId }: { paperId: string }) {
     window.addEventListener('pointerup', onUp);
   }
 
-  // 문서 제목 필드가 계약에 없다 — 픽스처의 첫 heading 블록 텍스트를 R1 상단바 제목으로 쓴다 (report 기록).
-  const titleText = blocks.find((b) => b.type === 'heading')?.headingText ?? 'Paper Teacher';
+  if (contentQuery.isPending) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', fontFamily: 'var(--font-sans)', color: 'var(--color-text-muted)' }}>
+        본문을 불러오는 중…
+      </div>
+    );
+  }
+  if (contentQuery.isError) {
+    // 진입 게이트(status COMPLETED)를 통과했는데 409면 적재 지연 등 일시 상태 — 서재로 안내
+    if (contentQuery.error instanceof ApiError && contentQuery.error.code === 'PAPER_NOT_READY') {
+      return <Navigate to="/library" replace state={{ toast: '본문 준비 중입니다. 잠시 후 다시 열어주세요' }} />;
+    }
+    return (
+      <div style={{ padding: 48, textAlign: 'center', fontFamily: 'var(--font-sans)', color: 'var(--color-text-muted)' }}>
+        본문을 불러오지 못했습니다{' '}
+        <button onClick={() => contentQuery.refetch()} style={{ marginLeft: 8 }}>다시 시도</button>
+      </div>
+    );
+  }
+
+  const titleText =
+    contentQuery.data?.title
+    ?? blocks.find((b) => b.type === 'heading')?.headingText
+    ?? 'Paper Teacher';
 
   return (
     <div
@@ -256,7 +289,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
               position: 'relative',
             }}
           >
-            <PaperViewer blocks={blocks} containerRef={viewerRef} />
+            <PaperViewer blocks={blocks} containerRef={viewerRef} onImageError={handleImageError} />
             <SelectionLayer viewerRef={viewerRef} onAsk={handleAsk} />
           </div>
 

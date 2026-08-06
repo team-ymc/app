@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  createPaper, completeUpload, getStatus, getDownloadUrl, uploadToS3, listPapers,
+  createPaper, completeUpload, getStatus, getDownloadUrl, uploadToS3, listPapers, fetchPaperContent,
 } from './papers';
 
 function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; status?: number; body?: unknown }) {
@@ -47,6 +47,18 @@ describe('api.js — fetch 계열', () => {
     const res = await listPapers();
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers', expect.objectContaining({}));
     expect(res.papers[0].paperId).toBe('p1');
+  });
+
+  it('fetchPaperContent: GET /content, 본문 응답을 그대로 돌려준다', async () => {
+    mockFetch({ body: { paperId: 'p1', title: 'T', schemaVersion: 1, blocks: [], assets: {} } });
+    const res = await fetchPaperContent('p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1/content', expect.anything());
+    expect(res.title).toBe('T');
+  });
+
+  it('fetchPaperContent: 409는 ApiError(code)로 던진다', async () => {
+    mockFetch({ ok: false, status: 409, body: { code: 'PAPER_NOT_READY', message: '' } });
+    await expect(fetchPaperContent('p1')).rejects.toMatchObject({ code: 'PAPER_NOT_READY' });
   });
 
   it('실패 응답: code·httpStatus를 실은 Error를 던진다', async () => {

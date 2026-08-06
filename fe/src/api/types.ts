@@ -31,3 +31,30 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+
+// 본문 블록 내용 — format으로 판별한다.
+export type PaperBlockContentDto =
+  | { format: 'text'; text: string }
+  | { format: 'formula'; tex: string }
+  | { format: 'table'; html: string }
+  | { format: 'image'; assetKey: string };
+
+export interface PaperContentBlockDto {
+  blockId: string;
+  globalOrder: number;
+  /** 파서 분류. 새 label이 추가될 수 있어 enum이 아니라 string으로 받는다. */
+  label: string;
+  headingLevel: number | null;
+  sectionPath: string[];
+  content: PaperBlockContentDto;
+}
+
+export interface PaperContentAssetDto { url: string; mediaType: string; expiresAt: string; }
+
+export interface PaperContentResponse {
+  paperId: string;
+  title: string | null;
+  schemaVersion: number;
+  blocks: PaperContentBlockDto[];
+  assets: Record<string, PaperContentAssetDto>;
+}

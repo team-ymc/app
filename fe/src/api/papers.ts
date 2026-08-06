@@ -2,7 +2,7 @@
 // BE 호출은 authFetch(자동 Bearer + 401 재시도)를 쓴다. S3 presigned PUT은 예외 — 서명 URL이 인가다.
 
 import { authFetch } from './auth';
-import { ApiError, type CreatePaperResponse, type Paper, type PaperStatusResponse } from './types';
+import { ApiError, type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse } from './types';
 
 export async function createPaper(filename: string, contentType: string): Promise<CreatePaperResponse> {
   const res = await authFetch('/api/papers', {
@@ -56,6 +56,13 @@ export async function listPapers(): Promise<{ papers: Paper[] }> {
   const res = await authFetch('/api/papers');
   if (!res.ok) throw await apiError(res);
   return res.json(); // { papers: [{ paperId, filename, status, createdAt, updatedAt }] }
+}
+
+// 파싱된 논문 본문 조회 (blocks는 globalOrder 오름차순으로 온다).
+export async function fetchPaperContent(paperId: string): Promise<PaperContentResponse> {
+  const res = await authFetch(`/api/papers/${paperId}/content`);
+  if (!res.ok) throw await apiError(res);
+  return res.json();
 }
 
 export async function apiError(res: Response): Promise<ApiError> {

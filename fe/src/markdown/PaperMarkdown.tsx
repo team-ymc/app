@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import './markdown.css';
 
-export function PaperMarkdown({ children }: { children: string }) {
+export function PaperMarkdown({ children, onImageError }: { children: string; onImageError?: () => void }) {
   return (
     <div className="pt-markdown">
       <Markdown
@@ -16,7 +16,7 @@ export function PaperMarkdown({ children }: { children: string }) {
             return (
               <figure className="pt-figure">
                 <img src={src ?? ''} alt={alt ?? ''} loading="lazy"
-                  onError={(e) => { e.currentTarget.classList.add('pt-figure-broken'); }} />
+                  onError={(e) => { e.currentTarget.classList.add('pt-figure-broken'); onImageError?.(); }} />
                 {alt && <figcaption>{alt}</figcaption>}
               </figure>
             );
