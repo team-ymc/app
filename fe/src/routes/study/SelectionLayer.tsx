@@ -11,10 +11,11 @@ import { ArrowBendUpLeft, ChatCircleText, NotePencil, Translate, X } from '@phos
 import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
 import { translateSelection } from '../../api/translate';
+import type { SelectionAnchors } from './selectionAnchors';
 
 export interface SelectionLayerProps {
   viewerRef: RefObject<HTMLDivElement | null>;
-  onAsk: (text: string, mode: 'current' | 'new') => void;
+  onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
 }
 
 // computeToolbarPosition의 top 계산은 popup.height를 쓰지 않는다(brief 구현 참고) — width만 정확하면
@@ -25,10 +26,10 @@ const ASK_POPUP_SIZE = { width: 150, height: 74 };
 
 type Layer =
   | { phase: 'idle' }
-  | { phase: 'toolbar'; text: string; rect: DOMRect; clear: () => void }
-  | { phase: 'translating'; text: string; rect: DOMRect; clear: () => void }
-  | { phase: 'translated'; text: string; rect: DOMRect; clear: () => void; translation: string }
-  | { phase: 'askChoice'; text: string; rect: DOMRect; clear: () => void };
+  | { phase: 'toolbar'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
+  | { phase: 'translating'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
+  | { phase: 'translated'; text: string; rect: DOMRect; clear: () => void; translation: string; anchors: SelectionAnchors | null }
+  | { phase: 'askChoice'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null };
 
 function truncate(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n).trim()}…` : text;
@@ -89,11 +90,11 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
   // 먼저 실행되므로, 뒤늦게 도착하는 이전 요청의 응답이 최신 상태를 덮어쓰지 않는다.
   useEffect(() => {
     if (layer.phase !== 'translating') return;
-    const { text, rect, clear } = layer;
+    const { text, rect, clear, anchors } = layer;
     let cancelled = false;
     translateSelection(text).then(({ translation }) => {
       if (cancelled) return;
-      setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, translation } : prev));
+      setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, translation, anchors } : prev));
     });
     return () => {
       cancelled = true;
@@ -106,13 +107,13 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
 
   function handleTranslate() {
     if (layer.phase !== 'toolbar') return;
-    const { text, rect, clear } = layer;
-    setLayer({ phase: 'translating', text, rect, clear });
+    const { text, rect, clear, anchors } = layer;
+    setLayer({ phase: 'translating', text, rect, clear, anchors });
   }
 
   function handleAsk() {
     if (layer.phase !== 'toolbar') return;
-    setLayer({ phase: 'askChoice', text: layer.text, rect: layer.rect, clear: layer.clear });
+    setLayer({ phase: 'askChoice', text: layer.text, rect: layer.rect, clear: layer.clear, anchors: layer.anchors });
   }
 
   // 번역 팝업 닫기 → clear()로 원문 읽기 복귀 (FT-006 Story 2).
@@ -125,10 +126,10 @@ export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
   // AI에게 질문 선택 → onAsk(text, mode). StudyPage가 pendingContext 세팅 + 챗 패널 열림·포커스한다.
   function handleAskChoice(mode: 'current' | 'new') {
     if (layer.phase !== 'askChoice') return;
-    const { text, clear } = layer;
+    const { text, clear, anchors } = layer;
     clear();
     setLayer({ phase: 'idle' });
-    onAsk(text, mode);
+    onAsk(text, mode, anchors);
   }
 
   if (layer.phase === 'toolbar') {

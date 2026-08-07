@@ -1,10 +1,12 @@
 // Task 14 brief: document의 selectionchange + mouseup에서 window.getSelection()을 검사해
 // 뷰어 컨테이너 내부의 텍스트 선택만 추적한다. 뷰어 밖 선택·collapse된 선택·clear() 호출 시 null.
 import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { computeSelectionAnchors, type SelectionAnchors } from './selectionAnchors';
 
 export interface TextSelection {
   text: string;
   rect: DOMRect;
+  anchors: SelectionAnchors | null;
   clear: () => void;
 }
 
@@ -35,7 +37,7 @@ export function useTextSelection(viewerRef: RefObject<HTMLDivElement | null>): T
         setSelection(null);
         return;
       }
-      setSelection({ text, rect: range.getBoundingClientRect(), clear });
+      setSelection({ text, rect: range.getBoundingClientRect(), anchors: computeSelectionAnchors(range), clear });
     }
 
     document.addEventListener('selectionchange', handleChange);

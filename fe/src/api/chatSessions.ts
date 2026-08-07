@@ -2,6 +2,7 @@
 import { authFetch } from './auth';
 import { apiError } from './papers';
 import type { ChatMessageStatus } from '../chat/chatState';
+import type { SelectionAnchors } from '../routes/study/selectionAnchors';
 
 export interface ChatSessionSummary {
   sessionId: string;
@@ -17,6 +18,7 @@ export interface ChatMessageItem {
   status: ChatMessageStatus;
   seq: number;            // 세션 내 단조 증가, 서버가 오름차순 정렬
   createdAt: string;
+  selection: SelectionAnchors | null; // user 메시지의 선택 앵커, 그 외 null
 }
 
 export async function listChatSessions(paperId: string): Promise<ChatSessionSummary[]> {
