@@ -84,7 +84,7 @@ flowchart LR
 - `useTextSelection`: `anchors {start, end}` 반환 추가.
 - `TutorPanel.buildContent()`: 인용문 삽입 제거. selection은 `streamChatMessage` → `chatStream.ts` body로 전달.
 - **선택 구절 칩**: 전송 시·이력 렌더 시 앵커로 로컬 본문에서 텍스트 복원해 말풍선 위에 표시. 클릭 시 해당 블록으로 스크롤. selection null인 옛 메시지는 칩 없음.
-- 앵커 변환 실패(본문 밖 선택 등)는 전송 전 차단. `SELECTION_TOO_LARGE`는 사용자 안내 문구로 표시.
+- 앵커 변환 실패(본문 밖 선택 등)는 selection 없이 전송한다 — 논문 전체 기반 답변으로 조용히 폴백(수용된 결정, 차단 UI 없음). `SELECTION_TOO_LARGE`는 사용자 안내 문구로 표시.
 
 ## 4. 테스트
 

@@ -1450,6 +1450,7 @@ Expected: 전부 PASS
 보고에 다음 두 가지를 포함해 사용자·팀이 배포 시 놓치지 않게 한다:
 
 - **DB 반영 순서**: local·dev는 `ddl-auto: update`로 자동 반영. prod는 `validate`이므로 **BE 배포 전에** `alter table chat_message add column selection jsonb;`를 먼저 적용한다(`be/docs/db/chat.sql` 하단 주석 참고). 컬럼이 nullable이라 구버전 앱과 공존 가능 — 롤백 시 컬럼은 그대로 둬도 된다.
+- **배포 순서**: BE를 FE보다 먼저(또는 동시에) 배포한다 — 구 BE는 새 FE의 `selection` 필드를 조용히 무시해(lenient Jackson) 선택 질문이 컨텍스트 없이 simple-agent로 가는 무증상 퇴행이 생긴다.
 - **알려진 제약(수용된 결정)**: ① 전환 전(simple-agent 시절) 세션에도 새 질문이 허용되지만, AI 체크포인트 키 구조가 달라 그 세션의 과거 AI 맥락 없이 새 대화로 답변한다. ② 드물게 선택 앵커 계산이 실패하면 selection 없이 논문 전체 질문으로 전송된다. 둘 다 dev 단계로 수용했으며 필요 시 후속 티켓에서 다룬다.
 
 - [ ] **Step 4: 변경 요약 보고 후 PR은 사용자 승인 대기**
