@@ -2,6 +2,7 @@
 package com.ymc.chat.service;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,7 @@ import com.ymc.chat.domain.ChatMessage;
 import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatMessageRole;
 import com.ymc.chat.domain.ChatMessageStatus;
+import com.ymc.chat.domain.ChatSelection;
 import com.ymc.chat.domain.ChatSession;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.common.error.ApiException;
@@ -57,11 +59,11 @@ public class ChatCommandService {
      * @throws DuplicateChatMessageException — 같은 id, 같은 content (멱등 재전송)
      */
     @Transactional
-    public ChatStartResult start(
-            UUID ownerId, UUID paperId, UUID sessionIdOrNull, UUID clientMessageId, String content) {
+    public ChatStartResult start(UUID ownerId, UUID paperId, UUID sessionIdOrNull,
+            UUID clientMessageId, String content, ChatSelection selection) {
 
         paperChatAccessValidator.validateChatReady(paperId, ownerId);
-        rejectDuplicate(ownerId, paperId, clientMessageId, content);
+        rejectDuplicate(ownerId, paperId, clientMessageId, content, selection);
 
         ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
 
@@ -75,8 +77,8 @@ public class ChatCommandService {
         session.recordActivity(now);
         ChatMessage assistant;
         try {
-            chatMessageRepository.save(
-                    ChatMessage.userMessage(session, clientMessageId, content, userSeq, now));
+            chatMessageRepository.save(ChatMessage.userMessage(
+                    session, clientMessageId, content, selection, userSeq, now));
             assistant = chatMessageRepository.saveAndFlush(
                     ChatMessage.assistantGenerating(session, clientMessageId, userSeq + 1, now));
         } catch (DataIntegrityViolationException e) {
@@ -84,7 +86,7 @@ public class ChatCommandService {
             // PG는 제약 위반 후 같은 트랜잭션의 추가 쿼리를 거부하므로(aborted, 25P02)
             // 재조회는 REQUIRES_NEW 새 트랜잭션에서 한다. 승자 커밋은 이미 끝났으므로 조회 가능하다.
             requiresNewTx.executeWithoutResult(
-                    tx -> rejectDuplicate(ownerId, paperId, clientMessageId, content));
+                    tx -> rejectDuplicate(ownerId, paperId, clientMessageId, content, selection));
             throw e; // rejectDuplicate가 못 잡는 위반이면 예상 밖 — 그대로 5xx
         }
 
@@ -95,7 +97,8 @@ public class ChatCommandService {
      * 재전송 판정. 요청자 소유·같은 논문의 재전송만 멱등으로 인정한다.
      * 같은 content면 멱등(기존 상태 반환), 다르면 CONFLICT.
      */
-    private void rejectDuplicate(UUID ownerId, UUID paperId, UUID clientMessageId, String content) {
+    private void rejectDuplicate(UUID ownerId, UUID paperId, UUID clientMessageId, String content,
+            ChatSelection selection) {
         Optional<ChatMessage> existingUser =
                 chatMessageRepository.findByClientMessageIdAndRole(clientMessageId, ChatMessageRole.USER);
         if (existingUser.isEmpty()) {
@@ -107,7 +110,8 @@ public class ChatCommandService {
             throw new ApiException(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT,
                     "clientMessageId가 다른 요청에 이미 사용되었습니다.");
         }
-        if (!existingUser.get().getContent().equals(content)) {
+        if (!existingUser.get().getContent().equals(content)
+                || !Objects.equals(existingUser.get().getSelection(), selection)) {
             throw new ApiException(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT,
                     "clientMessageId가 다른 요청에 이미 사용되었습니다.");
         }

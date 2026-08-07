@@ -42,7 +42,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
 
         ChatStartResult result = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "핵심 기여가 뭐야?");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "핵심 기여가 뭐야?", null);
 
         ChatSession session = chatSessionRepository.findById(result.sessionId()).orElseThrow();
         assertThat(session.getPaperId()).isEqualTo(paper.getId());
@@ -59,13 +59,13 @@ class ChatCommandServiceTest extends IntegrationTest {
     void startReusesSession() {
         Paper paper = givenCompletedPaper();
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문", null);
         // 첫 assistant를 종결시켜 CHAT_RUN_IN_PROGRESS를 피한다
         // (@Modifying 쿼리는 트랜잭션이 필요하므로 리포지토리 직접 호출이 아니라 transitions 빈을 쓴다)
         chatMessageTransitions.complete(first.assistantMessageId(), "답");
 
         ChatStartResult second = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "후속 질문");
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "후속 질문", null);
 
         assertThat(second.sessionId()).isEqualTo(first.sessionId());
         assertThat(chatMessageRepository.count()).isEqualTo(4);
@@ -79,7 +79,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 ChatSession.open(UUID.randomUUID(), paper.getId(), "질문", Instant.now()));
 
         assertThatThrownBy(() -> chatCommandService.start(
-                TEST_USER_ID, paper.getId(), otherOwners.getId(), UUID.randomUUID(), "질문"))
+                TEST_USER_ID, paper.getId(), otherOwners.getId(), UUID.randomUUID(), "질문", null))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CHAT_SESSION_NOT_FOUND));
     }
@@ -89,10 +89,10 @@ class ChatCommandServiceTest extends IntegrationTest {
     void rejectsConcurrentRun() {
         Paper paper = givenCompletedPaper();
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문", null);
 
         assertThatThrownBy(() -> chatCommandService.start(
-                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "성급한 질문"))
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "성급한 질문", null))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CHAT_RUN_IN_PROGRESS));
     }
@@ -103,12 +103,12 @@ class ChatCommandServiceTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
         UUID clientMessageId = UUID.randomUUID();
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문", null);
 
         DuplicateChatMessageException dup = catchThrowableOfType(
                 DuplicateChatMessageException.class,
                 () -> chatCommandService.start(
-                        TEST_USER_ID, paper.getId(), first.sessionId(), clientMessageId, "같은 질문"));
+                        TEST_USER_ID, paper.getId(), first.sessionId(), clientMessageId, "같은 질문", null));
 
         assertThat(dup.getSessionId()).isEqualTo(first.sessionId());
         assertThat(dup.getMessageId()).isEqualTo(first.assistantMessageId());
@@ -121,10 +121,10 @@ class ChatCommandServiceTest extends IntegrationTest {
     void duplicateDifferentContentConflicts() {
         Paper paper = givenCompletedPaper();
         UUID clientMessageId = UUID.randomUUID();
-        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "원래 질문");
+        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "원래 질문", null);
 
         assertThatThrownBy(() -> chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, clientMessageId, "다른 질문"))
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "다른 질문", null))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT));
         assertThat(chatMessageRepository.count()).isEqualTo(2);
@@ -145,7 +145,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 try {
                     barrier.await();
                     results.add(chatCommandService.start(
-                            TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문"));
+                            TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문", null));
                 } catch (Throwable t) {
                     results.add(t);
                 }
@@ -180,7 +180,7 @@ class ChatCommandServiceTest extends IntegrationTest {
     void foreignOwnerSameClientMessageIdIsConflict() {
         Paper paper = givenCompletedPaper();
         UUID clientMessageId = UUID.randomUUID();
-        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문", null);
 
         // 다른 사용자 소유의 COMPLETED 논문
         UUID otherOwner = UUID.randomUUID();
@@ -191,7 +191,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         paperTransitions.markParsed(othersPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
-                otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문"))
+                otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문", null))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT))
                 .isNotInstanceOf(DuplicateChatMessageException.class);
@@ -203,13 +203,13 @@ class ChatCommandServiceTest extends IntegrationTest {
     void samePaperScopeRequiredForIdempotency() {
         Paper paper = givenCompletedPaper();
         UUID clientMessageId = UUID.randomUUID();
-        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+        chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문", null);
 
         Paper secondPaper = givenProcessingPaper("second-paper.pdf");
         paperTransitions.markParsed(secondPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
-                TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))
+                TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문", null))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.CLIENT_MESSAGE_ID_CONFLICT));
     }
@@ -220,11 +220,11 @@ class ChatCommandServiceTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
 
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문", null);
         chatMessageTransitions.complete(first.assistantMessageId(), "답1");
 
         chatCommandService.start(
-                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문", null);
 
         var seqs = chatMessageRepository.findAll().stream()
                 .sorted(java.util.Comparator.comparingInt(ChatMessage::getSeq))
@@ -241,7 +241,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         String longQuestion = "가".repeat(150);
 
         ChatStartResult result = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), longQuestion);
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), longQuestion, null);
 
         ChatSession session = chatSessionRepository.findById(result.sessionId()).orElseThrow();
         assertThat(session.getTitle()).isEqualTo("가".repeat(120));
@@ -253,13 +253,13 @@ class ChatCommandServiceTest extends IntegrationTest {
     void followUpUpdatesLastMessageAt() {
         Paper paper = givenCompletedPaper();
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문", null);
         Instant firstActivity = chatSessionRepository.findById(first.sessionId())
                 .orElseThrow().getLastMessageAt();
         chatMessageTransitions.complete(first.assistantMessageId(), "답");
 
         chatCommandService.start(
-                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문", null);
 
         assertThat(chatSessionRepository.findById(first.sessionId()).orElseThrow()
                 .getLastMessageAt()).isAfter(firstActivity);

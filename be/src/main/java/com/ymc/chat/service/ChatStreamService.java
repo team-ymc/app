@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.ymc.chat.api.dto.ChatSseEventData;
+import com.ymc.chat.domain.ChatSelection;
 import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.chat.service.port.AiRunHandle;
@@ -48,11 +49,13 @@ public class ChatStreamService {
     private final ExecutorService chatRelayExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
-    public void begin(SseEmitter emitter, ChatStartResult started, String userContent) {
+    public void begin(SseEmitter emitter, ChatStartResult started, String userContent,
+            ChatSelection selection) {
         Run run = new Run(emitter, started);
         run.sendStarted();
         AiRunHandle handle = aiAgentStreamPort.stream(
-                new AiRunRequest(started.sessionId().toString(), userContent), run);
+                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(),
+                        userContent, selection), run);
         run.arm(handle);
     }
 
@@ -220,10 +223,14 @@ public class ChatStreamService {
         }
 
         @Override
-        public void onRunFailed(String error) {
-            // AI가 만든 임의 문자열이라 사용자 입력이 섞일 수 있다 — 원인 파악이 가능한 선에서 절단해 남긴다
-            log.warn("AI run 실패. messageId={} error={}",
-                    ids.assistantMessageId(), truncate(error, 200));
+        public void onRunFailed(String code, String message) {
+            log.warn("AI run 실패. messageId={} code={} message={}",
+                    ids.assistantMessageId(), code, truncate(message, 200));
+            if (code.startsWith("SELECTION_")) {
+                // 같은 selection 재시도는 의미가 없다 — 코드를 그대로 전달하고 retryable=false
+                failWith(code, selectionErrorMessage(code), false);
+                return;
+            }
             failWith("AI_RUN_FAILED", "답변을 생성하지 못했습니다.", true);
         }
 
@@ -294,6 +301,12 @@ public class ChatStreamService {
                 emitter.complete();
             }
         }
+    }
+
+    private static String selectionErrorMessage(String code) {
+        return "SELECTION_TOO_LARGE".equals(code)
+                ? "선택 영역이 너무 큽니다. 더 좁게 선택해 주세요."
+                : "선택 영역을 확인할 수 없습니다. 본문을 다시 선택해 주세요.";
     }
 
     private static String truncate(String value, int maxLength) {

@@ -24,14 +24,14 @@ class FakeAiAgentStreamAdapterTest {
         public void onDelta(String delta) { events.add("delta:" + delta); }
         public void onMessageCompleted(String message) { events.add("completed:" + message); }
         public void onRunCompleted() { events.add("run-completed"); }
-        public void onRunFailed(String error) { events.add("run-failed:" + error); }
+        public void onRunFailed(String code, String message) { events.add("run-failed:" + code + ":" + message); }
         public void onTransportError(Exception cause) { events.add("transport-error"); }
     };
 
     @Test
     @DisplayName("성공 시퀀스를 순서대로 콜백하고, delta 누적과 최종 답변이 일치한다")
     void successSequence() {
-        new FakeAiAgentStreamAdapter().stream(new AiRunRequest("t-1", "질문"), recorder);
+        new FakeAiAgentStreamAdapter().stream(new AiRunRequest("t-1", "paper-1", "질문", null), recorder);
 
         await().atMost(Duration.ofSeconds(5)).until(() -> events.contains("run-completed"));
 

@@ -43,7 +43,7 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
     ChatStartResult givenCompletedExchange(UUID ownerId, Paper paper, UUID sessionIdOrNull,
             String question) {
         ChatStartResult started = chatCommandService.start(
-                ownerId, paper.getId(), sessionIdOrNull, UUID.randomUUID(), question);
+                ownerId, paper.getId(), sessionIdOrNull, UUID.randomUUID(), question, null);
         chatMessageTransitions.complete(started.assistantMessageId(), "답변");
         return started;
     }
@@ -75,7 +75,7 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
         ChatStartResult first = givenCompletedExchange(TEST_USER_ID, paper, null, "질문1");
         // 후속 질문은 완료시키지 않는다 — GENERATING 상태 보존 검증
         chatCommandService.start(
-                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "질문2");
+                TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "질문2", null);
 
         mockMvc.perform(get("/api/papers/{paperId}/chat/sessions/{sessionId}/messages",
                         paper.getId(), first.sessionId())
@@ -166,7 +166,7 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
     void deleteSessionWhileGenerating() throws Exception {
         Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
         ChatStartResult started = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문", null);
         // markCompleted 하지 않음 — assistant는 GENERATING인 채다
 
         mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",

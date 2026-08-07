@@ -125,7 +125,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
             Thread.startVirtualThread(() -> {
                 listener.onRunStarted();
                 listener.onDelta("일부");
-                listener.onRunFailed("upstream raw error");
+                listener.onRunFailed("INTERNAL_SERVER_ERROR", "upstream raw error");
             });
             return (com.ymc.chat.service.port.AiRunHandle) () -> { };
         }).when(aiAgentStreamPort).stream(any(), any(AiStreamListener.class));
@@ -228,7 +228,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
         UUID clientMessageId = UUID.randomUUID();
         ChatStartResult first = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문", null);
 
         mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
                         .with(userJwt())

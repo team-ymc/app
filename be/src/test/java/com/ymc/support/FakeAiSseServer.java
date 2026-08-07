@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * BE↔AI SSE 계약(simple-agent-run-stream.yml)을 흉내내는 테스트 전용 서버.
+ * BE↔AI SSE 계약(inline-pdf-agent-run-stream.yml)을 흉내내는 테스트 전용 서버.
  * 프레임 단위 지연, terminal 없는 EOF, 장시간 침묵(행)을 스크립트로 재현한다.
  */
 public final class FakeAiSseServer implements AutoCloseable {
@@ -35,30 +35,31 @@ public final class FakeAiSseServer implements AutoCloseable {
         }
     }
 
-    // --- 계약 payload 헬퍼 (data.type == event 이름 규칙) ---
-    public static Frame runStarted(String threadId) {
+    // --- 계약 payload 헬퍼 (data.type == event 이름, 식별자는 요청 값으로 서빙 시 치환) ---
+    public static Frame runStarted() {
         return Frame.of("run.started",
-                "{\"type\":\"run.started\",\"thread_id\":\"" + threadId + "\"}");
+                "{\"type\":\"run.started\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\"}");
     }
 
-    public static Frame delta(String threadId, String delta) {
+    public static Frame delta(String delta) {
         return Frame.of("message.delta",
-                "{\"type\":\"message.delta\",\"thread_id\":\"" + threadId + "\",\"delta\":\"" + delta + "\"}");
+                "{\"type\":\"message.delta\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\",\"delta\":\"" + delta + "\"}");
     }
 
-    public static Frame messageCompleted(String threadId, String message) {
+    public static Frame messageCompleted(String message) {
         return Frame.of("message.completed",
-                "{\"type\":\"message.completed\",\"thread_id\":\"" + threadId + "\",\"message\":\"" + message + "\"}");
+                "{\"type\":\"message.completed\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\",\"message\":\"" + message + "\"}");
     }
 
-    public static Frame runCompleted(String threadId) {
+    public static Frame runCompleted() {
         return Frame.of("run.completed",
-                "{\"type\":\"run.completed\",\"thread_id\":\"" + threadId + "\"}");
+                "{\"type\":\"run.completed\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\"}");
     }
 
-    public static Frame runFailed(String threadId, String error) {
+    public static Frame runFailed(String code, String message) {
         return Frame.of("run.failed",
-                "{\"type\":\"run.failed\",\"thread_id\":\"" + threadId + "\",\"error\":\"" + error + "\"}");
+                "{\"type\":\"run.failed\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\","
+                        + "\"error\":{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}}");
     }
 
     private HttpServer server;
@@ -72,7 +73,10 @@ public final class FakeAiSseServer implements AutoCloseable {
             throw new IllegalStateException("fake AI 서버 기동 실패", e);
         }
         server.createContext("/", exchange -> {
-            lastRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            lastRequestBody.set(body);
+            String threadId = jsonField(body, "thread_id");
+            String paperId = jsonField(body, "paper_id");
             Script script = scripts.poll();
             if (script == null) {
                 exchange.sendResponseHeaders(500, -1);
@@ -83,7 +87,10 @@ public final class FakeAiSseServer implements AutoCloseable {
             try (OutputStream out = exchange.getResponseBody()) {
                 for (Frame frame : script.frames()) {
                     sleep(frame.delayMillis());
-                    out.write(("event: " + frame.event() + "\ndata: " + frame.dataJson() + "\n\n")
+                    String data = frame.dataJson()
+                            .replace("{{thread_id}}", threadId)
+                            .replace("{{paper_id}}", paperId);
+                    out.write(("event: " + frame.event() + "\ndata: " + data + "\n\n")
                             .getBytes(StandardCharsets.UTF_8));
                     out.flush();
                 }
@@ -113,6 +120,12 @@ public final class FakeAiSseServer implements AutoCloseable {
         if (server != null) {
             server.stop(0);
         }
+    }
+
+    private static String jsonField(String json, String name) {
+        var matcher = java.util.regex.Pattern
+                .compile("\"" + name + "\"\\s*:\\s*\"([^\"]*)\"").matcher(json);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     private static void sleep(long millis) {
