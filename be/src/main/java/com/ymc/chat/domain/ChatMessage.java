@@ -15,6 +15,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import lombok.Getter;
 
 /**
@@ -59,6 +62,11 @@ public class ChatMessage {
     @Column(name = "content", columnDefinition = "text")
     private String content;
 
+    /** user 메시지의 선택 영역 앵커. assistant와 선택 없는 질문은 null. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "selection", columnDefinition = "jsonb", updatable = false)
+    private ChatSelection selection;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private ChatMessageStatus status;
@@ -81,11 +89,13 @@ public class ChatMessage {
     }
 
     private ChatMessage(ChatSession session, ChatMessageRole role, String content,
-            ChatMessageStatus status, UUID clientMessageId, int seq, Instant now) {
+            ChatSelection selection, ChatMessageStatus status, UUID clientMessageId, int seq,
+            Instant now) {
         this.id = UUID.randomUUID();
         this.session = session;
         this.role = role;
         this.content = content;
+        this.selection = selection;
         this.status = status;
         this.clientMessageId = clientMessageId;
         this.seq = seq;
@@ -94,17 +104,17 @@ public class ChatMessage {
     }
 
     /** 사용자 질문. 저장 즉시 COMPLETED다. */
-    public static ChatMessage userMessage(
-            ChatSession session, UUID clientMessageId, String content, int seq, Instant now) {
+    public static ChatMessage userMessage(ChatSession session, UUID clientMessageId,
+            String content, ChatSelection selection, int seq, Instant now) {
         Objects.requireNonNull(content, "content");
-        return new ChatMessage(session, ChatMessageRole.USER, content,
+        return new ChatMessage(session, ChatMessageRole.USER, content, selection,
                 ChatMessageStatus.COMPLETED, clientMessageId, seq, now);
     }
 
     /** 생성 중인 assistant 답변 자리. content는 완료 시 조건부 UPDATE로 채운다. */
     public static ChatMessage assistantGenerating(
             ChatSession session, UUID clientMessageId, int seq, Instant now) {
-        return new ChatMessage(session, ChatMessageRole.ASSISTANT, null,
+        return new ChatMessage(session, ChatMessageRole.ASSISTANT, null, null,
                 ChatMessageStatus.GENERATING, clientMessageId, seq, now);
     }
 }

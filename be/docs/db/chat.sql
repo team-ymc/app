@@ -29,6 +29,8 @@ create table chat_message (
     role              varchar(16)                 not null
         check (role in ('USER', 'ASSISTANT')),
     content           text,
+    -- user 메시지의 선택 영역 블록 앵커(계약 ChatSelection, camelCase JSON). assistant·선택 없는 질문은 null.
+    selection         jsonb,
     status            varchar(16)                 not null
         check (status in ('GENERATING', 'COMPLETED', 'FAILED')),
     client_message_id uuid                        not null,
@@ -50,3 +52,6 @@ create table chat_message (
     -- 이 유니크 인덱스가 세션 내 히스토리 정렬 조회와 GENERATING 존재 검증도 겸한다 (YMC-260).
     constraint uk_chat_message_session_seq unique (session_id, seq)
 );
+
+-- 이미 생성된 DB에는 아래를 적용한다 (selection 컬럼 추가, nullable이라 구버전 앱과도 호환):
+-- alter table chat_message add column selection jsonb;

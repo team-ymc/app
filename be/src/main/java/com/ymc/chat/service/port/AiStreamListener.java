@@ -18,8 +18,8 @@ public interface AiStreamListener {
 
     void onRunCompleted();
 
-    /** AI가 run.failed를 보냄. raw error는 FE에 노출하지 않는다. */
-    void onRunFailed(String error);
+    /** AI가 run.failed를 보냄. code는 계약의 안정된 오류 코드, message는 raw라 FE에 그대로 노출하지 않는다. */
+    void onRunFailed(String code, String message);
 
     /** terminal event 없이 연결이 끊기거나 스트림 소비 중 예외가 남. */
     void onTransportError(Exception cause);

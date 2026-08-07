@@ -52,11 +52,13 @@ public class ChatController {
             @Valid @RequestBody ChatMessageStreamRequest request) {
 
         UUID ownerId = UUID.fromString(jwt.getSubject());
+        var selection = request.selection() == null ? null : request.selection().toDomain();
         ChatStartResult started = chatCommandService.start(
-                ownerId, paperId, request.sessionId(), request.clientMessageId(), request.content());
+                ownerId, paperId, request.sessionId(), request.clientMessageId(),
+                request.content(), selection);
 
         SseEmitter emitter = new SseEmitter(chatStreamProperties.emitterTimeout().toMillis());
-        chatStreamService.begin(emitter, started, request.content());
+        chatStreamService.begin(emitter, started, request.content(), selection);
 
         return ResponseEntity.ok()
                 .header("Cache-Control", "no-cache, no-transform") // 중간 계층 버퍼링·캐싱 방지 (계약)

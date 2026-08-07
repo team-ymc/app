@@ -100,11 +100,11 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void successOverWire() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.delta("t", "진짜 "),
-                FakeAiSseServer.delta("t", "응답"),
-                FakeAiSseServer.messageCompleted("t", "진짜 응답"),
-                FakeAiSseServer.runCompleted("t")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.delta("진짜 "),
+                FakeAiSseServer.delta("응답"),
+                FakeAiSseServer.messageCompleted("진짜 응답"),
+                FakeAiSseServer.runCompleted()));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -121,8 +121,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void runFailedOverWire() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.runFailed("t", "upstream raw detail")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.runFailed("INTERNAL_SERVER_ERROR", "upstream raw detail")));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -138,8 +138,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void runCompletedWithoutMessage() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.runCompleted("t")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.runCompleted()));
 
         MvcResult result = startStream(paper);
         awaitAssistantTerminal();
@@ -151,8 +151,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void eofAfterCompleted() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.messageCompleted("t", "완성")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.messageCompleted("완성")));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -167,8 +167,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void eofWithoutTerminal() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.delta("t", "일부")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.delta("일부")));
 
         MvcResult result = startStream(paper);
         awaitAssistantTerminal();
@@ -179,7 +179,7 @@ class AiRelayIntegrationTest extends IntegrationTest {
     @DisplayName("이벤트 사이 침묵이 idle timeout 초과 — AI_TIMEOUT")
     void idleSilence() throws Exception {
         Paper paper = givenCompletedPaper();
-        aiServer.enqueue(Script.of(FakeAiSseServer.runStarted("t")).thenHangMillis(30_000));
+        aiServer.enqueue(Script.of(FakeAiSseServer.runStarted()).thenHangMillis(30_000));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -193,8 +193,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void oversizedAccumulation() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.delta("t", "a".repeat(100))));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.delta("a".repeat(100))));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -211,10 +211,10 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void completedWinsOverAccumulated() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.delta("t", "가"),
-                FakeAiSseServer.messageCompleted("t", "나"),
-                FakeAiSseServer.runCompleted("t")));
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.delta("가"),
+                FakeAiSseServer.messageCompleted("나"),
+                FakeAiSseServer.runCompleted()));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
@@ -229,10 +229,10 @@ class AiRelayIntegrationTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
         // idle(1s)에는 안 걸리는 400ms 간격 delta 12개 = 4.8s > deadline(4s)
         FakeAiSseServer.Frame[] frames = new FakeAiSseServer.Frame[13];
-        frames[0] = FakeAiSseServer.runStarted("t");
+        frames[0] = FakeAiSseServer.runStarted();
         for (int i = 1; i <= 12; i++) {
             frames[i] = new FakeAiSseServer.Frame("message.delta",
-                    "{\"type\":\"message.delta\",\"thread_id\":\"t\",\"delta\":\"x\"}", 400);
+                    "{\"type\":\"message.delta\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\",\"delta\":\"x\"}", 400);
         }
         aiServer.enqueue(Script.of(frames));
 
@@ -248,11 +248,11 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void heartbeatDuringSilence() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
+                FakeAiSseServer.runStarted(),
                 // 800ms 침묵(heartbeat 300ms의 2배 이상, idle 1s 미만) 뒤 완료
                 new FakeAiSseServer.Frame("message.completed",
-                        "{\"type\":\"message.completed\",\"thread_id\":\"t\",\"message\":\"끝\"}", 800),
-                FakeAiSseServer.runCompleted("t")));
+                        "{\"type\":\"message.completed\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\",\"message\":\"끝\"}", 800),
+                FakeAiSseServer.runCompleted()));
 
         MvcResult result = startStream(paper);
         awaitAssistantTerminal();
@@ -267,21 +267,52 @@ class AiRelayIntegrationTest extends IntegrationTest {
     void feDisconnectStillPersists() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
-                FakeAiSseServer.runStarted("t"),
+                FakeAiSseServer.runStarted(),
                 new FakeAiSseServer.Frame("message.delta",
-                        "{\"type\":\"message.delta\",\"thread_id\":\"t\",\"delta\":\"느린\"}", 300),
-                FakeAiSseServer.messageCompleted("t", "느린 완성"),
-                FakeAiSseServer.runCompleted("t")));
+                        "{\"type\":\"message.delta\",\"thread_id\":\"{{thread_id}}\",\"paper_id\":\"{{paper_id}}\",\"delta\":\"느린\"}", 300),
+                FakeAiSseServer.messageCompleted("느린 완성"),
+                FakeAiSseServer.runCompleted()));
 
         // 컨트롤러 우회 — emitter를 직접 만들어 relay에 넘기고 즉시 FE 종료를 시뮬레이션한다
         var started = chatCommandService.start(
-                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문", null);
         var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(6_000L);
-        chatStreamService.begin(emitter, started, "질문");
+        chatStreamService.begin(emitter, started, "질문", null);
         emitter.complete(); // onCompletion → feConnected=false
 
         ChatMessage assistant = awaitAssistantTerminal();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
         assertThat(assistant.getContent()).isEqualTo("느린 완성");
+    }
+
+    @Test
+    @DisplayName("selection 요청이 AI body에 실리고, SELECTION_* 실패는 코드 그대로 retryable=false로 온다")
+    void selectionRelayAndErrorMapping() throws Exception {
+        Paper paper = givenCompletedPaper();
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted(),
+                FakeAiSseServer.runFailed("SELECTION_TOO_LARGE", "Selection exceeds limits.")));
+
+        MvcResult result = mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "clientMessageId", UUID.randomUUID().toString(),
+                                "content", "이 부분 설명해줘",
+                                "selection", Map.of(
+                                        "start", Map.of("blockId", "p0001-b0000"),
+                                        "end", Map.of("blockId", "p0001-b0002"))))))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        ChatMessage assistant = awaitAssistantTerminal();
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.FAILED);
+        assertThat(aiServer.lastRequestBody()).contains("\"paper_id\":\"" + paper.getId() + "\"");
+        assertThat(aiServer.lastRequestBody()).contains("\"block_id\":\"p0001-b0000\"");
+        String stream = streamBody(result);
+        assertThat(stream).contains("\"code\":\"SELECTION_TOO_LARGE\"");
+        assertThat(stream).contains("\"retryable\":false");
+        assertThat(stream).doesNotContain("Selection exceeds limits.");
     }
 }

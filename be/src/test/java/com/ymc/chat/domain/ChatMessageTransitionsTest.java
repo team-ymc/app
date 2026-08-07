@@ -61,10 +61,10 @@ class ChatMessageTransitionsTest extends IntegrationTest {
                 ChatSession.open(TEST_USER_ID, UUID.randomUUID(), "질문", Instant.now()));
         UUID clientMessageId = UUID.randomUUID();
         chatMessageRepository.saveAndFlush(
-                ChatMessage.userMessage(session, clientMessageId, "질문", 1, Instant.now()));
+                ChatMessage.userMessage(session, clientMessageId, "질문", null, 1, Instant.now()));
 
         assertThatThrownBy(() -> chatMessageRepository.saveAndFlush(
-                ChatMessage.userMessage(session, clientMessageId, "질문", 2, Instant.now())))
+                ChatMessage.userMessage(session, clientMessageId, "질문", null, 2, Instant.now())))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
