@@ -20,6 +20,7 @@ import { SelectionLayer } from './study/SelectionLayer';
 import { TocRail } from './study/TocRail';
 import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
 import { useScrollSpy } from './study/useScrollSpy';
+import type { SelectionAnchors } from './study/selectionAnchors';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const SPLIT_MIN = 30;
@@ -115,8 +116,8 @@ function StudyPageContent({ paperId }: { paperId: string }) {
 
   // SelectionLayer의 Ask popup에서 "현재 채팅"/"새 채팅"을 고르면 호출된다 — pendingContext를 세팅하고
   // 챗 패널이 접혀 있으면 펼친다(TutorPanel이 pendingContext 변화에 반응해 입력창에 포커스한다).
-  function handleAsk(text: string, mode: 'current' | 'new') {
-    setPendingContext({ text, mode });
+  function handleAsk(text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) {
+    setPendingContext({ text, mode, anchors });
     setChatCollapsed(false);
   }
 
@@ -321,6 +322,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
           >
             <TutorPanel
               paperId={paperId}
+              blocks={blocks}
               pendingContext={pendingContext}
               onContextConsumed={() => setPendingContext(null)}
               collapsed={chatCollapsed}

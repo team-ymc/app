@@ -10,24 +10,29 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Quotes, X } from '@phosphor-icons/react';
 import { chatReducer, initialChatState } from '../../chat/chatState';
 import { streamChatMessage } from '../../chat/chatStream';
+import { resolveSelectionPreview } from '../../chat/selectionPreview';
 import { listChatSessions, listChatSessionMessages, deleteChatSession } from '../../api/chatSessions';
 import type { ChatSessionSummary } from '../../api/chatSessions';
 import { ApiError } from '../../api/types';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
+import type { PaperBlock } from '../../markdown/paperContent';
 import { TutorNotebook } from '../../design/components/TutorNotebook';
 import { NotebookSection } from '../../design/components/NotebookSection';
 import { StudentMessage } from '../../design/components/StudentMessage';
 import { IconButton } from '../../design/components/IconButton';
+import type { SelectionAnchors } from './selectionAnchors';
 
 // controller 승인 확장(brief): pendingContext.mode==='new'면 전송 전에 dispatch({type:'reset'})해서
 // ask popup의 "새 채팅" 선택을 지원한다. mode 생략 시 기존 세션에 이어 붙인다("현재 채팅").
 export interface TutorPanelPendingContext {
   text: string;
   mode?: 'current' | 'new';
+  anchors: SelectionAnchors | null;
 }
 
 export interface TutorPanelProps {
   paperId: string;
+  blocks: PaperBlock[];
   pendingContext: TutorPanelPendingContext | null;
   onContextConsumed: () => void;
   collapsed: boolean;
@@ -222,13 +227,7 @@ function dotStyle(delay: number): CSSProperties {
   };
 }
 
-// 계약: content는 자유 텍스트 — BE 변경 없이 FE 포맷팅으로 인용 구절을 붙인다 (brief Step 1).
-function buildContent(context: TutorPanelPendingContext | null, question: string): string {
-  if (!context) return question;
-  return `다음은 논문에서 선택한 구절이다:\n> ${context.text}\n\n${question}`;
-}
-
-export function TutorPanel({ paperId, pendingContext, onContextConsumed, collapsed, onToggleCollapse }: TutorPanelProps) {
+export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed, collapsed, onToggleCollapse }: TutorPanelProps) {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const [input, setInput] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
@@ -278,9 +277,9 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
     if (pendingContext) textareaRef.current?.focus();
   }, [pendingContext]);
 
-  function run(clientMessageId: string, content: string, resend: boolean) {
+  function run(clientMessageId: string, content: string, resend: boolean, selection: SelectionAnchors | null) {
     historyLoadSeq.current += 1; // 전송(첫 전송·재시도 모두) 시작 — 진행 중인 히스토리 로드를 무효화
-    dispatch({ type: 'send', clientMessageId, content, resend });
+    dispatch({ type: 'send', clientMessageId, content, selection, resend });
     const controller = new AbortController();
     abortRef.current = controller;
     streamChatMessage({
@@ -288,6 +287,7 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
       sessionId: state.sessionId,
       clientMessageId,
       content,
+      selection,
       signal: controller.signal,
       onEvent: (e) => {
         // 전송 완료 시 세션 목록을 무효화 — 새 세션이 다음에 드롭다운을 열 때 반영되게 한다.
@@ -361,10 +361,9 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   function handleSend() {
     const question = input.trim();
     if (!question || state.streaming) return;
-    const content = buildContent(pendingContext, question);
     setInput('');
     resetComposerHeight();
-    run(crypto.randomUUID(), content, false);
+    run(crypto.randomUUID(), question, false, pendingContext?.anchors ?? null);
     if (pendingContext) onContextConsumed();
   }
 
@@ -388,11 +387,11 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
   function handleRetry() {
     if (state.streaming) return;
     if (state.pending) {
-      run(state.pending.clientMessageId, state.pending.content, true);
+      run(state.pending.clientMessageId, state.pending.content, true, state.pending.selection);
       return;
     }
     const lastUser = [...state.messages].reverse().find((m) => m.role === 'user');
-    if (lastUser) run(crypto.randomUUID(), lastUser.content, true);
+    if (lastUser) run(crypto.randomUUID(), lastUser.content, true, lastUser.selection);
   }
 
   if (collapsed) {
@@ -560,8 +559,21 @@ export function TutorPanel({ paperId, pendingContext, onContextConsumed, collaps
         <TutorNotebook style={{ borderLeft: 'none' }} composer={composer}>
           {state.messages.map((m) => {
             if (m.role === 'user') {
+              const preview = m.selection ? resolveSelectionPreview(blocks, m.selection) : null;
               return (
-                <div key={m.key} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div key={m.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  {m.selection ? (
+                    <button
+                      onClick={() => document.getElementById(m.selection!.start.blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      title="선택한 본문으로 이동"
+                      style={{ ...contextChipStyle, maxWidth: 260, border: '1px solid var(--color-border)' }}
+                    >
+                      <Quotes size={12} color="var(--color-text-muted)" />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {preview ?? '선택한 구절'}
+                      </span>
+                    </button>
+                  ) : null}
                   <StudentMessage
                     style={{
                       background: 'var(--color-bg-surface)',
