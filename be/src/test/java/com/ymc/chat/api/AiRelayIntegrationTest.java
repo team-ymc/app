@@ -277,11 +277,39 @@ class AiRelayIntegrationTest extends IntegrationTest {
         var started = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
         var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(6_000L);
-        chatStreamService.begin(emitter, started, "질문");
+        chatStreamService.begin(emitter, started, "질문", null);
         emitter.complete(); // onCompletion → feConnected=false
 
         ChatMessage assistant = awaitAssistantTerminal();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
         assertThat(assistant.getContent()).isEqualTo("느린 완성");
+    }
+
+    @Test
+    @DisplayName("selection이 wire까지 snake_case로 전달된다")
+    void selectionRelayedOverWire() throws Exception {
+        Paper paper = givenCompletedPaper();
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted("t"),
+                FakeAiSseServer.messageCompleted("t", "답"),
+                FakeAiSseServer.runCompleted("t")));
+
+        MvcResult result = mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "clientMessageId", UUID.randomUUID().toString(),
+                                "content", "질문",
+                                "selection", Map.of(
+                                        "start", Map.of("blockId", "p0-b0", "offset", 0),
+                                        "end", Map.of("blockId", "p0-b1"))))))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        awaitAssistantTerminal();
+        streamBody(result);
+        assertThat(aiServer.lastRequestBody()).contains("\"block_id\":\"p0-b0\"");
+        assertThat(aiServer.lastRequestBody()).doesNotContain("blockId");
     }
 }

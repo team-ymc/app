@@ -11,10 +11,12 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ymc.chat.api.dto.ChatSelectionDto;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.chat.service.port.AiRunHandle;
 import com.ymc.chat.service.port.AiRunRequest;
@@ -50,7 +52,23 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
     record StreamRequestBody(
             @JsonProperty("thread_id") String threadId,
             @JsonProperty("paper_id") String paperId,
-            String message) {
+            String message,
+            @JsonInclude(JsonInclude.Include.NON_NULL) SelectionBody selection) {
+    }
+
+    record SelectionBody(AnchorBody start, AnchorBody end) {
+        static SelectionBody from(ChatSelectionDto dto) {
+            return dto == null ? null
+                    : new SelectionBody(AnchorBody.from(dto.start()), AnchorBody.from(dto.end()));
+        }
+    }
+
+    record AnchorBody(
+            @JsonProperty("block_id") String blockId,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Integer offset) {
+        static AnchorBody from(ChatSelectionDto.Anchor anchor) {
+            return new AnchorBody(anchor.blockId(), anchor.offset());
+        }
     }
 
     @Override
@@ -59,7 +77,8 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
         Flux<ServerSentEvent<String>> events = aiWebClient.post()
                 .uri(STREAM_PATH)
                 .accept(MediaType.TEXT_EVENT_STREAM)
-                .bodyValue(new StreamRequestBody(request.threadId(), request.paperId(), request.message()))
+                .bodyValue(new StreamRequestBody(request.threadId(), request.paperId(), request.message(),
+                        SelectionBody.from(request.selection())))
                 .retrieve()
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {
                 });

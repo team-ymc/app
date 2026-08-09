@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.ymc.chat.api.dto.ChatSelectionDto;
 import com.ymc.chat.api.dto.ChatSseEventData;
 import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.port.AiAgentStreamPort;
@@ -48,11 +49,11 @@ public class ChatStreamService {
     private final ExecutorService chatRelayExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
-    public void begin(SseEmitter emitter, ChatStartResult started, String userContent) {
+    public void begin(SseEmitter emitter, ChatStartResult started, String userContent, ChatSelectionDto selection) {
         Run run = new Run(emitter, started);
         run.sendStarted();
         AiRunHandle handle = aiAgentStreamPort.stream(
-                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent), run);
+                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selection), run);
         run.arm(handle);
     }
 

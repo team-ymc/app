@@ -3,6 +3,7 @@ package com.ymc.chat.api.dto;
 
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,5 +11,6 @@ import jakarta.validation.constraints.NotNull;
 public record ChatMessageStreamRequest(
         UUID sessionId,
         @NotNull UUID clientMessageId,
-        @NotBlank String content) {
+        @NotBlank String content,
+        @Valid ChatSelectionDto selection) {
 }
