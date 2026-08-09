@@ -13,7 +13,7 @@ BE↔AI `inline-pdf-agent-run-stream.yml`(AI 제공).
 
 ## 데이터 흐름
 
-```
+```text
 FE 선택(Range) → 블록 앵커+UTF-16 offset → POST /chat/messages { content, selection? }
 BE: bean validation(형식만) → ChatStreamService → AiRunRequest(+selection)
 어댑터: camelCase→snake_case → AI { selection: { start: {block_id, offset?}, end: … } }
