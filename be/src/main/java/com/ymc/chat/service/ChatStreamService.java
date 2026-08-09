@@ -52,7 +52,7 @@ public class ChatStreamService {
         Run run = new Run(emitter, started);
         run.sendStarted();
         AiRunHandle handle = aiAgentStreamPort.stream(
-                new AiRunRequest(started.sessionId().toString(), userContent), run);
+                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent), run);
         run.arm(handle);
     }
 

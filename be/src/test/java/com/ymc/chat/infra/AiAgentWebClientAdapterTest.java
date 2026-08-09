@@ -78,26 +78,27 @@ class AiAgentWebClientAdapterTest {
                 FakeAiSseServer.messageCompleted("t-1", "안녕하세요"),
                 FakeAiSseServer.runCompleted("t-1")));
 
-        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-1", "질문"), recorder);
+        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-1", "p-1", "질문"), recorder);
 
         await().atMost(WAIT).until(() -> events.contains("run-completed"));
         assertThat(events).containsExactly(
                 "started", "delta:안녕", "delta:하세요", "completed:안녕하세요", "run-completed");
         assertThat(aiServer.lastRequestBody()).contains("\"thread_id\":\"t-1\"");
+        assertThat(aiServer.lastRequestBody()).contains("\"paper_id\":\"p-1\"");
         assertThat(aiServer.lastRequestBody()).contains("\"message\":\"질문\"");
         assertThat(aiServer.lastRequestBody()).doesNotContain("threadId");
     }
 
     @Test
-    @DisplayName("run.failed를 error 문자열과 함께 전달한다")
+    @DisplayName("run.failed의 error 객체를 code: message 문자열로 전달한다")
     void runFailed() {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t-2"),
-                FakeAiSseServer.runFailed("t-2", "boom")));
+                FakeAiSseServer.runFailed("t-2", "PAPER_DOCUMENT_NOT_FOUND", "boom")));
 
-        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-2", "질문"), recorder);
+        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-2", "p-2", "질문"), recorder);
 
-        await().atMost(WAIT).until(() -> events.contains("run-failed:boom"));
+        await().atMost(WAIT).until(() -> events.contains("run-failed:PAPER_DOCUMENT_NOT_FOUND: boom"));
         assertThat(events).doesNotContain("run-completed");
     }
 
@@ -106,7 +107,7 @@ class AiAgentWebClientAdapterTest {
     void idleSilenceTimesOut() {
         aiServer.enqueue(Script.of(FakeAiSseServer.runStarted("t-3")).thenHangMillis(10_000));
 
-        adapter(Duration.ofMillis(300)).stream(new AiRunRequest("t-3", "질문"), recorder);
+        adapter(Duration.ofMillis(300)).stream(new AiRunRequest("t-3", "p-3", "질문"), recorder);
 
         await().atMost(WAIT).until(() -> events.stream().anyMatch(e -> e.startsWith("transport-error:")));
         assertThat(events).contains("transport-error:" + TimeoutException.class.getSimpleName());
@@ -119,7 +120,7 @@ class AiAgentWebClientAdapterTest {
                 FakeAiSseServer.runStarted("t-4"),
                 FakeAiSseServer.delta("t-4", "일부")));
 
-        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-4", "질문"), recorder);
+        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-4", "p-4", "질문"), recorder);
 
         await().atMost(WAIT).until(() -> events.stream().anyMatch(e -> e.startsWith("transport-error:")));
         assertThat(events).doesNotContain("run-completed");
@@ -132,7 +133,7 @@ class AiAgentWebClientAdapterTest {
                 FakeAiSseServer.Frame.of("message.delta", "{not-json"),
                 FakeAiSseServer.runCompleted("t-5")));
 
-        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-5", "질문"), recorder);
+        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-5", "p-5", "질문"), recorder);
 
         await().atMost(WAIT).until(() -> events.stream().anyMatch(e -> e.startsWith("transport-error:")));
         // 오류 후 구독이 취소됐으므로 후속 terminal 콜백이 오지 않는다

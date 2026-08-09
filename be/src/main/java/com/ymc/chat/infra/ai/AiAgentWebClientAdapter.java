@@ -26,7 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Scheduler;
 
 /**
- * BE↔AI 계약(simple-agent-run-stream.yml)의 WebClient 구현 (설계 §4).
+ * BE↔AI 계약(inline-pdf-agent-run-stream.yml)의 WebClient 구현 (설계 §4).
  *
  * <p>reactive 체인은 이 클래스 밖으로 나가지 않는다 — 리스너 콜백은 전부
  * {@code chatRelayScheduler}(virtual thread)에서 순서대로 호출되므로 relay는 블로킹해도 된다.
@@ -39,7 +39,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
 
     private static final Logger log = LoggerFactory.getLogger(AiAgentWebClientAdapter.class);
 
-    static final String STREAM_PATH = "/api/v1/agents/simple-agent/runs/stream";
+    static final String STREAM_PATH = "/api/v1/agents/inline-pdf-agent/runs/stream";
 
     private final WebClient aiWebClient;
     private final Scheduler chatRelayScheduler;
@@ -47,7 +47,10 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
     private final ObjectMapper objectMapper;
 
     /** wire 형식은 snake_case (계약) — 코드 컨벤션과 경계에서 변환한다. */
-    record StreamRequestBody(@JsonProperty("thread_id") String threadId, String message) {
+    record StreamRequestBody(
+            @JsonProperty("thread_id") String threadId,
+            @JsonProperty("paper_id") String paperId,
+            String message) {
     }
 
     @Override
@@ -56,7 +59,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
         Flux<ServerSentEvent<String>> events = aiWebClient.post()
                 .uri(STREAM_PATH)
                 .accept(MediaType.TEXT_EVENT_STREAM)
-                .bodyValue(new StreamRequestBody(request.threadId(), request.message()))
+                .bodyValue(new StreamRequestBody(request.threadId(), request.paperId(), request.message()))
                 .retrieve()
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {
                 });
@@ -90,7 +93,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 }
                 case "run.failed" -> {
                     terminalSeen.set(true);
-                    listener.onRunFailed(textField(event.data(), "error"));
+                    listener.onRunFailed(errorField(event.data()));
                 }
                 default -> log.debug("알 수 없는 AI event 무시: {}", name);
             }
@@ -103,8 +106,20 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
 
     /** data JSON에서 필수 문자열 필드를 꺼낸다. 없으면 계약 위반 — transport error로 처리된다. */
     private String textField(String data, String fieldName) throws JsonProcessingException {
-        JsonNode node = objectMapper.readTree(data);
-        JsonNode value = node.get(fieldName);
+        return requireText(objectMapper.readTree(data), fieldName);
+    }
+
+    /** run.failed의 error 객체(code+message)를 로깅용 문자열로 합친다. code는 FE에 노출하지 않는다. */
+    private String errorField(String data) throws JsonProcessingException {
+        JsonNode error = objectMapper.readTree(data).get("error");
+        if (error == null || !error.isObject()) {
+            throw new IllegalArgumentException("run.failed data에 'error' 객체가 없습니다.");
+        }
+        return requireText(error, "code") + ": " + requireText(error, "message");
+    }
+
+    private static String requireText(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.get(fieldName);
         if (value == null || !value.isTextual()) {
             throw new IllegalArgumentException(
                     "AI event data에 '" + fieldName + "' 문자열 필드가 없습니다.");

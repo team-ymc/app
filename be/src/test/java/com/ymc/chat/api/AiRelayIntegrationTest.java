@@ -122,7 +122,7 @@ class AiRelayIntegrationTest extends IntegrationTest {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t"),
-                FakeAiSseServer.runFailed("t", "upstream raw detail")));
+                FakeAiSseServer.runFailed("t", "PAPER_DOCUMENT_NOT_FOUND", "upstream raw detail")));
 
         MvcResult result = startStream(paper);
         ChatMessage assistant = awaitAssistantTerminal();
