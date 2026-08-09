@@ -13,6 +13,10 @@ export interface PaperBlock {
   tableHtml?: string;
   headingText?: string;
   headingLevel?: number;
+  /** offset 계산 기준 원문. 없으면 atomic 블록이라 offset 대상이 아니다. */
+  sourceText?: string;
+  /** markdown offset − 원문 offset. heading의 '## ' 길이. */
+  sourceOffsetShift?: number;
 }
 
 export interface TocEntry { blockId: string; text: string; level: number; }
@@ -51,15 +55,16 @@ function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBl
     case 'text': {
       if (b.label === 'doc_title' || b.label === 'paragraph_title') {
         const level = b.headingLevel ?? 1;
-        return {
+        const hashes = '#'.repeat(Math.min(level, 6));
+        return withSource({
           id: b.blockId,
           type: level <= 2 ? 'heading' : 'subheading',
-          markdown: `${'#'.repeat(Math.min(level, 6))} ${c.text}`,
+          markdown: `${hashes} ${c.text}`,
           headingText: c.text,
           headingLevel: level,
-        };
+        }, c.text, hashes.length + 1);
       }
-      return { id: b.blockId, type: 'para', markdown: c.text };
+      return withSource({ id: b.blockId, type: 'para', markdown: c.text }, c.text, 0);
     }
     case 'formula':
       return { id: b.blockId, type: 'equation', markdown: `$$\n${c.tex}\n$$` };
@@ -76,7 +81,16 @@ function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBl
     default: {
       console.warn(`알 수 없는 content format — para로 강등: ${(c as { format: string }).format} (${b.blockId})`);
       const text = (c as { text?: string }).text ?? '';
-      return { id: b.blockId, type: 'para', markdown: text };
+      return withSource({ id: b.blockId, type: 'para', markdown: text }, text, 0);
     }
   }
+}
+
+// 불변식이 깨지면 원문을 버려 atomic으로 강등한다 — 틀린 offset을 보내는 것보다 블록 단위가 낫다.
+function withSource(block: PaperBlock, sourceText: string, shift: number): PaperBlock {
+  if ((block.markdown ?? '').slice(shift) !== sourceText) {
+    console.warn(`markdown과 원문이 어긋나 offset 대상에서 제외: ${block.id}`);
+    return block;
+  }
+  return { ...block, sourceText, sourceOffsetShift: shift };
 }

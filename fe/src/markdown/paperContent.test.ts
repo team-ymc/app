@@ -78,4 +78,37 @@ describe('adaptPaperContent', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
+
+  it('text 블록만 canonical 원문과 shift를 보존한다 (heading은 # prefix 길이만큼)', () => {
+    const out = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'p0', globalOrder: 0, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: '본문 **강조** 문장' } },
+        { blockId: 'h2', globalOrder: 1, label: 'paragraph_title', headingLevel: 2, sectionPath: [], content: { format: 'text', text: '결론' } },
+        { blockId: 'h9', globalOrder: 2, label: 'paragraph_title', headingLevel: 9, sectionPath: [], content: { format: 'text', text: '깊은 제목' } },
+        { blockId: 'f0', globalOrder: 3, label: 'display_formula', headingLevel: null, sectionPath: [], content: { format: 'formula', tex: 'E=mc^2' } },
+        { blockId: 't0', globalOrder: 4, label: 'table', headingLevel: null, sectionPath: [], content: { format: 'table', html: '<table></table>' } },
+      ],
+    }));
+    expect(out.blocks[0]).toMatchObject({ sourceText: '본문 **강조** 문장', sourceOffsetShift: 0 });
+    expect(out.blocks[1]).toMatchObject({ sourceText: '결론', sourceOffsetShift: 3 });
+    // headingLevel 9는 markdown 조립이 '#'을 6개로 캡하므로 shift도 7이어야 한다
+    expect(out.blocks[2]).toMatchObject({ sourceText: '깊은 제목', sourceOffsetShift: 7 });
+    expect(out.blocks[3].sourceText).toBeUndefined();
+    expect(out.blocks[4].sourceText).toBeUndefined();
+  });
+
+  it('보존된 모든 text 블록이 markdown.slice(shift) === sourceText 불변식을 만족한다', () => {
+    const out = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'p0', globalOrder: 0, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: '문단' } },
+        { blockId: 'h1', globalOrder: 1, label: 'doc_title', headingLevel: 1, sectionPath: [], content: { format: 'text', text: '제목' } },
+        { blockId: 'h3', globalOrder: 2, label: 'paragraph_title', headingLevel: 3, sectionPath: [], content: { format: 'text', text: '소제목' } },
+      ],
+    }));
+    for (const block of out.blocks) {
+      if (block.sourceText === undefined) continue;
+      expect(block.sourceOffsetShift).toBeDefined();
+      expect((block.markdown ?? '').slice(block.sourceOffsetShift!)).toBe(block.sourceText);
+    }
+  });
 });

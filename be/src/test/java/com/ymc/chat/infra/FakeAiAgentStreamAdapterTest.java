@@ -31,7 +31,7 @@ class FakeAiAgentStreamAdapterTest {
     @Test
     @DisplayName("성공 시퀀스를 순서대로 콜백하고, delta 누적과 최종 답변이 일치한다")
     void successSequence() {
-        new FakeAiAgentStreamAdapter().stream(new AiRunRequest("t-1", "p-1", "질문"), recorder);
+        new FakeAiAgentStreamAdapter().stream(new AiRunRequest("t-1", "p-1", "질문", null), recorder);
 
         await().atMost(Duration.ofSeconds(5)).until(() -> events.contains("run-completed"));
 
