@@ -37,7 +37,7 @@ export function PaperViewer({ blocks, containerRef, onImageError }: PaperViewerP
                 {b.type === 'table' && b.tableHtml != null ? (
                   <SanitizedHtmlTable html={b.tableHtml} />
                 ) : (
-                  <PaperMarkdown onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
+                  <PaperMarkdown sourcePos onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
                 )}
               </section>
             ))}

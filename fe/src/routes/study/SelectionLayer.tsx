@@ -12,9 +12,11 @@ import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
 import { translateSelection } from '../../api/translate';
 import type { SelectionAnchors } from './selectionAnchors';
+import type { PaperBlock } from '../../markdown/paperContent';
 
 export interface SelectionLayerProps {
   viewerRef: RefObject<HTMLDivElement | null>;
+  blocks: PaperBlock[];
   onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
 }
 
@@ -35,8 +37,8 @@ function truncate(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n).trim()}…` : text;
 }
 
-export function SelectionLayer({ viewerRef, onAsk }: SelectionLayerProps) {
-  const sel = useTextSelection(viewerRef);
+export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps) {
+  const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   const popupRef = useRef<HTMLDivElement>(null);
 

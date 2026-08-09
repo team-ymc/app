@@ -85,7 +85,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   const viewerRef = useRef<HTMLDivElement>(null);
   const splitRegionRef = useRef<HTMLDivElement>(null);
 
-  const blocks = contentQuery.data?.blocks ?? [];
+  const blocks = useMemo(() => contentQuery.data?.blocks ?? [], [contentQuery.data]);
   const toc = contentQuery.data?.toc ?? [];
   // toc.map()이 렌더마다 새 배열을 만들면 useScrollSpy의 effect deps가 매번 바뀌어
   // IntersectionObserver가 불필요하게 재구축된다(스플리터 드래그 중 pointermove마다 리렌더되면 특히 심함) — 메모이즈.
@@ -291,7 +291,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             }}
           >
             <PaperViewer blocks={blocks} containerRef={viewerRef} onImageError={handleImageError} />
-            <SelectionLayer viewerRef={viewerRef} onAsk={handleAsk} />
+            <SelectionLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
           </div>
 
           {/* Resizable splitter */}

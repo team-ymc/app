@@ -14,7 +14,11 @@ export function resolveSelectionPreview(
   if (startIdx < 0 || endIdx < 0 || startIdx > endIdx) return null;
   const text = blocks
     .slice(startIdx, endIdx + 1)
-    .map(blockText)
+    .map((b, i) => blockText(
+      b,
+      i === 0 ? selection.start.offset : undefined,
+      i === endIdx - startIdx ? selection.end.offset : undefined,
+    ))
     .map((t) => t.trim())
     .filter(Boolean)
     .join(' ');
@@ -22,8 +26,8 @@ export function resolveSelectionPreview(
   return text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX)}…` : text;
 }
 
-function blockText(b: PaperBlock): string {
-  if (b.type === 'heading' || b.type === 'subheading') return b.headingText ?? '';
-  if (b.type === 'para') return b.markdown ?? '';
-  return ''; // equation·table·figure·other는 미리보기에서 제외
+// 원문을 offset 범위로 자른다. atomic 블록은 미리보기에서 제외된다.
+function blockText(b: PaperBlock, from: number | undefined, to: number | undefined): string {
+  if (b.sourceText === undefined) return '';
+  return b.sourceText.slice(from ?? 0, to ?? b.sourceText.length);
 }
