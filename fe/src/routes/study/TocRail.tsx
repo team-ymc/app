@@ -1,6 +1,7 @@
 // 이식: Paper Study Page.dc.html R3 TOC nav rail (railStyle/toc item rowStyle 값 그대로).
 import type { CSSProperties } from 'react';
 import { IconButton } from '../../design/components/IconButton';
+import { InlineTex } from '../../markdown/InlineTex';
 import type { TocEntry } from '../../markdown/paperContent';
 
 export interface TocRailProps {
@@ -58,7 +59,7 @@ export function TocRail({ toc, activeId, tocOpen, onToggle, onJump }: TocRailPro
             };
             return (
               <button key={item.blockId} onClick={() => onJump(item.blockId)} style={rowStyle}>
-                {item.text}
+                <InlineTex>{item.text}</InlineTex>
               </button>
             );
           })}
