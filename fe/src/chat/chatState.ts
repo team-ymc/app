@@ -128,7 +128,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           error: it.status === 'FAILED'
             ? { code: 'HISTORY_FAILED', message: '응답 생성에 실패했습니다.', retryable: false }
             : null,
-          selection: it.selection ?? null,
+          selection: null, // 이력 응답에는 selection이 없다
         })),
       };
     case 'reset':

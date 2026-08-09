@@ -90,7 +90,7 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
 
 const item = (over: Partial<ChatMessageItem>): ChatMessageItem => ({
   messageId: 'm-1', role: 'USER', content: '질문', status: 'COMPLETED',
-  seq: 1, createdAt: '2026-08-01T00:00:00Z', selection: null, ...over,
+  seq: 1, createdAt: '2026-08-01T00:00:00Z', ...over,
 });
 
 describe('historyLoaded', () => {
@@ -117,15 +117,6 @@ describe('historyLoaded', () => {
       items: [item({ messageId: 'm-3', role: 'ASSISTANT', content: null, status: 'GENERATING', seq: 2 })],
     });
     expect(s.messages[0]).toEqual({ key: 'm-3', role: 'assistant', content: '', status: 'GENERATING', error: null, selection: null });
-  });
-
-  test('historyLoaded는 항목의 selection을 보존한다', () => {
-    const sel = { start: { blockId: 'b1' }, end: { blockId: 'b2' } };
-    const s = chatReducer(initialChatState, {
-      type: 'historyLoaded', sessionId: 's1',
-      items: [item({ messageId: 'm1', role: 'USER', content: '질문', status: 'COMPLETED', seq: 1, createdAt: 't', selection: sel })],
-    });
-    expect(s.messages[0].selection).toEqual(sel);
   });
 
   test('FAILED assistant는 retryable=false 에러로 매핑된다 — 과거 실패에 재시도 미노출', () => {
