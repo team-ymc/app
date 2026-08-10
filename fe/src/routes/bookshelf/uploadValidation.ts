@@ -1,3 +1,4 @@
+// BE `paper.upload.max-file-size`와 같은 값을 둔다. 강제는 BE와 S3가 하고 여기선 사전 안내만 한다 —
 export const MAX_PDF_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 type UploadCandidate = Pick<File, 'type' | 'size'>;
