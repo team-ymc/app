@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -16,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +38,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperUploadCompletionService;
+import com.ymc.paper.service.PaperUploadPolicy;
+import com.ymc.paper.service.port.UploadedObjectMetadata;
 import com.ymc.support.IntegrationTest;
 
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -52,6 +57,9 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PaperUploadCompletionService completionService;
+
+    @Autowired
+    private PaperUploadPolicy uploadPolicy;
 
     @Test
     @DisplayName("정상 완료 통보: parse-requests에 {paperId, fileKey} 발행 + PROCESSING (200)")
@@ -116,7 +124,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESSING"));
 
-        verify(fileStorage, never()).exists(anyString());
+        verify(fileStorage, never()).head(anyString());
         verify(parseRequestPublisher, never()).publish(any(), anyString());
         assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
     }
@@ -166,13 +174,32 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("실제 객체가 50 MiB를 넘으면 삭제하고 413 FILE_TOO_LARGE — 파싱 요청은 발행하지 않는다")
+    void rejectsAndDeletesOversizedObject() throws Exception {
+        Paper paper = givenPendingPaper(FILENAME);
+        UploadedObjectMetadata oversized =
+                new UploadedObjectMetadata(uploadPolicy.maxFileBytes() + 1);
+        doReturn(Optional.of(oversized)).when(fileStorage).head(paper.getFileKey());
+        doNothing().when(fileStorage).delete(paper.getFileKey());
+
+        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"));
+
+        verify(fileStorage).delete(paper.getFileKey());
+        verify(parseRequestPublisher, never()).publish(any(), anyString());
+        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
+    }
+
+    @Test
     @DisplayName("없는 paperId: S3를 조회하지 않고 404 PAPER_NOT_FOUND")
     void rejectsUnknownPaperId() throws Exception {
         mockMvc.perform(post("/api/papers/{paperId}/complete", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
 
-        verify(fileStorage, never()).exists(anyString());
+        verify(fileStorage, never()).head(anyString());
     }
 
     @Test

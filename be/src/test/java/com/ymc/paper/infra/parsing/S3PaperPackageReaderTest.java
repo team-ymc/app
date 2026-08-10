@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,7 @@ import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParsedPaperPackage;
 import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
+import com.ymc.paper.service.port.UploadedObjectMetadata;
 
 class S3PaperPackageReaderTest {
 
@@ -38,7 +40,7 @@ class S3PaperPackageReaderTest {
         }
 
         @Override
-        public PresignedUpload presignUpload(String fileKey, String contentType) {
+        public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
             throw new UnsupportedOperationException();
         }
 
@@ -53,7 +55,12 @@ class S3PaperPackageReaderTest {
         }
 
         @Override
-        public boolean exists(String fileKey) {
+        public Optional<UploadedObjectMetadata> head(String fileKey) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void delete(String fileKey) {
             throw new UnsupportedOperationException();
         }
     };
@@ -182,7 +189,7 @@ class S3PaperPackageReaderTest {
             }
 
             @Override
-            public PresignedUpload presignUpload(String fileKey, String contentType) {
+            public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
                 throw new UnsupportedOperationException();
             }
 
@@ -197,7 +204,12 @@ class S3PaperPackageReaderTest {
             }
 
             @Override
-            public boolean exists(String fileKey) {
+            public Optional<UploadedObjectMetadata> head(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void delete(String fileKey) {
                 throw new UnsupportedOperationException();
             }
         };

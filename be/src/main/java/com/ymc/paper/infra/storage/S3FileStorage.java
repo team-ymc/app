@@ -1,15 +1,19 @@
 package com.ymc.paper.infra.storage;
 
+import java.util.Optional;
+
 import org.springframework.stereotype.Component;
 
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
+import com.ymc.paper.service.port.UploadedObjectMetadata;
 
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.http.HttpStatusCode;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -34,7 +38,7 @@ public class S3FileStorage implements FileStorage {
     private final AwsProperties props;
 
     @Override
-    public PresignedUpload presignUpload(String fileKey, String contentType) {
+    public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
         PresignedPutObjectRequest presigned = presigner.presignPutObject(
                 PutObjectPresignRequest.builder()
                         .signatureDuration(props.s3().presignExpiry())
@@ -42,6 +46,7 @@ public class S3FileStorage implements FileStorage {
                                 .bucket(props.s3().bucket())
                                 .key(fileKey)
                                 .contentType(contentType)
+                                .contentLength(contentLength)
                                 .build())
                         .build());
         return new PresignedUpload(presigned.url().toString(), presigned.expiration());
@@ -63,28 +68,36 @@ public class S3FileStorage implements FileStorage {
     }
 
     /**
-     * 객체 없음(404)만 false로 접는다. S3 일시 장애(5xx·타임아웃)는 삼키지 않고 그대로 던져
+     * 객체 없음(404)만 empty로 접는다. S3 일시 장애(5xx·타임아웃)는 삼키지 않고 그대로 던져
      * 5xx가 되게 한다 — 장애를 "업로드 안 됨"으로 오인해 409를 주면 FE가 헛되이 재업로드한다.
      *
      * <p>HEAD 응답에는 본문이 없어 에러 코드를 못 읽는 경우가 있다. SDK가 {@link NoSuchKeyException}으로
      * 매핑하지 못하고 상태코드만 있는 {@link S3Exception}으로 던지는 엔드포인트가 있어 둘 다 받는다.
      */
     @Override
-    public boolean exists(String fileKey) {
+    public Optional<UploadedObjectMetadata> head(String fileKey) {
         try {
-            s3.headObject(HeadObjectRequest.builder()   // HEAD 요청
+            var response = s3.headObject(HeadObjectRequest.builder()
                     .bucket(props.s3().bucket())
                     .key(fileKey)
                     .build());
-            return true;
+            return Optional.of(new UploadedObjectMetadata(response.contentLength()));
         } catch (NoSuchKeyException e) {                // 404
-            return false;
+            return Optional.empty();
         } catch (S3Exception e) {
             if (e.statusCode() == HttpStatusCode.NOT_FOUND) {
-                return false;
+                return Optional.empty();
             }
             throw e; // 5xx : 서버 장애 전파
         }
+    }
+
+    @Override
+    public void delete(String fileKey) {
+        s3.deleteObject(DeleteObjectRequest.builder()
+                .bucket(props.s3().bucket())
+                .key(fileKey)
+                .build());
     }
 
     @Override

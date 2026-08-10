@@ -56,6 +56,10 @@ chat:
     max-content-length: 65536       # delta 누적 상한 (문자 수). 초과 시 AI_RESPONSE_TOO_LARGE
     emitter-timeout: 11m            # MVC async timeout — deadline보다 커야 워치독이 먼저 발화
 
+paper:
+  upload:
+    max-file-size: ${MAX_UPLOAD_FILE_SIZE:50MB}   # 단일 PDF 상한. 계약의 CreatePaperRequest.size 최대값과 같아야 한다
+
 # AWS 설정 — 기본값은 공통이며 배포 환경에서는 AI와 같은 환경변수명으로 덮어쓴다.
 aws:
   region: ${AWS_DEFAULT_REGION:ap-northeast-2}
