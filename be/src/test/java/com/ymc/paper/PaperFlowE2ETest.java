@@ -36,6 +36,9 @@ import software.amazon.awssdk.services.sqs.model.Message;
  */
 class PaperFlowE2ETest extends IntegrationTest {
 
+    private static final byte[] FAKE_PDF =
+            "%PDF-1.4\n%e2e fake pdf\n".getBytes(StandardCharsets.UTF_8);
+
     @Test
     @DisplayName("성공 흐름: 등록 → S3 업로드 → complete → 파싱 요청 → 결과 수신 → COMPLETED")
     void completesEndToEnd() throws Exception {
@@ -94,20 +97,21 @@ class PaperFlowE2ETest extends IntegrationTest {
     private JsonNode createPaper(String filename) throws Exception {
         String response = mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                Map.of("filename", filename, "contentType", "application/pdf"))))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "filename", filename,
+                                "contentType", "application/pdf",
+                                "size", FAKE_PDF.length))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(response);
     }
 
-    /** presigned URL로 S3에 직접 PUT — BE를 거치지 않는다. */
+    /** presigned URL로 S3에 직접 PUT — BE를 거치지 않는다. 바이트 수는 create에 신고한 값과 같아야 한다. */
     private void uploadTo(String uploadUrl) throws Exception {
         HttpResponse<Void> response = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create(uploadUrl))
                         .header("Content-Type", "application/pdf")
-                        .PUT(HttpRequest.BodyPublishers.ofString(
-                                "%PDF-1.4\n%e2e fake pdf\n", StandardCharsets.UTF_8))
+                        .PUT(HttpRequest.BodyPublishers.ofByteArray(FAKE_PDF))
                         .build(),
                 HttpResponse.BodyHandlers.discarding());
 

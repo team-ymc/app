@@ -38,7 +38,10 @@ public class LocalStackTestConfiguration {
 
     @Bean
     LocalStackContainer localStackContainer() {
-        return new LocalStackContainer(LOCALSTACK_IMAGE).withServices(Service.S3, Service.SQS);
+        // 기본값은 서명 검증을 건너뛴다 — 그러면 presigned 서명에 넣은 제약이 지켜지는지 검증할 수 없다.
+        return new LocalStackContainer(LOCALSTACK_IMAGE)
+                .withServices(Service.S3, Service.SQS)
+                .withEnv("S3_SKIP_SIGNATURE_VALIDATION", "0");
     }
 
     @Bean

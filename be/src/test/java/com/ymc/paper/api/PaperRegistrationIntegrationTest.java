@@ -33,6 +33,7 @@ import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperRegistrationService;
+import com.ymc.paper.service.PaperUploadPolicy;
 import com.ymc.support.IntegrationTest;
 
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -46,6 +47,9 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
 
     @Autowired
     private PaperRegistrationService registrationService;
+
+    @Autowired
+    private PaperUploadPolicy uploadPolicy;
 
     @Test
     @DisplayName("정상 등록: UPLOAD_PENDING 레코드 생성 + presigned URL 발급 (201)")
@@ -73,6 +77,9 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
 
         // 만료 시각은 미래
         assertThat(Instant.parse(body.get("uploadExpiresAt").asText())).isAfter(Instant.now());
+
+        // 크기 강제의 근거 — content-length가 서명 헤더에 들어가야 한다
+        assertThat(body.get("uploadUrl").asText()).contains("content-length");
     }
 
     @Test
@@ -87,7 +94,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
 
         HttpResponse<Void> response = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create(uploadUrl))
-                        // 서명에 contentType이 들어가므로 같은 헤더를 보내야 한다
+                        // 서명에 contentType과 정확한 바이트 수가 들어간다 — 둘 다 맞아야 통과한다
                         .header("Content-Type", "application/pdf")
                         .PUT(HttpRequest.BodyPublishers.ofByteArray(fakePdf()))
                         .build(),
@@ -128,7 +135,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     void 소유자는_인증_주체다() throws Exception {
         mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"filename\":\"owner.pdf\",\"contentType\":\"application/pdf\"}"))
+                        .content("{\"filename\":\"owner.pdf\",\"contentType\":\"application/pdf\",\"size\":42}"))
                 .andExpect(status().isCreated());
 
         Paper saved = paperRepository.findAll().get(0);
@@ -140,7 +147,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("파일명 중복 판정은 사용자 단위 — 다른 사용자는 같은 파일명 등록 가능 (YMC-215)")
     void 중복_판정은_사용자_스코프다() throws Exception {
-        String body = "{\"filename\":\"same.pdf\",\"contentType\":\"application/pdf\"}";
+        String body = "{\"filename\":\"same.pdf\",\"contentType\":\"application/pdf\",\"size\":42}";
         mockMvc.perform(post("/api/papers").with(userJwt())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
@@ -168,7 +175,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
             List<Callable<Outcome>> calls = Collections.nCopies(attempts, () -> {
                 startLine.await();
                 try {
-                    registrationService.register(TEST_USER_ID, "race.pdf", "application/pdf");
+                    registrationService.register(TEST_USER_ID, "race.pdf", "application/pdf", fakePdf().length);
                     return Outcome.CREATED;
                 } catch (ApiException e) {
                     return e.code() == ErrorCode.DUPLICATE_FILENAME
@@ -200,6 +207,45 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("상한 초과 size: 413 FILE_TOO_LARGE, 레코드 생성 안 함")
+    void rejectsOversizedDeclaredSize() throws Exception {
+        mockMvc.perform(createRequest(FILENAME, "application/pdf", uploadPolicy.maxFileBytes() + 1)
+                        .with(userJwt()))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"));
+
+        assertThat(paperRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("상한과 같은 size는 허용한다")
+    void acceptsSizeAtLimit() throws Exception {
+        mockMvc.perform(createRequest(FILENAME, "application/pdf", uploadPolicy.maxFileBytes())
+                        .with(userJwt()))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("신고한 size와 다른 바이트 수로 PUT 하면 S3가 거절한다")
+    void rejectsUploadWithMismatchedSize() throws Exception {
+        JsonNode body = readBody(mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        byte[] bigger = new byte[fakePdf().length + 1];
+
+        HttpResponse<Void> response = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create(body.get("uploadUrl").asText()))
+                        .header("Content-Type", "application/pdf")
+                        .PUT(HttpRequest.BodyPublishers.ofByteArray(bigger))
+                        .build(),
+                HttpResponse.BodyHandlers.discarding());
+
+        assertThat(response.statusCode()).isEqualTo(403);
+        assertThat(objectExists(body.get("fileKey").asText())).isFalse();
+    }
+
+    @Test
     @DisplayName("contentType 불허: 400 UNSUPPORTED_FILE_TYPE, 레코드 생성 안 함")
     void rejectsNonPdfContentType() throws Exception {
         mockMvc.perform(createRequest(FILENAME, "image/png").with(userJwt()))
@@ -224,6 +270,20 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("size 누락: 400 VALIDATION_ERROR")
+    void rejectsMissingSize() throws Exception {
+        mockMvc.perform(post("/api/papers").with(userJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"filename": "a.pdf", "contentType": "application/pdf"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        assertThat(paperRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("malformed JSON: 400 VALIDATION_ERROR")
     void rejectsMalformedJson() throws Exception {
         mockMvc.perform(post("/api/papers").with(userJwt())
@@ -235,10 +295,15 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
 
     private MockHttpServletRequestBuilder createRequest(String filename, String contentType)
             throws Exception {
+        return createRequest(filename, contentType, fakePdf().length);
+    }
+
+    private MockHttpServletRequestBuilder createRequest(String filename, String contentType, long size)
+            throws Exception {
         return post("/api/papers")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(
-                        Map.of("filename", filename, "contentType", contentType)));
+                        Map.of("filename", filename, "contentType", contentType, "size", size)));
     }
 
     private JsonNode readBody(MvcResult result) throws Exception {

@@ -3,6 +3,8 @@ package com.ymc.paper.service;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +26,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PaperRegistrationService {
 
+    private static final Logger log = LoggerFactory.getLogger(PaperRegistrationService.class);
+
     /** MVP는 PDF만 받는다 (계약 `CreatePaperRequest.contentType` enum). */
     public static final String PDF_CONTENT_TYPE = "application/pdf";
 
     private final PaperRepository paperRepository;
     private final FileStorage fileStorage;
+    private final PaperUploadPolicy uploadPolicy;
 
     /**
      * 파일명이 중복이 아니면 레코드를 만들고 업로드 URL을 발급한다.
@@ -37,10 +42,12 @@ public class PaperRegistrationService {
      * 동시 요청은 제약 위반으로 잡아 같은 409로 변환한다.
      *
      * @throws ApiException {@code UNSUPPORTED_FILE_TYPE} — contentType이 PDF가 아님
+     * @throws ApiException {@code FILE_TOO_LARGE} — 신고된 크기가 상한을 넘음. 레코드를 만들지 않는다
      * @throws ApiException {@code DUPLICATE_FILENAME} — 같은 소유자에게 같은 파일명이 이미 있음
      */
     @Transactional
-    public PaperRegistrationResult register(UUID ownerId, String filename, String contentType) {
+    public PaperRegistrationResult register(
+            UUID ownerId, String filename, String contentType, long size) {
 
         // 1. PDF 타입 검사
         if (!PDF_CONTENT_TYPE.equals(contentType)) {
@@ -49,7 +56,15 @@ public class PaperRegistrationService {
                     "지원하지 않는 파일 형식입니다: " + contentType);
         }
 
-        // 2. 사전 조회
+        // 2. 크기 상한 — 이 값이 그대로 서명에 들어가므로 여기서 막으면 S3도 초과분을 받지 않는다
+        if (uploadPolicy.exceedsLimit(size)) {
+            // FE가 먼저 막으므로 여기까지 온 건 FE를 거치지 않은 요청이다
+            log.warn("업로드 크기 상한 초과: ownerId={}, size={}, limit={}",
+                    ownerId, size, uploadPolicy.maxFileBytes());
+            throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
+        }
+
+        // 3. 사전 조회
         if (paperRepository.existsByOwnerIdAndFilename(ownerId, filename)) {
             throw duplicateFilename(filename);
         }
@@ -65,7 +80,7 @@ public class PaperRegistrationService {
 
         // S3는 외부 I/O가 발생하지만,
         // presign은 S3 호출이 아니라 로컬 서명 계산이라 트랜잭션 안에서 해도 외부 I/O가 없다.
-        PresignedUpload upload = fileStorage.presignUpload(paper.getFileKey(), contentType);
+        PresignedUpload upload = fileStorage.presignUpload(paper.getFileKey(), contentType, size);
 
         return new PaperRegistrationResult(
                 paper.getId(),

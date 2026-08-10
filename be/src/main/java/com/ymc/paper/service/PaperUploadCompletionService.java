@@ -13,6 +13,7 @@ import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParseRequestPublisher;
+import com.ymc.paper.service.port.UploadedObjectMetadata;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,11 +40,13 @@ public class PaperUploadCompletionService {
     private final PaperTransitions transitions;
     private final FileStorage fileStorage;
     private final ParseRequestPublisher parseRequestPublisher;
+    private final PaperUploadPolicy uploadPolicy;
 
     /**
      * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId (S3는 조회하지 않는다)
      * @throws ApiException {@code FORBIDDEN} — 소유자가 아님
      * @throws ApiException {@code UPLOAD_NOT_FOUND} — S3에 객체가 없음. 상태는 UPLOAD_PENDING 유지
+     * @throws ApiException {@code FILE_TOO_LARGE} — 실제 객체가 제한을 초과함. 객체는 삭제하고 상태는 유지
      */
     public PaperStatusView complete(UUID paperId, UUID ownerId) {
         Paper paper = find(paperId);
@@ -59,10 +62,17 @@ public class PaperUploadCompletionService {
             return PaperStatusView.from(paper);
         }
 
-        if (!fileStorage.exists(paper.getFileKey())) {
-            throw new ApiException(
-                    ErrorCode.UPLOAD_NOT_FOUND,
-                    "업로드된 파일을 찾을 수 없습니다. 업로드 후 다시 시도해 주세요.");
+        UploadedObjectMetadata uploadedObject = fileStorage.head(paper.getFileKey()).orElseThrow(() ->
+                new ApiException(
+                        ErrorCode.UPLOAD_NOT_FOUND,
+                        "업로드된 파일을 찾을 수 없습니다. 업로드 후 다시 시도해 주세요."));
+
+        if (uploadPolicy.exceedsLimit(uploadedObject.contentLength())) {
+            // 서명이 크기를 고정하므로 정상 경로에선 도달 불가
+            log.warn("상한 초과 객체 삭제: paperId={}, contentLength={}, limit={}",
+                    paperId, uploadedObject.contentLength(), uploadPolicy.maxFileBytes());
+            fileStorage.delete(paper.getFileKey());
+            throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
         }
 
         // (1) CAS 커밋 — 동시 complete 중 한 건만 주인이 된다

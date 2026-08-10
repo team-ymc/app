@@ -49,7 +49,8 @@ public class PaperController {
             @Valid @RequestBody CreatePaperRequest request) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         PaperCreated body = PaperCreated.from(
-                registrationService.register(ownerId, request.filename(), request.contentType()));
+                registrationService.register(
+                        ownerId, request.filename(), request.contentType(), request.size()));
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
