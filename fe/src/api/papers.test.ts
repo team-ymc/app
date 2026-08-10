@@ -10,13 +10,13 @@ function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; statu
 describe('api.js — fetch 계열', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('createPaper: POST /api/papers에 filename·contentType을 JSON으로 보낸다', async () => {
+  it('createPaper: POST /api/papers에 filename·contentType·size를 JSON으로 보낸다', async () => {
     mockFetch({ body: { paperId: 'p1', uploadUrl: 'https://s3/put' } });
-    const res = await createPaper('a.pdf', 'application/pdf');
+    const res = await createPaper('a.pdf', 'application/pdf', 1234);
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers', expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: 'a.pdf', contentType: 'application/pdf' }),
+      body: JSON.stringify({ filename: 'a.pdf', contentType: 'application/pdf', size: 1234 }),
     }));
     expect(res.paperId).toBe('p1');
   });
@@ -63,7 +63,7 @@ describe('api.js — fetch 계열', () => {
 
   it('실패 응답: code·httpStatus를 실은 Error를 던진다', async () => {
     mockFetch({ ok: false, status: 409, body: { code: 'DUPLICATE_FILENAME', message: '중복' } });
-    await expect(createPaper('a.pdf', 'application/pdf')).rejects.toMatchObject({
+    await expect(createPaper('a.pdf', 'application/pdf', 1234)).rejects.toMatchObject({
       code: 'DUPLICATE_FILENAME', httpStatus: 409, message: '중복',
     });
   });

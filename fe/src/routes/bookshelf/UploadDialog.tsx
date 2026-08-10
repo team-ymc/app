@@ -10,6 +10,7 @@ import { X, UploadSimple, FileText } from '@phosphor-icons/react';
 import { Button } from '../../design/components/Button';
 import { createPaper, uploadToS3, completeUpload } from '../../api/papers';
 import { ApiError } from '../../api/types';
+import { validatePdfUpload } from './uploadValidation';
 
 type UploadPhase = 'idle' | 'file-selected' | 'uploading';
 
@@ -57,8 +58,11 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
 
   function onFileChosen(file: File | null) {
     if (!file) return;
-    if (file.type !== 'application/pdf') {
-      setError(new Error('PDF 파일만 업로드할 수 있습니다'));
+    const validationError = validatePdfUpload(file);
+    if (validationError) {
+      setSelectedFile(null);
+      setPhase('idle');
+      setError(new Error(validationError));
       return;
     }
     setError(null);
@@ -102,7 +106,7 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
     setUploadPct(0);
     setError(null);
     try {
-      const created = await createPaper(selectedFile.name, 'application/pdf');
+      const created = await createPaper(selectedFile.name, 'application/pdf', selectedFile.size);
       await uploadToS3(created.uploadUrl, selectedFile, (pct) => setUploadPct(pct));
       await completeUpload(created.paperId);
       queryClient.invalidateQueries({ queryKey: ['papers'] });

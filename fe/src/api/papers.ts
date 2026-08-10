@@ -4,17 +4,18 @@
 import { authFetch } from './auth';
 import { ApiError, type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse } from './types';
 
-export async function createPaper(filename: string, contentType: string): Promise<CreatePaperResponse> {
+// size는 presigned PUT 서명에 박히는 정확한 바이트 수다 — 업로드가 이 값과 다르면 S3가 403으로 거절한다.
+export async function createPaper(filename: string, contentType: string, size: number): Promise<CreatePaperResponse> {
   const res = await authFetch('/api/papers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename, contentType }),
+    body: JSON.stringify({ filename, contentType, size }),
   });
   if (!res.ok) throw await apiError(res);
   return res.json(); // { paperId, fileKey, uploadUrl, uploadExpiresAt, status, createdAt }
 }
 
-// presigned PUT. Content-Type은 서명값과 정확히 일치해야 한다 (DESIGN.md D6).
+// presigned PUT. Content-Type과 바이트 수가 서명값과 정확히 일치해야 한다 (DESIGN.md D6).
 export function uploadToS3(uploadUrl: string, file: Blob, onProgress?: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
