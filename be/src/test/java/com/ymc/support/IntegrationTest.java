@@ -209,7 +209,7 @@ public abstract class IntegrationTest {
                         .key(paper.getFileKey())
                         .contentType("application/pdf")
                         .build(),
-                RequestBody.fromBytes("%PDF-1.4\n%fake pdf for test\n".getBytes(StandardCharsets.UTF_8)));
+                RequestBody.fromBytes(TEST_PDF_BYTES));
     }
 
     /** 클래스패스의 축소판 파서 패키지를 LocalStack S3의 주어진 prefix로 올린다. */

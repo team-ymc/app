@@ -240,6 +240,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
         HttpResponse<Void> response = HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create(body.get("uploadUrl").asText()))
                         .header("Content-Type", "application/pdf")
+                        .header("x-amz-checksum-sha256", checksumOf(TEST_PDF_BYTES))
                         .PUT(HttpRequest.BodyPublishers.ofByteArray(bigger))
                         .build(),
                 HttpResponse.BodyHandlers.discarding());
