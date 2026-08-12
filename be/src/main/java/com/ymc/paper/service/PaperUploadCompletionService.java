@@ -80,19 +80,20 @@ public class PaperUploadCompletionService {
         // 같은 Paper의 동시 complete에서 패자가 대표 원본을 지우는 사고 방지.
         if (outcome.linkedToExisting()
                 && !paper.getFileKey().equals(outcome.document().getFileKey())) {
-            deleteBestEffort(paperId, paper.getFileKey());
+            deleteBestEffort(paperId, outcome.document().getId(), paper.getFileKey());
         }
 
         parsingStarter.startIfUploaded(outcome.document().getId());
         return views.statusView(find(paperId));
     }
 
-    private void deleteBestEffort(UUID paperId, String fileKey) {
+    private void deleteBestEffort(UUID paperId, UUID documentId, String fileKey) {
         try {
             fileStorage.delete(fileKey);
         } catch (RuntimeException e) {
             // 잔여 객체는 후속 정리 작업이 재삭제한다 — complete를 실패로 되돌리지 않는다
-            log.warn("중복 업로드 객체 삭제 실패: paperId={}, fileKey={}", paperId, fileKey, e);
+            log.warn("중복 업로드 객체 삭제 실패: paperId={}, documentId={}, fileKey={}",
+                    paperId, documentId, fileKey, e);
         }
     }
 
