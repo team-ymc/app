@@ -10,8 +10,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperContentIngestService;
 import com.ymc.support.IntegrationTest;
 
@@ -23,7 +23,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
     /** COMPLETED + 적재까지 끝난 논문. */
     private Paper givenIngestedPaper() {
         Paper paper = givenProcessingPaper("content.pdf");
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         ingestService.ingest(paper.getId(), givenPackageOnS3(paper.getId()));
         return reload(paper.getId());
     }
@@ -78,7 +78,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
     @Test
     void 완료됐지만_미적재면_409_PAPER_NOT_READY() throws Exception {
         Paper paper = givenProcessingPaper("not-ingested.pdf");
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
                 .andExpect(status().isConflict())

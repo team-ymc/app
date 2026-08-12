@@ -28,13 +28,15 @@ import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
+import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperContentAssetRepository;
 import com.ymc.paper.domain.PaperContentBlockRepository;
 import com.ymc.paper.domain.PaperContentRepository;
 import com.ymc.paper.domain.PaperRepository;
-import com.ymc.paper.service.PaperTransitions;
+import com.ymc.paper.service.DocumentParsingStarter;
+import com.ymc.paper.service.DocumentTransitions;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParseRequestPublisher;
 import com.ymc.user.domain.RefreshTokenRepository;
@@ -133,7 +135,10 @@ public abstract class IntegrationTest {
     protected ParseRequestPublisher parseRequestPublisher;
 
     @MockitoSpyBean
-    protected PaperTransitions paperTransitions;
+    protected DocumentTransitions documentTransitions;
+
+    @MockitoSpyBean
+    protected DocumentParsingStarter documentParsingStarter;
 
     @MockitoSpyBean
     protected AiAgentStreamPort aiAgentStreamPort;
@@ -173,12 +178,20 @@ public abstract class IntegrationTest {
         return paperRepository.save(Paper.register(TEST_USER_ID, filename, Instant.now()));
     }
 
-    /** 파싱 대기 중(PROCESSING) 레코드 — 결과 수신 시나리오의 출발점. */
+    /** UPLOADED document에 연결된 Paper — 발행 직전 상태. */
+    protected Document givenLinkedDocument(Paper paper) {
+        Document document = documentRepository.save(Document.create(
+                UUID.randomUUID(), randomChecksum(), paper.getFileKey(), paper.getId(), Instant.now()));
+        tx.execute(s -> paperRepository.linkDocument(paper.getId(), document.getId(), Instant.now()));
+        return document;
+    }
+
+    /** 파싱 진행 중 상태 — 결과 수신 시나리오의 출발점. */
     protected Paper givenProcessingPaper(String filename) {
         Paper paper = givenPendingPaper(filename);
-        paperTransitions.markUploaded(paper.getId());
-        paperTransitions.markProcessing(paper.getId());
-        clearInvocations(paperTransitions);
+        Document document = givenLinkedDocument(paper);
+        documentTransitions.markProcessing(document.getId());
+        clearInvocations(documentTransitions);
         return reload(paper.getId());
     }
 

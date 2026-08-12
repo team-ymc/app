@@ -43,7 +43,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     void returnsTerminalStatus(PaperStatus terminal) throws Exception {
         Paper paper = givenProcessingPaper("terminal-" + terminal + ".pdf");
         String errorCode = terminal == PaperStatus.FAILED ? "PDF_UNREADABLE" : null;
-        paperTransitions.markParsed(paper.getId(), terminal, errorCode);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.valueOf(terminal.name()), errorCode);
 
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
@@ -56,7 +56,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("transition.pdf");
         Instant beforeTransition = reload(paper.getId()).getUpdatedAt();
 
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         JsonNode body = objectMapper.readTree(
                 mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
@@ -66,7 +66,8 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
 
         Instant afterTransition = Instant.parse(body.get("updatedAt").asText());
         assertThat(afterTransition).isAfterOrEqualTo(beforeTransition);
-        assertThat(afterTransition).isEqualTo(reload(paper.getId()).getUpdatedAt());
+        assertThat(afterTransition).isEqualTo(
+                documentRepository.findById(paper.getDocumentId()).orElseThrow().getUpdatedAt());
     }
 
     @Test

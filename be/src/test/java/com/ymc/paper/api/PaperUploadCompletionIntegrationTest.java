@@ -3,9 +3,7 @@ package com.ymc.paper.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -16,44 +14,29 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Collections;
-import java.util.List;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.dao.QueryTimeoutException;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperUploadCompletionService;
 import com.ymc.paper.service.PaperUploadPolicy;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
 import com.ymc.support.IntegrationTest;
 
-import software.amazon.awssdk.services.sqs.model.Message;
-
 /**
- * spec: paper-upload-completion (tasks 4.5).
+ * spec: paper-upload-completion, Document 중복 제거 전환 (tasks 5.2).
  *
- * <p>발행 실패·전이 실패처럼 컨트롤러가 5xx로 끝나는 시나리오는 MockMvc가 예외를 그대로 되던지므로
- * 서비스를 직접 호출해 "예외가 나가고 레코드는 UPLOADED에 남는다"를 검증한다.
+ * <p>발행 실패처럼 컨트롤러가 5xx로 끝나는 시나리오는 MockMvc가 예외를 그대로 되던지므로
+ * 서비스를 직접 호출해 "예외가 나가고 document는 UPLOADED로 반납된다"를 검증한다.
  */
-@ExtendWith(OutputCaptureExtension.class)
 class PaperUploadCompletionIntegrationTest extends IntegrationTest {
-
-    private static final String FILENAME = "attention-is-all-you-need.pdf";
 
     @Autowired
     private PaperUploadCompletionService completionService;
@@ -62,114 +45,110 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     private PaperUploadPolicy uploadPolicy;
 
     @Test
-    @DisplayName("정상 완료 통보: parse-requests에 {paperId, fileKey} 발행 + PROCESSING (200)")
-    void publishesParseRequestAndMovesToProcessing() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
+    void 신규_checksum이면_document를_만들고_발행하고_PROCESSING을_반환한다() throws Exception {
+        Paper paper = givenPendingPaper("first.pdf");
         givenUploadedObject(paper);
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.paperId").value(paper.getId().toString()))
-                .andExpect(jsonPath("$.status").value("PROCESSING"))
-                .andExpect(jsonPath("$.updatedAt").isNotEmpty());
-
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.PROCESSING);
-
-        List<Message> published = receive(parseRequestQueueUrl(), 5);
-        assertThat(published).hasSize(1);
-
-        JsonNode body = objectMapper.readTree(published.get(0).body());
-        assertThat(body.get("paper_id").asText()).isEqualTo(paper.getId().toString());
-        assertThat(body.get("file_key").asText()).isEqualTo(paper.getFileKey());
-        // 계약(messaging.yml ParseRequest)은 additionalProperties: false — 필드가 딱 둘이어야 한다
-        assertThat(body.properties()).hasSize(2);
-    }
-
-    @Test
-    @DisplayName("빠른 결과 선도착: complete는 5xx 없이 terminal을 반환하고 PROCESSING이 덮지 않는다")
-    void fastResultBeforeProcessingReturnsTerminal() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
-        givenUploadedObject(paper);
-
-        // 발행 직후·PROCESSING 커밋 전에 빠른 FAILED 결과가 도착한 상황을 재현한다.
-        // markParsed는 UPLOADED에서 terminal로 전이한다 (Task 2 / spec §3).
-        doAnswer(invocation -> {
-            invocation.callRealMethod();
-            paperTransitions.markParsed(paper.getId(), PaperStatus.FAILED, "PDF_UNREADABLE");
-            return null;
-        }).when(parseRequestPublisher).publish(any(), anyString());
-
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("FAILED"));
-
-        Paper after = reload(paper.getId());
-        assertThat(after.getStatus()).isEqualTo(PaperStatus.FAILED);       // PROCESSING이 덮지 않았다
-        assertThat(after.getErrorCode()).isEqualTo("PDF_UNREADABLE");
-    }
-
-    @Test
-    @DisplayName("중복 호출은 멱등: S3 HEAD도 큐 재발행도 하지 않고 현재 상태를 200으로 돌려준다")
-    void duplicateCompleteIsIdempotent() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
-        givenUploadedObject(paper);
-
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
-                .andExpect(status().isOk());
-
-        drain(parseRequestQueueUrl());
-        clearInvocations(fileStorage, parseRequestPublisher);
-
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESSING"));
 
-        verify(fileStorage, never()).head(anyString());
-        verify(parseRequestPublisher, never()).publish(any(), anyString());
-        assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
+        Paper linked = reload(paper.getId());
+        assertThat(linked.getDocumentId()).isNotNull();
+        Document document = documentRepository.findById(linked.getDocumentId()).orElseThrow();
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.PROCESSING);
+        assertThat(document.getRequestPaperId()).isEqualTo(paper.getId());
+        assertThat(document.getFileKey()).isEqualTo(paper.getFileKey());
+        verify(parseRequestPublisher).publish(paper.getId(), paper.getFileKey());
     }
 
     @Test
-    @DisplayName("동시 complete 호출: 조건부 전이에 성공한 한 건만 발행한다")
-    void concurrentCompletePublishesOnce() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
-        givenUploadedObject(paper);
+    void 기존_checksum이면_연결만_하고_발행없이_현재_상태를_반환하고_중복_객체를_지운다() throws Exception {
+        // 선행자: 같은 바이트를 먼저 완료
+        Paper first = givenPendingPaper("origin.pdf");
+        givenUploadedObject(first);
+        mockMvc.perform(post("/api/papers/{id}/complete", first.getId()).with(userJwt()))
+                .andExpect(status().isOk());
         clearInvocations(parseRequestPublisher);
 
-        int attempts = 4;
-        CountDownLatch startLine = new CountDownLatch(1);
+        // 다른 사용자가 같은 바이트를 다른 파일명으로 업로드
+        Paper second = paperRepository.save(Paper.register(OTHER_USER_ID, "copy.pdf", Instant.now()));
+        givenUploadedObject(second);
 
-        try (ExecutorService pool = Executors.newFixedThreadPool(attempts)) {
-            List<Callable<PaperStatus>> calls = Collections.nCopies(attempts, () -> {
-                startLine.await();
-                return completionService.complete(paper.getId(), TEST_USER_ID).status();
-            });
+        mockMvc.perform(post("/api/papers/{id}/complete", second.getId()).with(otherUserJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSING"));   // 기존 작업 상태 즉시 반환
 
-            List<Future<PaperStatus>> futures = calls.stream().map(pool::submit).toList();
-            startLine.countDown();
-
-            // 어느 호출도 실패하지 않는다 — 진 쪽은 재발행 없이 현재 상태를 돌려준다
-            for (Future<PaperStatus> future : futures) {
-                assertThat(future.get()).isIn(PaperStatus.UPLOADED, PaperStatus.PROCESSING);
-            }
-        }
-
-        verify(parseRequestPublisher, times(1)).publish(any(), anyString());
-        assertThat(receive(parseRequestQueueUrl(), 5)).hasSize(1);
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.PROCESSING);
+        assertThat(reload(second.getId()).getDocumentId())
+                .isEqualTo(reload(first.getId()).getDocumentId());
+        verify(parseRequestPublisher, never()).publish(any(), any());
+        verify(fileStorage).delete(second.getFileKey());     // 중복 객체 삭제
+        verify(fileStorage, never()).delete(first.getFileKey());   // 대표 원본은 보존
     }
 
     @Test
-    @DisplayName("S3에 객체가 없으면 전이 없이 409 UPLOAD_NOT_FOUND — UPLOAD_PENDING 유지 (재시도 가능)")
-    void rejectsWhenObjectMissing() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);   // 업로드하지 않았다
+    void 발행_실패면_예외가_나가고_document는_UPLOADED로_반납되고_재호출이_구제한다() throws Exception {
+        Paper paper = givenPendingPaper("rescue.pdf");
+        givenUploadedObject(paper);
+        doThrow(new RuntimeException("SQS down")).doCallRealMethod()
+                .when(parseRequestPublisher).publish(any(), any());
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
+        assertThatThrownBy(() -> completionService.complete(paper.getId(), TEST_USER_ID))
+                .isInstanceOf(RuntimeException.class);
+
+        Document document = documentRepository
+                .findById(reload(paper.getId()).getDocumentId()).orElseThrow();
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.UPLOADED);   // 반납됨
+
+        // 같은 Paper의 complete 재호출이 구제 발행한다 (HEAD 없이)
+        clearInvocations(fileStorage);
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSING"));
+        verify(fileStorage, never()).head(any());
+        verify(parseRequestPublisher, times(2)).publish(paper.getId(), paper.getFileKey());
+    }
+
+    @Test
+    void 이미_연결된_paper의_재호출은_HEAD없이_현재_상태를_반환한다() throws Exception {
+        Paper paper = givenProcessingPaper("idem.pdf");
+        clearInvocations(fileStorage, parseRequestPublisher);
+
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSING"));
+
+        verify(fileStorage, never()).head(any());
+        verify(parseRequestPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void 중복_객체_삭제가_실패해도_complete는_성공한다() throws Exception {
+        Paper first = givenPendingPaper("origin2.pdf");
+        givenUploadedObject(first);
+        mockMvc.perform(post("/api/papers/{id}/complete", first.getId()).with(userJwt()))
+                .andExpect(status().isOk());
+
+        Paper second = paperRepository.save(Paper.register(OTHER_USER_ID, "copy2.pdf", Instant.now()));
+        givenUploadedObject(second);
+        doThrow(new RuntimeException("delete fail")).when(fileStorage).delete(second.getFileKey());
+
+        mockMvc.perform(post("/api/papers/{id}/complete", second.getId()).with(otherUserJwt()))
+                .andExpect(status().isOk());
+        assertThat(reload(second.getId()).getDocumentId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("S3에 객체가 없으면 전이 없이 409 UPLOAD_NOT_FOUND — 연결 없음 (재시도 가능)")
+    void rejectsWhenObjectMissing() throws Exception {
+        Paper paper = givenPendingPaper("attention-is-all-you-need.pdf");   // 업로드하지 않았다
+
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("UPLOAD_NOT_FOUND"));
 
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
-        verify(parseRequestPublisher, never()).publish(any(), anyString());
+        assertThat(reload(paper.getId()).getDocumentId()).isNull();
+        verify(parseRequestPublisher, never()).publish(any(), any());
         assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
     }
 
@@ -182,99 +161,51 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("UPLOAD_CHECKSUM_MISSING"));
 
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        assertThat(reload(paper.getId()).getDocumentId()).isNull();
         verify(parseRequestPublisher, never()).publish(any(), any());
     }
 
     @Test
     @DisplayName("실제 객체가 50 MiB를 넘으면 삭제하고 413 FILE_TOO_LARGE — 파싱 요청은 발행하지 않는다")
     void rejectsAndDeletesOversizedObject() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
+        Paper paper = givenPendingPaper("attention-is-all-you-need.pdf");
         UploadedObjectMetadata oversized =
                 new UploadedObjectMetadata(uploadPolicy.maxFileBytes() + 1, checksumOf(TEST_PDF_BYTES));
         doReturn(Optional.of(oversized)).when(fileStorage).head(paper.getFileKey());
         doNothing().when(fileStorage).delete(paper.getFileKey());
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
                 .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"));
 
         verify(fileStorage).delete(paper.getFileKey());
-        verify(parseRequestPublisher, never()).publish(any(), anyString());
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        verify(parseRequestPublisher, never()).publish(any(), any());
+        assertThat(reload(paper.getId()).getDocumentId()).isNull();
         assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
     }
 
     @Test
     @DisplayName("없는 paperId: S3를 조회하지 않고 404 PAPER_NOT_FOUND")
     void rejectsUnknownPaperId() throws Exception {
-        mockMvc.perform(post("/api/papers/{paperId}/complete", UUID.randomUUID()).with(userJwt()))
+        mockMvc.perform(post("/api/papers/{id}/complete", UUID.randomUUID()).with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
 
-        verify(fileStorage, never()).head(anyString());
+        verify(fileStorage, never()).head(any());
     }
 
     @Test
-    @DisplayName("남의 논문: 전이도 발행도 없이 403 FORBIDDEN")
+    @DisplayName("남의 논문: 연결도 발행도 없이 403 FORBIDDEN")
     void rejectsOtherUsersPaper() throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
+        Paper paper = givenPendingPaper("attention-is-all-you-need.pdf");
         givenUploadedObject(paper);   // 객체는 있다 — 막는 것은 소유자 검증뿐이다
 
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(otherUserJwt()))
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(otherUserJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
-        verify(parseRequestPublisher, never()).publish(any(), anyString());
+        assertThat(reload(paper.getId()).getDocumentId()).isNull();
+        verify(parseRequestPublisher, never()).publish(any(), any());
         assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("큐 발행 실패: 예외가 나가고 레코드는 UPLOADED에 남으며, 정체가 WARN으로 관측된다")
-    void publishFailureLeavesRecordUploaded(CapturedOutput output) throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
-        givenUploadedObject(paper);
-        doThrow(new IllegalStateException("SQS 장애")).when(parseRequestPublisher)
-                .publish(any(), anyString());
-
-        assertThatThrownBy(() -> completionService.complete(paper.getId(), TEST_USER_ID))
-                .isInstanceOf(IllegalStateException.class);
-
-        // 발행 실패가 CAS 커밋을 롤백시키지 않았다 (트랜잭션 경계 분리, tasks 4.3)
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOADED);
-
-        // 복구하지 않기로 한 갭이므로 WARN 로그가 유일한 관측 수단이다 (design D6·Risks).
-        // 이 단언이 깨진다면 정체가 조용해진 것이다 — 로그를 지우지 말고 여기부터 다시 생각할 것.
-        assertThat(output).contains("파싱 요청 발행 실패").contains(paper.getId().toString());
-
-        // 재호출해도 UPLOAD_PENDING이 아니므로 재발행하지 않는다 — MVP는 이 정체를 복구하지 않는다
-        clearInvocations(parseRequestPublisher);
-        mockMvc.perform(post("/api/papers/{paperId}/complete", paper.getId()).with(userJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UPLOADED"));
-
-        verify(parseRequestPublisher, never()).publish(any(), anyString());
-        assertThat(receive(parseRequestQueueUrl(), 1)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("발행 후 PROCESSING 전이 실패: 레코드는 UPLOADED에 남고, 파싱 요청은 이미 나갔음이 WARN으로 관측된다")
-    void processingCommitFailureLeavesRecordUploaded(CapturedOutput output) throws Exception {
-        Paper paper = givenPendingPaper(FILENAME);
-        givenUploadedObject(paper);
-        doThrow(new QueryTimeoutException("DB 타임아웃")).when(paperTransitions)
-                .markProcessing(paper.getId());
-
-        assertThatThrownBy(() -> completionService.complete(paper.getId(), TEST_USER_ID))
-                .isInstanceOf(QueryTimeoutException.class);
-
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOADED);
-
-        // 발행은 이미 성공했다 — 파싱은 진행되고, 결과가 오면 PROCESSING→ CAS가 0 row가 된다
-        verify(parseRequestPublisher, times(1)).publish(any(), anyString());
-        assertThat(receive(parseRequestQueueUrl(), 5)).hasSize(1);
-
-        assertThat(output).contains("PROCESSING 전이 실패").contains(paper.getId().toString());
     }
 }

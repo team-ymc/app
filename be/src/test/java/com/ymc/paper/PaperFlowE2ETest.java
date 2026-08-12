@@ -90,8 +90,10 @@ class PaperFlowE2ETest extends IntegrationTest {
                 """.formatted(paperId));
 
         awaitStatus(paperId, PaperStatus.FAILED);
-        // 실패 코드는 저장하되 사용자에게는 노출하지 않는다 (MVP)
-        assertThat(reload(paperId).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
+        // 실패 코드는 저장하되 사용자에게는 노출하지 않는다 (MVP) — 진실 원천은 연결된 Document
+        UUID documentId = reload(paperId).getDocumentId();
+        assertThat(documentRepository.findById(documentId).orElseThrow().getErrorCode())
+                .isEqualTo("PARSE_RETRIES_EXHAUSTED");
     }
 
     private JsonNode createPaper(String filename) throws Exception {

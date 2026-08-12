@@ -25,8 +25,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.ymc.chat.domain.ChatMessage;
 import com.ymc.chat.domain.ChatMessageRole;
 import com.ymc.chat.domain.ChatMessageStatus;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.FakeAiSseServer;
 import com.ymc.support.FakeAiSseServer.Script;
 import com.ymc.support.IntegrationTest;
@@ -66,7 +66,7 @@ class AiRelayIntegrationTest extends IntegrationTest {
 
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("relay-" + UUID.randomUUID() + ".pdf");
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
