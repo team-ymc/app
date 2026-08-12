@@ -18,6 +18,8 @@ import com.ymc.chat.domain.ChatMessageStatus;
 import com.ymc.chat.domain.ChatSession;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.support.IntegrationTest;
 
@@ -32,7 +34,7 @@ class ChatCommandServiceTest extends IntegrationTest {
     /** 파싱 완료(COMPLETED) 논문 — 채팅 가능 상태. */
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("chat-target.pdf");
-        paperTransitions.markParsed(paper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -186,9 +188,9 @@ class ChatCommandServiceTest extends IntegrationTest {
         UUID otherOwner = UUID.randomUUID();
         Paper othersPaper = paperRepository.save(
                 com.ymc.paper.domain.Paper.register(otherOwner, "others-dup.pdf", Instant.now()));
-        paperTransitions.markUploaded(othersPaper.getId());
-        paperTransitions.markProcessing(othersPaper.getId());
-        paperTransitions.markParsed(othersPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
+        Document othersDocument = givenLinkedDocument(othersPaper);
+        documentTransitions.markProcessing(othersDocument.getId());
+        documentTransitions.markParsed(othersDocument.getId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문"))
@@ -206,7 +208,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
 
         Paper secondPaper = givenProcessingPaper("second-paper.pdf");
-        paperTransitions.markParsed(secondPaper.getId(), com.ymc.paper.domain.PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(secondPaper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))

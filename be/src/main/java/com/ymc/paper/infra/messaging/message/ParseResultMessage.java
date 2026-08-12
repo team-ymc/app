@@ -5,7 +5,7 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.ymc.paper.domain.PaperStatus;
+import com.ymc.paper.domain.DocumentStatus;
 
 /**
  * project-docs/contracts/backend-ai/sqs/messaging.yml 0.2.0 `ParseResult` 대응.
@@ -49,23 +49,23 @@ public record ParseResultMessage(
         if (terminalStatus() == null) {
             return Optional.of("파싱 서버가 낼 수 없는 status입니다: " + status);
         }
-        if (terminalStatus() == PaperStatus.COMPLETED
+        if (terminalStatus() == DocumentStatus.COMPLETED
                 && (manifestKey == null || manifestKey.isBlank())) {
             return Optional.of("status=completed인데 manifest_key가 없습니다.");
         }
-        if (terminalStatus() == PaperStatus.FAILED && errorCode() == null) {
+        if (terminalStatus() == DocumentStatus.FAILED && errorCode() == null) {
             return Optional.of("status=failed인데 error.code가 없습니다.");
         }
         return Optional.empty();
     }
 
-    /** 계약의 소문자 status를 BE {@link PaperStatus}로 매핑한다. 계약에 없는 값이면 null. */
-    public PaperStatus terminalStatus() {
+    /** 계약의 소문자 status를 BE {@link DocumentStatus}로 매핑한다. 계약에 없는 값이면 null. */
+    public DocumentStatus terminalStatus() {
         if (STATUS_COMPLETED.equals(status)) {
-            return PaperStatus.COMPLETED;
+            return DocumentStatus.COMPLETED;
         }
         if (STATUS_FAILED.equals(status)) {
-            return PaperStatus.FAILED;
+            return DocumentStatus.FAILED;
         }
         return null;
     }

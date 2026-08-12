@@ -10,18 +10,16 @@
 --   spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create
 --   spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=<path>.sql
 --
--- 상태 라이프사이클(계약 openapi.yaml PaperStatus):
---   UPLOAD_PENDING → UPLOADED → PROCESSING → COMPLETED | FAILED
---   EXPIRED는 post-MVP(reconciliation batch)만 쓴다 — MVP에서는 발생하지 않는다.
+-- 상태는 Paper가 갖지 않는다 — document가 소유하고 조회 시 파생한다(PaperDocumentViews).
+-- document_id의 FK·인덱스는 이 파일에만 있다 — Paper 엔티티는 연관관계 없이 컬럼만 매핑하므로
+-- ddl-auto(update)로 띄운 local·dev 스키마에는 이 FK·인덱스가 없다(수동 DDL 소유 대상).
 
 create table paper (
     id          uuid                        not null,
     owner_id    uuid                        not null,
     filename    varchar(255)                not null,
     file_key    varchar(255)                not null,
-    status      varchar(32)                 not null
-        check (status in ('UPLOAD_PENDING', 'UPLOADED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED')),
-    error_code  varchar(255),
+    document_id uuid,
     created_at  timestamp(6) with time zone not null,
     updated_at  timestamp(6) with time zone not null,
 
@@ -29,6 +27,10 @@ create table paper (
 
     -- 파일명 중복 판정(409 DUPLICATE_FILENAME)의 최종 방어선. 사전 조회를 나란히 통과한
     -- 동시 요청은 이 제약이 잡는다 (design D4). 상태를 가리지 않으므로 업로드에 실패해
-    -- UPLOAD_PENDING으로 남은 레코드도 중복으로 걸린다 (MVP는 같은 파일명 재업로드 미지원).
-    constraint uk_paper_owner_filename unique (owner_id, filename)
+    -- document 미연결로 남은 레코드도 중복으로 걸린다 (MVP는 같은 파일명 재업로드 미지원).
+    constraint uk_paper_owner_filename unique (owner_id, filename),
+
+    constraint fk_paper_document foreign key (document_id) references document (id)
 );
+
+create index ix_paper_document on paper (document_id);

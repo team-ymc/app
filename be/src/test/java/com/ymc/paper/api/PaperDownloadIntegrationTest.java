@@ -12,8 +12,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.IntegrationTest;
 
 /** spec: paper-download (Task 3). */
@@ -34,7 +34,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     @DisplayName("완료된 논문: 200과 다운로드 URL")
     void returnsDownloadUrlForCompletedPaper() throws Exception {
         Paper paper = givenProcessingPaper("done.pdf");
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())

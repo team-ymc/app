@@ -29,8 +29,9 @@ import com.ymc.chat.domain.ChatMessageStatus;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatStartResult;
 import com.ymc.chat.service.port.AiStreamListener;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.IntegrationTest;
 
 class ChatMessageStreamIntegrationTest extends IntegrationTest {
@@ -40,7 +41,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
 
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("chat-e2e.pdf");
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -180,9 +181,9 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
     void foreignPaper() throws Exception {
         Paper others = paperRepository.save(com.ymc.paper.domain.Paper.register(
                 UUID.randomUUID(), "others.pdf", Instant.now()));
-        paperTransitions.markUploaded(others.getId());
-        paperTransitions.markProcessing(others.getId());
-        paperTransitions.markParsed(others.getId(), PaperStatus.COMPLETED, null);
+        Document othersDocument = givenLinkedDocument(others);
+        documentTransitions.markProcessing(othersDocument.getId());
+        documentTransitions.markParsed(othersDocument.getId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(post("/api/papers/{paperId}/chat/messages", others.getId())
                         .with(userJwt())

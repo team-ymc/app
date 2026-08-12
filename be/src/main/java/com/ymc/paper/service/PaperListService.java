@@ -16,12 +16,10 @@ import lombok.RequiredArgsConstructor;
 public class PaperListService {
 
     private final PaperRepository paperRepository;
+    private final PaperDocumentViews views;
 
     @Transactional(readOnly = true)
     public List<PaperListView> list(UUID ownerId) {
-        return paperRepository.findAllByOwnerId(ownerId)
-                .stream()
-                .map(PaperListView::from)
-                .toList();
+        return views.listViews(paperRepository.findAllByOwnerId(ownerId));
     }
 }

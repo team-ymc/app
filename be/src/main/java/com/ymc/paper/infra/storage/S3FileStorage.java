@@ -13,6 +13,7 @@ import com.ymc.paper.service.port.UploadedObjectMetadata;
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.http.HttpStatusCode;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ChecksumMode;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -38,7 +39,8 @@ public class S3FileStorage implements FileStorage {
     private final AwsProperties props;
 
     @Override
-    public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
+    public PresignedUpload presignUpload(
+            String fileKey, String contentType, long contentLength, String checksumSha256) {
         PresignedPutObjectRequest presigned = presigner.presignPutObject(
                 PutObjectPresignRequest.builder()
                         .signatureDuration(props.s3().presignExpiry())
@@ -47,6 +49,7 @@ public class S3FileStorage implements FileStorage {
                                 .key(fileKey)
                                 .contentType(contentType)
                                 .contentLength(contentLength)
+                                .checksumSHA256(checksumSha256)
                                 .build())
                         .build());
         return new PresignedUpload(presigned.url().toString(), presigned.expiration());
@@ -80,8 +83,10 @@ public class S3FileStorage implements FileStorage {
             var response = s3.headObject(HeadObjectRequest.builder()
                     .bucket(props.s3().bucket())
                     .key(fileKey)
+                    .checksumMode(ChecksumMode.ENABLED)
                     .build());
-            return Optional.of(new UploadedObjectMetadata(response.contentLength()));
+            return Optional.of(
+                    new UploadedObjectMetadata(response.contentLength(), response.checksumSHA256()));
         } catch (NoSuchKeyException e) {                // 404
             return Optional.empty();
         } catch (S3Exception e) {

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class PaperStatusService {
 
     private final PaperRepository paperRepository;
+    private final PaperDocumentViews views;
 
     /**
      * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId
@@ -31,6 +32,6 @@ public class PaperStatusService {
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
-        return PaperStatusView.from(paper);
+        return views.statusView(paper);
     }
 }

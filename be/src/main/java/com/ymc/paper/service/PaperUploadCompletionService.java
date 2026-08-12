@@ -10,25 +10,24 @@ import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
-import com.ymc.paper.domain.PaperStatus;
+import com.ymc.paper.service.PaperDocumentLinkService.LinkOutcome;
 import com.ymc.paper.service.port.FileStorage;
-import com.ymc.paper.service.port.ParseRequestPublisher;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * 업로드 완료 통보 → 파싱 요청 발행 (design D6).
+ * 업로드 완료 통보 — S3 검증 checksum으로 Document를 결정하고 발행 규칙을 실행한다.
  *
  * <pre>
- * paper 조회 → 이미 전이됨이면 HEAD·재발행 없이 현재 상태 200 (멱등)
- *              └ UPLOAD_PENDING이면 S3 HEAD → CAS(UPLOAD_PENDING→UPLOADED) 커밋
- *                                             → 큐 발행
- *                                             → UPLOADED→PROCESSING 커밋 → 200
+ * paper 조회·소유 확인
+ * → 이미 연결됨: 발행 규칙(정체 구제 창구) 후 파생 상태 반환 (HEAD 없음)
+ * → 미연결: HEAD(checksum 포함) 검증 → [Tx] Document 생성/연결 → 중복 객체 삭제(best-effort)
+ *          → 발행 규칙 → 파생 상태 반환
  * </pre>
  *
- * <p><b>이 클래스에 {@code @Transactional}을 걸지 말 것.</b> 세 단계는 서로 다른 트랜잭션이어야 한다 —
- * 경계는 {@link PaperTransitions}가 갖는다 (tasks 4.3).
+ * <p><b>이 클래스에 {@code @Transactional}을 걸지 말 것.</b> 연결 커밋·선점 커밋·큐 발행은
+ * 서로 다른 경계여야 한다 — 경계는 {@link PaperDocumentLinkService}·{@link DocumentTransitions}가 갖는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,73 +36,64 @@ public class PaperUploadCompletionService {
     private static final Logger log = LoggerFactory.getLogger(PaperUploadCompletionService.class);
 
     private final PaperRepository paperRepository;
-    private final PaperTransitions transitions;
+    private final PaperDocumentLinkService linkService;
+    private final DocumentParsingStarter parsingStarter;
+    private final PaperDocumentViews views;
     private final FileStorage fileStorage;
-    private final ParseRequestPublisher parseRequestPublisher;
     private final PaperUploadPolicy uploadPolicy;
 
-    /**
-     * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId (S3는 조회하지 않는다)
-     * @throws ApiException {@code FORBIDDEN} — 소유자가 아님
-     * @throws ApiException {@code UPLOAD_NOT_FOUND} — S3에 객체가 없음. 상태는 UPLOAD_PENDING 유지
-     * @throws ApiException {@code FILE_TOO_LARGE} — 실제 객체가 제한을 초과함. 객체는 삭제하고 상태는 유지
-     */
     public PaperStatusView complete(UUID paperId, UUID ownerId) {
         Paper paper = find(paperId);
-
-        // 멱등 반환·HEAD·큐 발행 어느 것도 남의 논문에서 일어나면 안 되므로 가장 먼저 막는다.
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
 
-        // 이미 전이된 레코드는 HEAD도 재발행도 하지 않고 현재 상태를 돌려준다. 객체의 사후 삭제나
-        // S3 일시 장애가 이미 끝난 complete의 결과를 바꾸지 않게 한다 (계약의 멱등 규칙).
-        if (paper.getStatus() != PaperStatus.UPLOAD_PENDING) {
-            return PaperStatusView.from(paper);
+        // 멱등 재호출. 발행 규칙을 먼저 거치는 이유: 발행 실패로 UPLOADED에 정체된 Document를
+        // 재호출이 구제할 수 있는 유일한 창구이기 때문이다.
+        if (paper.getDocumentId() != null) {
+            parsingStarter.startIfUploaded(paper.getDocumentId());
+            return views.statusView(find(paperId));
         }
 
         UploadedObjectMetadata uploadedObject = fileStorage.head(paper.getFileKey()).orElseThrow(() ->
-                new ApiException(
-                        ErrorCode.UPLOAD_NOT_FOUND,
+                new ApiException(ErrorCode.UPLOAD_NOT_FOUND,
                         "업로드된 파일을 찾을 수 없습니다. 업로드 후 다시 시도해 주세요."));
 
         if (uploadPolicy.exceedsLimit(uploadedObject.contentLength())) {
-            // 서명이 크기를 고정하므로 정상 경로에선 도달 불가
             log.warn("상한 초과 객체 삭제: paperId={}, contentLength={}, limit={}",
                     paperId, uploadedObject.contentLength(), uploadPolicy.maxFileBytes());
             fileStorage.delete(paper.getFileKey());
             throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
         }
 
-        // (1) CAS 커밋 — 동시 complete 중 한 건만 주인이 된다
-        if (!transitions.markUploaded(paperId)) {
-            // 동시 요청이 먼저 전이했다. 재발행하지 않고 최신 상태를 다시 읽어 돌려준다.
-            return PaperStatusView.from(find(paperId));
+        if (uploadedObject.checksumSha256() == null || uploadedObject.checksumSha256().isBlank()) {
+            throw new ApiException(ErrorCode.UPLOAD_CHECKSUM_MISSING,
+                    "업로드 객체에 검증된 checksum이 없습니다. 같은 파일을 다시 업로드한 뒤 재시도해 주세요.");
         }
 
-        // (2) 큐 발행 — 트랜잭션 밖. 실패하면 예외가 올라가 5xx가 되고 레코드는 UPLOADED에 남는다.
-        //     순서 주의: 반드시 UPLOADED 커밋(1) 후 발행
-        //     뒤집으면(발행 먼저) 커밋 실패 시 재시도 → 중복 파싱(고 비용).
-        //     - "중복(비용)보다 누락(정체)이 낫다". (로그로 남음)
-        //     ADR-001 §5가 문서화한 MVP 갭이라 복구 장치를 두지 않는다 (post-MVP reconciliation batch).
-        try {
-            parseRequestPublisher.publish(paperId, paper.getFileKey());
-        } catch (RuntimeException e) {
-            // 복구하지 않기로 한 갭이라 WARN이 UPLOADED 정체를 알아챌 유일한 수단
-            log.warn("파싱 요청 발행 실패, UPLOADED 정체: paperId={}, fileKey={}",
-                    paperId, paper.getFileKey(), e);
-            throw e;
-        }
-        log.info("파싱 요청 발행: paperId={}, fileKey={}", paperId, paper.getFileKey());
+        LinkOutcome outcome = linkService.linkOrCreate(
+                paperId, paper.getFileKey(), uploadedObject.checksumSha256());
+        log.info("document {}: paperId={}, documentId={}",
+                outcome.linkedToExisting() ? "연결" : "생성", paperId, outcome.document().getId());
 
-        // (3) PROCESSING 커밋 — CAS라 빠른 결과가 이미 terminal로 전이시켰으면 그 상태를
-        //     그대로 돌려준다 (정상 경합, 5xx 아님). 여기서의 예외는 DB 장애 등 실제 오류뿐이다.
+        // 연결 커밋 후에만 삭제. 대표 원본과 같은 key면 절대 지우지 않는다 —
+        // 같은 Paper의 동시 complete에서 패자가 대표 원본을 지우는 사고 방지.
+        if (outcome.linkedToExisting()
+                && !paper.getFileKey().equals(outcome.document().getFileKey())) {
+            deleteBestEffort(paperId, outcome.document().getId(), paper.getFileKey());
+        }
+
+        parsingStarter.startIfUploaded(outcome.document().getId());
+        return views.statusView(find(paperId));
+    }
+
+    private void deleteBestEffort(UUID paperId, UUID documentId, String fileKey) {
         try {
-            return transitions.markProcessing(paperId);
+            fileStorage.delete(fileKey);
         } catch (RuntimeException e) {
-            // 발행은 이미 나갔다. 결과가 오면 UPLOADED에서 바로 terminal로 전이된다 (spec §3 C2).
-            log.warn("PROCESSING 전이 실패, 발행 후 UPLOADED 정체: paperId={}", paperId, e);
-            throw e;
+            // 잔여 객체는 후속 정리 작업이 재삭제한다 — complete를 실패로 되돌리지 않는다
+            log.warn("중복 업로드 객체 삭제 실패: paperId={}, documentId={}, fileKey={}",
+                    paperId, documentId, fileKey, e);
         }
     }
 

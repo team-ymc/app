@@ -21,18 +21,23 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentContentAssetRepository;
+import com.ymc.paper.domain.DocumentContentBlockRepository;
+import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperContentAssetRepository;
-import com.ymc.paper.domain.PaperContentBlockRepository;
-import com.ymc.paper.domain.PaperContentRepository;
 import com.ymc.paper.domain.PaperRepository;
-import com.ymc.paper.service.PaperTransitions;
+import com.ymc.paper.service.DocumentContentIngestService;
+import com.ymc.paper.service.DocumentParsingStarter;
+import com.ymc.paper.service.DocumentTransitions;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParseRequestPublisher;
 import com.ymc.user.domain.RefreshTokenRepository;
@@ -86,13 +91,22 @@ public abstract class IntegrationTest {
     protected PaperRepository paperRepository;
 
     @Autowired
-    protected PaperContentRepository paperContentRepository;
+    protected DocumentRepository documentRepository;
 
     @Autowired
-    protected PaperContentBlockRepository paperContentBlockRepository;
+    protected TransactionTemplate tx;
 
     @Autowired
-    protected PaperContentAssetRepository paperContentAssetRepository;
+    protected DocumentContentRepository documentContentRepository;
+
+    @Autowired
+    protected DocumentContentBlockRepository documentContentBlockRepository;
+
+    @Autowired
+    protected DocumentContentAssetRepository documentContentAssetRepository;
+
+    @Autowired
+    protected DocumentContentIngestService documentContentIngestService;
 
     @Autowired
     protected UserRepository userRepository;
@@ -125,7 +139,10 @@ public abstract class IntegrationTest {
     protected ParseRequestPublisher parseRequestPublisher;
 
     @MockitoSpyBean
-    protected PaperTransitions paperTransitions;
+    protected DocumentTransitions documentTransitions;
+
+    @MockitoSpyBean
+    protected DocumentParsingStarter documentParsingStarter;
 
     @MockitoSpyBean
     protected AiAgentStreamPort aiAgentStreamPort;
@@ -140,10 +157,11 @@ public abstract class IntegrationTest {
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
-        paperContentBlockRepository.deleteAll();
-        paperContentAssetRepository.deleteAll();
-        paperContentRepository.deleteAll();
+        documentContentBlockRepository.deleteAll();
+        documentContentAssetRepository.deleteAll();
+        documentContentRepository.deleteAll();
         paperRepository.deleteAll();
+        documentRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
     }
@@ -164,24 +182,72 @@ public abstract class IntegrationTest {
         return paperRepository.save(Paper.register(TEST_USER_ID, filename, Instant.now()));
     }
 
-    /** 파싱 대기 중(PROCESSING) 레코드 — 결과 수신 시나리오의 출발점. */
+    /** UPLOADED document에 연결된 Paper — 발행 직전 상태. */
+    protected Document givenLinkedDocument(Paper paper) {
+        Document document = documentRepository.save(Document.create(
+                UUID.randomUUID(), randomChecksum(), paper.getFileKey(), paper.getId(), Instant.now()));
+        tx.execute(s -> paperRepository.linkDocument(paper.getId(), document.getId(), Instant.now()));
+        return document;
+    }
+
+    /** 파싱 진행 중 상태 — 결과 수신 시나리오의 출발점. */
     protected Paper givenProcessingPaper(String filename) {
         Paper paper = givenPendingPaper(filename);
-        paperTransitions.markUploaded(paper.getId());
-        paperTransitions.markProcessing(paper.getId());
-        clearInvocations(paperTransitions);
+        Document document = givenLinkedDocument(paper);
+        documentTransitions.markProcessing(document.getId());
+        clearInvocations(documentTransitions);
         return reload(paper.getId());
     }
 
-    /** FE가 presigned URL로 업로드한 상황을 만든다 (여기선 서버 자격증명으로 바로 넣는다). */
+    /** 등록·업로드 테스트가 공유하는 가짜 PDF 바이트. checksum·size가 이 값 기준으로 맞아야 S3가 받는다. */
+    protected static final byte[] TEST_PDF_BYTES =
+            "%PDF-1.4\n%fake pdf for test\n".getBytes(StandardCharsets.UTF_8);
+
+    /** 표준 Base64 SHA-256 (32 bytes → 44 chars). */
+    protected static String checksumOf(byte[] bytes) {
+        try {
+            return java.util.Base64.getEncoder().encodeToString(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** 형식만 유효한 무작위 checksum — 픽스처 간 unique 충돌 회피용. */
+    protected static String randomChecksum() {
+        byte[] bytes = new byte[32];
+        java.util.concurrent.ThreadLocalRandom.current().nextBytes(bytes);
+        return java.util.Base64.getEncoder().encodeToString(bytes);
+    }
+
+    /** TEST_PDF_BYTES와 정합인 등록 요청 본문. */
+    protected String createPaperJson(String filename) {
+        return """
+                {"filename":"%s","contentType":"application/pdf","size":%d,"checksumSha256":"%s"}"""
+                .formatted(filename, TEST_PDF_BYTES.length, checksumOf(TEST_PDF_BYTES));
+    }
+
+    /** FE가 checksum 서명 presigned URL로 업로드한 상황 (서버 자격증명으로 대신 넣는다). */
     protected void givenUploadedObject(Paper paper) {
         s3.putObject(
                 PutObjectRequest.builder()
                         .bucket(awsProperties.s3().bucket())
                         .key(paper.getFileKey())
                         .contentType("application/pdf")
+                        .checksumSHA256(checksumOf(TEST_PDF_BYTES))
                         .build(),
-                RequestBody.fromBytes("%PDF-1.4\n%fake pdf for test\n".getBytes(StandardCharsets.UTF_8)));
+                RequestBody.fromBytes(TEST_PDF_BYTES));
+    }
+
+    /** checksum 없이 올라간 객체 — UPLOAD_CHECKSUM_MISSING 재현용. */
+    protected void givenUploadedObjectWithoutChecksum(Paper paper) {
+        s3.putObject(
+                PutObjectRequest.builder()
+                        .bucket(awsProperties.s3().bucket())
+                        .key(paper.getFileKey())
+                        .contentType("application/pdf")
+                        .build(),
+                RequestBody.fromBytes(TEST_PDF_BYTES));
     }
 
     /** 클래스패스의 축소판 파서 패키지를 LocalStack S3의 주어진 prefix로 올린다. */

@@ -14,8 +14,9 @@ public interface FileStorage {
      * <p>contentType과 contentLength가 서명에 들어가므로 클라이언트는 PUT 시 같은
      * {@code Content-Type}과 정확히 같은 바이트 수를 보내야 한다 — 다르면 S3가 거절한다.
      * 크기를 서명에 넣는 것이 상한을 S3에서 강제하는 수단이다.
+     * checksumSha256도 서명에 포함되어 S3가 실제 바이트와 대조 검증한다.
      */
-    PresignedUpload presignUpload(String fileKey, String contentType, long contentLength);
+    PresignedUpload presignUpload(String fileKey, String contentType, long contentLength, String checksumSha256);
 
     /** 업로드가 실제로 끝났는지 확인하고 메타데이터를 반환한다 (S3 HEAD). */
     Optional<UploadedObjectMetadata> head(String fileKey);

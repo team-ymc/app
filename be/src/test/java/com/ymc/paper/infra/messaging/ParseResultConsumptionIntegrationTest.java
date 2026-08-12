@@ -18,12 +18,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.QueryTimeoutException;
 
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.IntegrationTest;
 
 /**
- * spec: parse-result-consumption (tasks 6.4). LocalStack SQS에 실제로 발행하고 리스너가 소비하게 둔다.
+ * spec: parse-result-consumption (tasks 6.4), Document 역조회 전환 (tasks 5.5).
+ * LocalStack SQS에 실제로 발행하고 리스너가 소비하게 둔다.
  */
 class ParseResultConsumptionIntegrationTest extends IntegrationTest {
 
@@ -37,23 +39,23 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
                 """.formatted(paper.getId(), manifestKey));
 
-        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
-        assertThat(reload(paper.getId()).getErrorCode()).isNull();
+        awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
+        assertThat(documentOf(paper).getErrorCode()).isNull();
     }
 
     @Test
     @DisplayName("UPLOADED 상태의 결과도 terminal로 전이된다 (PROCESSING 커밋 전 선도착 흡수)")
     void appliesResultArrivingBeforeProcessing() {
         Paper paper = givenPendingPaper("early-result.pdf");
-        paperTransitions.markUploaded(paper.getId());
+        Document document = givenLinkedDocument(paper);   // UPLOADED — 발행 규칙을 거치지 않았다
         String manifestKey = givenPackageOnS3(paper.getId());
 
         publishParseResult("""
                 {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
                 """.formatted(paper.getId(), manifestKey));
 
-        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
-        assertThat(reload(paper.getId()).getErrorCode()).isNull();
+        awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
+        assertThat(documentRepository.findById(document.getId()).orElseThrow().getErrorCode()).isNull();
     }
 
     @Test
@@ -72,7 +74,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 }
                 """.formatted(paper.getId(), manifestKey));
 
-        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
+        awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
     }
 
     @Test
@@ -84,12 +86,12 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 {"paper_id":"%s","status":"failed","error":{"code":"PARSE_RETRIES_EXHAUSTED","message":"재시도 소진"}}
                 """.formatted(paper.getId()));
 
-        awaitStatus(paper.getId(), PaperStatus.FAILED);
-        assertThat(reload(paper.getId()).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
+        awaitDocumentStatus(paper.getId(), DocumentStatus.FAILED);
+        assertThat(documentOf(paper).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
     }
 
     @Test
-    @DisplayName("중복 결과 수신: 이미 COMPLETED인 레코드는 변하지 않고 메시지는 정상 소비된다")
+    @DisplayName("중복 결과 수신: 이미 COMPLETED인 document는 변하지 않고 메시지는 정상 소비된다")
     void duplicateResultLeavesRecordUnchanged() {
         Paper paper = givenProcessingPaper("duplicate.pdf");
         String manifestKey = givenPackageOnS3(paper.getId());
@@ -98,19 +100,19 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 """.formatted(paper.getId(), manifestKey);
 
         publishParseResult(message);
-        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
-        var firstUpdatedAt = reload(paper.getId()).getUpdatedAt();
+        awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
+        var firstUpdatedAt = documentOf(paper).getUpdatedAt();
 
         publishParseResult(message);
         awaitConsumed(parseResultQueueUrl());
 
-        Paper after = reload(paper.getId());
-        assertThat(after.getStatus()).isEqualTo(PaperStatus.COMPLETED);
+        Document after = documentOf(paper);
+        assertThat(after.getStatus()).isEqualTo(DocumentStatus.COMPLETED);
         assertThat(after.getUpdatedAt()).isEqualTo(firstUpdatedAt);   // 두 번째 수신은 아무것도 바꾸지 않았다
     }
 
     @Test
-    @DisplayName("알 수 없는 paperId: 상태 변경 없이 정상 소비된다")
+    @DisplayName("알 수 없는 paperId: 대응 document가 없어 상태 변경 없이 정상 소비된다")
     void unknownPaperIdIsConsumed() {
         UUID unknownId = UUID.randomUUID();
 
@@ -119,7 +121,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 """.formatted(unknownId, unknownId));
 
         awaitConsumed(parseResultQueueUrl());
-        assertThat(paperRepository.count()).isZero();
+        assertThat(documentRepository.count()).isZero();
     }
 
     @Test
@@ -132,7 +134,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 """.formatted(paper.getId()));
 
         awaitConsumed(parseResultQueueUrl());
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.PROCESSING);
+        assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.PROCESSING);
     }
 
     @ParameterizedTest(name = "비복구 입력이라 소비만 한다: {0}")
@@ -151,7 +153,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
         publishParseResult(template.contains("%s") ? template.formatted(paper.getId()) : template);
 
         awaitConsumed(parseResultQueueUrl());
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.PROCESSING);
+        assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.PROCESSING);
     }
 
     @Test
@@ -160,23 +162,29 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
         // PROCESSING 상태 논문 생성
         Paper paper = givenProcessingPaper("transient.pdf");
         String manifestKey = givenPackageOnS3(paper.getId());
+        UUID documentId = reload(paper.getId()).getDocumentId();
 
         // 첫 수신은 DB 타임아웃, 그 뒤로는 정상 — 예외가 리스너 밖으로 나가야 재전달된다
         doThrow(new QueryTimeoutException("DB 타임아웃"))       // 첫 호출에서 QueryTOE
                 .doCallRealMethod()                           // 실제 메서드 호출
-                .when(paperTransitions).markParsed(eq(paper.getId()), any(), any());
+                .when(documentTransitions).markParsed(eq(documentId), any(), any());
 
         // 메시지 발행
         publishParseResult("""
                 {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
                 """.formatted(paper.getId(), manifestKey));
 
-        awaitStatus(paper.getId(), PaperStatus.COMPLETED);
-        verify(paperTransitions, atLeast(2)).markParsed(eq(paper.getId()), any(), any());
+        awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
+        verify(documentTransitions, atLeast(2)).markParsed(eq(documentId), any(), any());
     }
 
-    private void awaitStatus(UUID paperId, PaperStatus expected) {
+    private Document documentOf(Paper paper) {
+        return documentRepository.findByRequestPaperId(paper.getId()).orElseThrow();
+    }
+
+    private void awaitDocumentStatus(UUID requestPaperId, DocumentStatus expected) {
         await().atMost(CONSUME_TIMEOUT).pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> assertThat(reload(paperId).getStatus()).isEqualTo(expected));
+                .untilAsserted(() -> assertThat(documentRepository.findByRequestPaperId(requestPaperId)
+                        .orElseThrow().getStatus()).isEqualTo(expected));
     }
 }

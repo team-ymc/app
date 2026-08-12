@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class PaperChatAccessValidator {
 
     private final PaperRepository paperRepository;
+    private final PaperDocumentViews views;
 
     /**
      * @throws ApiException PAPER_NOT_FOUND(404) — 논문 없음
@@ -33,9 +34,10 @@ public class PaperChatAccessValidator {
     @Transactional(readOnly = true)
     public void validateChatReady(UUID paperId, UUID ownerId) {
         Paper paper = getOwned(paperId, ownerId);
-        if (paper.getStatus() != PaperStatus.COMPLETED) {
+        PaperStatus status = PaperDocumentViews.derivedStatus(paper, views.documentOf(paper).orElse(null));
+        if (status != PaperStatus.COMPLETED) {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
-                    "논문이 아직 학습 가능한 상태가 아닙니다: " + paper.getStatus());
+                    "논문이 아직 학습 가능한 상태가 아닙니다: " + status);
         }
     }
 

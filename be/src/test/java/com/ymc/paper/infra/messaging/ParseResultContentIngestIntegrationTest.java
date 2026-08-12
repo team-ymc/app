@@ -6,16 +6,17 @@ import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
-import com.ymc.paper.service.PaperContentIngestService;
+import com.ymc.paper.service.DocumentContentIngestService;
 import com.ymc.support.IntegrationTest;
 
-/** messaging.yml 0.2.0 wire 형식 기준. */
+/** messaging.yml 0.2.0 wire 형식 기준. 전이·적재 결과는 연결된 Document에서 확인한다. */
 class ParseResultContentIngestIntegrationTest extends IntegrationTest {
 
     @Autowired
-    PaperContentIngestService ingestService;
+    DocumentContentIngestService ingestService;
 
     @Test
     void completed_메시지는_전이와_적재까지_수행한다() {
@@ -28,8 +29,8 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         awaitConsumed(parseResultQueueUrl());
 
         await().atMost(CONSUME_TIMEOUT).untilAsserted(() -> {
-            assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.COMPLETED);
-            assertThat(ingestService.isIngested(paper.getId())).isTrue();
+            assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.COMPLETED);
+            assertThat(ingestService.isIngested(documentOf(paper).getId())).isTrue();
         });
     }
 
@@ -43,8 +44,8 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         awaitConsumed(parseResultQueueUrl());
 
         // 폐기 = 정상 소비(ack)하되 아무것도 반영하지 않는다
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.PROCESSING);
-        assertThat(ingestService.isIngested(paper.getId())).isFalse();
+        assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.PROCESSING);
+        assertThat(ingestService.isIngested(documentOf(paper).getId())).isFalse();
     }
 
     @Test
@@ -52,7 +53,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         // 시나리오: 전이는 커밋됐는데 적재가 실패해 메시지가 재전달된 경우
         Paper paper = givenProcessingPaper("redelivery.pdf");
         String manifestKey = givenPackageOnS3(paper.getId());
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        documentTransitions.markParsed(reload(paper.getId()).getDocumentId(), DocumentStatus.COMPLETED, null);
 
         publishParseResult("""
                 {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
@@ -60,7 +61,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         awaitConsumed(parseResultQueueUrl());
 
         await().atMost(CONSUME_TIMEOUT).untilAsserted(
-                () -> assertThat(ingestService.isIngested(paper.getId())).isTrue());
+                () -> assertThat(ingestService.isIngested(documentOf(paper).getId())).isTrue());
     }
 
     @Test
@@ -72,8 +73,12 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
                 """.formatted(paper.getId()));
         awaitConsumed(parseResultQueueUrl());
 
-        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.FAILED);
-        assertThat(reload(paper.getId()).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
-        assertThat(ingestService.isIngested(paper.getId())).isFalse();
+        assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.FAILED);
+        assertThat(documentOf(paper).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
+        assertThat(ingestService.isIngested(documentOf(paper).getId())).isFalse();
+    }
+
+    private Document documentOf(Paper paper) {
+        return documentRepository.findByRequestPaperId(paper.getId()).orElseThrow();
     }
 }

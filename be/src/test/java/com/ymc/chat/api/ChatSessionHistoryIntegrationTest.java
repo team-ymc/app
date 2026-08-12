@@ -18,8 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
 import com.ymc.chat.service.ChatStartResult;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.IntegrationTest;
 
 /** 세션 목록·메시지 히스토리·삭제 (YMC-260). 계약 operation listChatSessions 외 2개. */
@@ -33,9 +34,9 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
 
     Paper givenCompletedPaper(UUID ownerId, String filename) {
         Paper paper = paperRepository.save(Paper.register(ownerId, filename, Instant.now()));
-        paperTransitions.markUploaded(paper.getId());
-        paperTransitions.markProcessing(paper.getId());
-        paperTransitions.markParsed(paper.getId(), PaperStatus.COMPLETED, null);
+        Document document = givenLinkedDocument(paper);
+        documentTransitions.markProcessing(document.getId());
+        documentTransitions.markParsed(document.getId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 

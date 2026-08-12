@@ -40,7 +40,8 @@ class S3PaperPackageReaderTest {
         }
 
         @Override
-        public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
+        public PresignedUpload presignUpload(
+                String fileKey, String contentType, long contentLength, String checksumSha256) {
             throw new UnsupportedOperationException();
         }
 
@@ -189,7 +190,8 @@ class S3PaperPackageReaderTest {
             }
 
             @Override
-            public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
+            public PresignedUpload presignUpload(
+                    String fileKey, String contentType, long contentLength, String checksumSha256) {
                 throw new UnsupportedOperationException();
             }
 

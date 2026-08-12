@@ -10,9 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 상태 전이는 전부 조건부 UPDATE(CAS)로 판정한다 — 변경된 row가 1일 때만 후속 동작을 진행한다 (spec §3).
- * 동시 complete·결과 선도착·중복 수신이 실재하는 전이라 load-modify-save로는 lost update를 막을 수 없다.
- * {@link Paper}에는 생성 불변식만 남는다.
+ * 상태는 Paper가 아니라 연결된 {@link Document}가 소유한다 — Paper 자신의 전이는
+ * document 연결(CAS) 하나뿐이다.
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
@@ -26,59 +25,18 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     List<Paper> findAllByOwnerId(UUID ownerId);
 
     /**
-     * complete 수신 시의 {@code UPLOAD_PENDING → UPLOADED}. 동시 complete 호출 중 한 건만 1을 받는다.
-     *
-     * @return 변경된 row 수 (1이면 이 호출이 전이의 주인 — 파싱 요청을 발행한다)
-     */
-    // flushAutomatically : UPDATE 전, 영속성 컨텍스트 변경사항 flush
-    // clearAutomatically : Update 후, 1차 캐시 비움. 과거 데이터 제거하여 새로운 데이터 read해옴
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update Paper p
-               set p.status = com.ymc.paper.domain.PaperStatus.UPLOADED,
-                   p.updatedAt = :now
-             where p.id = :id
-               and p.status = com.ymc.paper.domain.PaperStatus.UPLOAD_PENDING
-            """)
-    int markUploaded(@Param("id") UUID id, @Param("now") Instant now);
-
-    /**
-     * 파싱 요청 발행 후의 {@code UPLOADED → PROCESSING}. 빠른 결과가 이미 terminal로
-     * 전이시켰으면 0을 받는다 — 호출자가 재조회해 분기한다 (spec §3).
+     * 검증 완료된 Paper를 Document에 연결. document_id가 null일 때만 1 row다.
+     * updated_at을 함께 갱신한다 — 연결 순간이 이 Paper의 표시 상태가 바뀐 시각이고,
+     * bulk UPDATE는 JPA auditing을 우회하기 때문이다.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Paper p
-               set p.status = com.ymc.paper.domain.PaperStatus.PROCESSING,
+               set p.documentId = :documentId,
                    p.updatedAt = :now
-             where p.id = :id
-               and p.status = com.ymc.paper.domain.PaperStatus.UPLOADED
+             where p.id = :paperId
+               and p.documentId is null
             """)
-    int markProcessing(@Param("id") UUID id, @Param("now") Instant now);
-
-    /**
-     * 결과 수신 시의 {@code UPLOADED | PROCESSING → COMPLETED | FAILED}. 중복 수신·이미 terminal이면 0을 받는다.
-     *
-     * <p>{@code UPLOADED}를 포함하는 이유: request 발행 후 PROCESSING 커밋 전에 결과가 도착하거나
-     * BE가 죽는 경합을 흡수한다 (spec §3, ADR-002 Follow-ups).
-     *
-     * @param terminal  {@code COMPLETED} 또는 {@code FAILED}
-     * @param errorCode 실패 코드. {@code COMPLETED}면 null
-     * @return 변경된 row 수 (0이면 이미 terminal이거나 진행 전 상태 — 경고 로그 후 소비)
-     */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update Paper p
-               set p.status = :terminal,
-                   p.errorCode = :errorCode,
-                   p.updatedAt = :now
-             where p.id = :id
-               and p.status in (com.ymc.paper.domain.PaperStatus.UPLOADED,
-                                com.ymc.paper.domain.PaperStatus.PROCESSING)
-            """)
-    int markParsed(
-            @Param("id") UUID id,
-            @Param("terminal") PaperStatus terminal,
-            @Param("errorCode") String errorCode,
+    int linkDocument(@Param("paperId") UUID paperId, @Param("documentId") UUID documentId,
             @Param("now") Instant now);
 }
