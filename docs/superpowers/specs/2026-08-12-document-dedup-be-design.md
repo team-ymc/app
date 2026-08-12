@@ -25,7 +25,7 @@
 | 컬럼 | 타입·제약 | 설명 |
 |---|---|---|
 | `id` | uuid PK | BE가 insert 전 생성 (paperId와 동일 패턴) |
-| `checksum_sha256` | varchar(44) not null, `uk_document_checksum` unique | S3가 검증한 표준 Base64 SHA-256. 동시 complete에서 Document 유일성의 근거. 보존 migration 채택 시에만 nullable(§8) |
+| `checksum_sha256` | varchar(44) not null, `uk_document_checksum` unique | S3가 검증한 표준 Base64 SHA-256. 동시 complete에서 Document 유일성의 근거 |
 | `file_key` | varchar not null | 대표 원본 key. 최초 업로더의 `uploads/{paperId}/original.pdf`를 복제 없이 그대로 사용 (ADR-003) |
 | `status` | varchar(32) not null | `DocumentStatus`: `UPLOADED → PROCESSING → COMPLETED / FAILED`. 검증된 객체가 있어야 Document가 생기므로 `UPLOAD_PENDING` 없음 |
 | `error_code` | varchar null | AI 실패 코드 원문 (기존 `Paper.errorCode` 이동) |
@@ -155,17 +155,14 @@ FE가 `UPLOAD_PENDING → COMPLETED` 같은 점프를 볼 수 있다는 것(순�
 - 대표 Paper 삭제 후 `request_paper_id`는 dangling — 정상. 결과 소비·구제 발행 모두 성립.
 - 참조 없는 Document 정리, 삭제 실패 중복 객체 정리 배치: 범위 외 (ADR-003 follow-up).
 
-## 8. Migration — ⚠ 기존 데이터 보존 여부 팀 확인 대기
+## 8. Migration — 기존 데이터 초기화로 확정 (2026-08-12)
 
-**기본 경로 (보존 불필요로 확인되면):** §2 DDL만 반영. 데이터 이관 없음. local/dev는 스키마 재생성.
+§2 DDL만 반영하고 데이터 이관은 하지 않는다. local/dev는 스키마·데이터 재생성.
+`ddl-auto: update`는 컬럼 제거·테이블 개명을 못 하므로 dev 반영은 재생성 또는 수동 SQL로 한다.
 
-**보존 경로 (부록):** 기존 업로드 객체에는 S3 `ChecksumSHA256`이 없다(checksum 없이 PUT됨).
-S3 재다운로드 재계산은 비용 대비 이득이 없어 배제하고:
-
-- `checksum_sha256`을 **NULL 허용 unique**로 완화 (PostgreSQL은 NULL 중복 허용)
-- 기존 Paper당 Document 1개 백필: `request_paper_id = paperId`, `file_key`·상태·`error_code` 복사,
-  checksum NULL → 기존 건은 전부 별개 Document로 취급, 중복 제거는 신규 업로드부터만 적용
-- 산출물 테이블은 `paper_id` → 매핑된 `document_id`로 UPDATE
+기존 Paper당 Document를 백필하는 보존 경로(checksum NULL 허용)도 검토했으나, 기존 업로드
+객체에는 S3 검증 checksum이 없어(소급 불가) 중복 제거에 참여할 수 없고 dev 데이터는 보존
+가치가 없어 배제했다.
 
 ## 9. 테스트
 
@@ -180,7 +177,6 @@ S3 재다운로드 재계산은 비용 대비 이득이 없어 배제하고:
 | 대표 Paper 삭제 후 status·download·결과 소비 | 신규 (repository로 row 삭제 후 검증) |
 | 결과 중복 수신·재전달·미지의 paper_id | `ParseResultConsumptionIntegrationTest`를 Document 기준으로 개정 |
 | E2E: 등록→PUT→complete→발행→결과→COMPLETED | `PaperFlowE2ETest` 개정 (uploadHeaders 사용) |
-| migration | 보존 경로 채택 시에만 백필 스크립트 테스트 추가 |
 
 ## 10. 관측
 
