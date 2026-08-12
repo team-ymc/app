@@ -14,6 +14,7 @@ import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.PresignedUpload;
 
@@ -90,7 +91,7 @@ public class PaperRegistrationService {
                 Map.of("Content-Type", contentType, "x-amz-checksum-sha256", checksumSha256),
                 upload.url(),
                 upload.expiresAt(),
-                paper.getStatus(),
+                PaperStatus.UPLOAD_PENDING,
                 paper.getCreatedAt());
     }
 

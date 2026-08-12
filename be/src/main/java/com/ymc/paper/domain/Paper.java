@@ -6,8 +6,6 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -20,9 +18,8 @@ import lombok.Getter;
  * <p>id는 DB가 아니라 BE가 insert 전에 만든다 — fileKey가 id를 포함해야 하고(design D5),
  * presigned URL도 insert 전에 발급 대상 key를 알아야 하기 때문이다.
  *
- * <p>상태 전이는 전부 {@link PaperRepository}의 조건부 UPDATE(CAS)로 한다 — 동시 complete·
- * 결과 선도착·중복 수신이 실재하는 전이라 load-modify-save로는 lost update를 막을 수 없다
- * (spec §3). 엔티티에는 생성 불변식만 남는다.
+ * <p>상태는 연결된 {@link Document}가 소유하고 조회 시 파생한다 ({@link
+ * com.ymc.paper.service.PaperDocumentViews}) — 엔티티에는 생성 불변식만 남는다.
  */
 @Getter
 @Entity
@@ -56,14 +53,6 @@ public class Paper {
     @Column(name = "file_key", nullable = false, updatable = false)
     private String fileKey;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 32)
-    private PaperStatus status;
-
-    /** 파싱 실패 코드. 해석하지 않고 저장만 한다 — 코드 목록은 AI 소유·미확정 (design D7). */
-    @Column(name = "error_code")
-    private String errorCode;
-
     /** 연결된 공유 Document. 업로드 검증 전에는 null이며 연결은 linkDocument CAS로만 한다. */
     @Column(name = "document_id")
     private UUID documentId;
@@ -84,7 +73,6 @@ public class Paper {
         this.ownerId = ownerId;
         this.filename = filename;
         this.fileKey = FILE_KEY_FORMAT.formatted(id);
-        this.status = PaperStatus.UPLOAD_PENDING;
         this.createdAt = now;
         this.updatedAt = now;
     }

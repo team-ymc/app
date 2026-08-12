@@ -34,10 +34,10 @@ public class PaperChatAccessValidator {
     @Transactional(readOnly = true)
     public void validateChatReady(UUID paperId, UUID ownerId) {
         Paper paper = getOwned(paperId, ownerId);
-        if (PaperDocumentViews.derivedStatus(paper, views.documentOf(paper).orElse(null))
-                != PaperStatus.COMPLETED) {
+        PaperStatus status = PaperDocumentViews.derivedStatus(paper, views.documentOf(paper).orElse(null));
+        if (status != PaperStatus.COMPLETED) {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
-                    "논문이 아직 학습 가능한 상태가 아닙니다: " + paper.getStatus());
+                    "논문이 아직 학습 가능한 상태가 아닙니다: " + status);
         }
     }
 

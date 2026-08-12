@@ -58,10 +58,10 @@ public class PaperDocumentViews {
                 .toList();
     }
 
-    /** Document 상태는 API PaperStatus와 이름 1:1이다. 연결 전에는 paper 상태 그대로. */
+    /** Document 상태는 API PaperStatus와 이름 1:1이다. 연결 전 = 업로드 대기. */
     static PaperStatus derivedStatus(Paper paper, Document document) {
         if (document == null) {
-            return paper.getStatus();
+            return PaperStatus.UPLOAD_PENDING;
         }
         return PaperStatus.valueOf(document.getStatus().name());
     }

@@ -26,14 +26,13 @@ class PaperTest {
     class Register {
 
         @Test
-        @DisplayName("새 논문은 UPLOAD_PENDING으로 시작하고 createdAt·updatedAt이 같다")
-        void startsAsUploadPending() {
+        @DisplayName("새 논문은 createdAt·updatedAt이 같다")
+        void startsWithMatchingTimestamps() {
             Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
 
-            assertThat(paper.getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
             assertThat(paper.getOwnerId()).isEqualTo(OWNER_ID);
             assertThat(paper.getFilename()).isEqualTo(FILENAME);
-            assertThat(paper.getErrorCode()).isNull();
+            assertThat(paper.getDocumentId()).isNull();
             assertThat(paper.getCreatedAt()).isEqualTo(NOW);
             assertThat(paper.getUpdatedAt()).isEqualTo(NOW);
         }

@@ -31,7 +31,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperRegistrationService;
 import com.ymc.paper.service.PaperUploadPolicy;
 import com.ymc.support.IntegrationTest;
@@ -69,9 +68,9 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
         // 신규 fileKey 형식 — uploads/{paperId}/original.pdf (BE 내부 형식, 계약 아님)
         assertThat(body.get("fileKey").asText()).isEqualTo("uploads/" + paperId + "/original.pdf");
 
-        // 레코드가 실제로 UPLOAD_PENDING으로 저장됐다
+        // 레코드가 실제로 저장됐다 — document 미연결이 파생 상태 UPLOAD_PENDING의 근거다
         Paper saved = paperRepository.findById(paperId).orElseThrow();
-        assertThat(saved.getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        assertThat(saved.getDocumentId()).isNull();
         assertThat(saved.getFilename()).isEqualTo(FILENAME);
         assertThat(saved.getOwnerId()).isEqualTo(TEST_USER_ID);
 
@@ -121,11 +120,11 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("업로드에 실패해 UPLOAD_PENDING으로 남은 레코드도 중복으로 걸린다 (MVP 재업로드 미지원)")
     void pendingRecordAlsoCountsAsDuplicate() throws Exception {
-        // 업로드하지 않아 UPLOAD_PENDING에 머무는 레코드
+        // 업로드하지 않아 document 미연결(파생 상태 UPLOAD_PENDING)로 머무는 레코드
         mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
         assertThat(paperRepository.findAll()).singleElement()
-                .extracting(Paper::getStatus)
-                .isEqualTo(PaperStatus.UPLOAD_PENDING);
+                .extracting(Paper::getDocumentId)
+                .isNull();
 
         mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
                 .andExpect(status().isConflict())
