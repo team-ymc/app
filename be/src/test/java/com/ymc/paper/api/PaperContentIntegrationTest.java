@@ -5,26 +5,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
+import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.service.PaperContentIngestService;
 import com.ymc.support.IntegrationTest;
 
 class PaperContentIntegrationTest extends IntegrationTest {
-
-    @Autowired
-    PaperContentIngestService ingestService;
 
     /** COMPLETED + 적재까지 끝난 논문. */
     private Paper givenIngestedPaper() {
         Paper paper = givenProcessingPaper("content.pdf");
         documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
-        ingestService.ingest(paper.getId(), givenPackageOnS3(paper.getId()));
+        documentContentIngestService.ingest(paper.getDocumentId(), givenPackageOnS3(paper.getId()));
         return reload(paper.getId());
     }
 
@@ -106,5 +103,23 @@ class PaperContentIntegrationTest extends IntegrationTest {
     void 인증_없으면_401() throws Exception {
         mockMvc.perform(get("/api/papers/{id}/content", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 같은_document에_연결된_두_paper는_같은_본문을_받는다() throws Exception {
+        Paper mine = givenPendingPaper("mine.pdf");
+        Document document = givenLinkedDocument(mine);
+        Paper theirs = paperRepository.save(Paper.register(OTHER_USER_ID, "theirs.pdf", Instant.now()));
+        tx.execute(s -> paperRepository.linkDocument(theirs.getId(), document.getId(), Instant.now()));
+        tx.execute(s -> documentRepository.markParsed(
+                document.getId(), DocumentStatus.COMPLETED, null, Instant.now()));
+
+        String manifestKey = givenPackageOnS3(document.getRequestPaperId());
+        documentContentIngestService.ingest(document.getId(), manifestKey);
+
+        mockMvc.perform(get("/api/papers/{id}/content", mine.getId()).with(userJwt()))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/papers/{id}/content", theirs.getId()).with(otherUserJwt()))
+                .andExpect(status().isOk());
     }
 }

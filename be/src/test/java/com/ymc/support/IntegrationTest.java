@@ -29,12 +29,13 @@ import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentContentAssetRepository;
+import com.ymc.paper.domain.DocumentContentBlockRepository;
+import com.ymc.paper.domain.DocumentContentRepository;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.domain.PaperContentAssetRepository;
-import com.ymc.paper.domain.PaperContentBlockRepository;
-import com.ymc.paper.domain.PaperContentRepository;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.service.DocumentContentIngestService;
 import com.ymc.paper.service.DocumentParsingStarter;
 import com.ymc.paper.service.DocumentTransitions;
 import com.ymc.paper.service.port.FileStorage;
@@ -96,13 +97,16 @@ public abstract class IntegrationTest {
     protected TransactionTemplate tx;
 
     @Autowired
-    protected PaperContentRepository paperContentRepository;
+    protected DocumentContentRepository documentContentRepository;
 
     @Autowired
-    protected PaperContentBlockRepository paperContentBlockRepository;
+    protected DocumentContentBlockRepository documentContentBlockRepository;
 
     @Autowired
-    protected PaperContentAssetRepository paperContentAssetRepository;
+    protected DocumentContentAssetRepository documentContentAssetRepository;
+
+    @Autowired
+    protected DocumentContentIngestService documentContentIngestService;
 
     @Autowired
     protected UserRepository userRepository;
@@ -153,9 +157,9 @@ public abstract class IntegrationTest {
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
-        paperContentBlockRepository.deleteAll();
-        paperContentAssetRepository.deleteAll();
-        paperContentRepository.deleteAll();
+        documentContentBlockRepository.deleteAll();
+        documentContentAssetRepository.deleteAll();
+        documentContentRepository.deleteAll();
         paperRepository.deleteAll();
         documentRepository.deleteAll();
         drain(parseRequestQueueUrl());

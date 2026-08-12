@@ -25,7 +25,7 @@ public class ParseResultService {
 
     private final DocumentTransitions transitions;
     private final DocumentRepository documentRepository;
-    private final PaperContentIngestService ingestService;
+    private final DocumentContentIngestService ingestService;
 
     public void apply(UUID requestPaperId, DocumentStatus terminal, String errorCode,
             String manifestKey) {
@@ -51,8 +51,8 @@ public class ParseResultService {
         boolean completed = transitioned || documentRepository.findById(documentId)
                 .map(d -> d.getStatus() == DocumentStatus.COMPLETED)
                 .orElse(false);
-        if (completed && !ingestService.isIngested(requestPaperId)) {
-            ingestService.ingest(requestPaperId, manifestKey);
+        if (completed && !ingestService.isIngested(documentId)) {
+            ingestService.ingest(documentId, manifestKey);
             log.info("본문 적재 완료: requestPaperId={}, documentId={}", requestPaperId, documentId);
         }
     }

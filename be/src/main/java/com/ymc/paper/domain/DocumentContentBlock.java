@@ -28,22 +28,22 @@ import lombok.Getter;
 @Getter
 @Entity
 @Table(
-        name = "paper_content_block",
+        name = "document_content_block",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_paper_content_block",
-                columnNames = {"paper_id", "block_id"}),
+                name = "uk_document_content_block",
+                columnNames = {"document_id", "block_id"}),
         indexes = @Index(
-                name = "ix_paper_content_block_order",
-                columnList = "paper_id, global_order"))
-public class PaperContentBlock {
+                name = "ix_document_content_block_order",
+                columnList = "document_id, global_order"))
+public class DocumentContentBlock {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "paper_id", nullable = false, updatable = false)
-    private UUID paperId;
+    @Column(name = "document_id", nullable = false, updatable = false)
+    private UUID documentId;
 
     /** 파서가 부여한 안정 블록 id (예: p0002-b0006). FE 선택 anchor·DOM id로 쓰인다. */
     @Column(name = "block_id", nullable = false, updatable = false)
@@ -66,13 +66,13 @@ public class PaperContentBlock {
     @Column(name = "content", nullable = false)
     private JsonNode content;
 
-    protected PaperContentBlock() {
+    protected DocumentContentBlock() {
         // JPA
     }
 
-    private PaperContentBlock(UUID paperId, String blockId, int globalOrder, String label,
+    private DocumentContentBlock(UUID documentId, String blockId, int globalOrder, String label,
             Integer headingLevel, List<String> sectionPath, JsonNode content) {
-        this.paperId = paperId;
+        this.documentId = documentId;
         this.blockId = blockId;
         this.globalOrder = globalOrder;
         this.label = label;
@@ -81,13 +81,13 @@ public class PaperContentBlock {
         this.content = content;
     }
 
-    public static PaperContentBlock of(UUID paperId, String blockId, int globalOrder, String label,
+    public static DocumentContentBlock of(UUID documentId, String blockId, int globalOrder, String label,
             Integer headingLevel, List<String> sectionPath, JsonNode content) {
-        Objects.requireNonNull(paperId, "paperId");
+        Objects.requireNonNull(documentId, "documentId");
         Objects.requireNonNull(blockId, "blockId");
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(sectionPath, "sectionPath");
         Objects.requireNonNull(content, "content");
-        return new PaperContentBlock(paperId, blockId, globalOrder, label, headingLevel, sectionPath, content);
+        return new DocumentContentBlock(documentId, blockId, globalOrder, label, headingLevel, sectionPath, content);
     }
 }

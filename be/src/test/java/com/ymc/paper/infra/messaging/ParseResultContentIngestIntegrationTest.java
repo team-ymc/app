@@ -9,14 +9,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.service.PaperContentIngestService;
+import com.ymc.paper.service.DocumentContentIngestService;
 import com.ymc.support.IntegrationTest;
 
 /** messaging.yml 0.2.0 wire 형식 기준. 전이·적재 결과는 연결된 Document에서 확인한다. */
 class ParseResultContentIngestIntegrationTest extends IntegrationTest {
 
     @Autowired
-    PaperContentIngestService ingestService;
+    DocumentContentIngestService ingestService;
 
     @Test
     void completed_메시지는_전이와_적재까지_수행한다() {
@@ -30,7 +30,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
 
         await().atMost(CONSUME_TIMEOUT).untilAsserted(() -> {
             assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.COMPLETED);
-            assertThat(ingestService.isIngested(paper.getId())).isTrue();
+            assertThat(ingestService.isIngested(documentOf(paper).getId())).isTrue();
         });
     }
 
@@ -45,7 +45,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
 
         // 폐기 = 정상 소비(ack)하되 아무것도 반영하지 않는다
         assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.PROCESSING);
-        assertThat(ingestService.isIngested(paper.getId())).isFalse();
+        assertThat(ingestService.isIngested(documentOf(paper).getId())).isFalse();
     }
 
     @Test
@@ -61,7 +61,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         awaitConsumed(parseResultQueueUrl());
 
         await().atMost(CONSUME_TIMEOUT).untilAsserted(
-                () -> assertThat(ingestService.isIngested(paper.getId())).isTrue());
+                () -> assertThat(ingestService.isIngested(documentOf(paper).getId())).isTrue());
     }
 
     @Test
@@ -75,7 +75,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
 
         assertThat(documentOf(paper).getStatus()).isEqualTo(DocumentStatus.FAILED);
         assertThat(documentOf(paper).getErrorCode()).isEqualTo("PARSE_RETRIES_EXHAUSTED");
-        assertThat(ingestService.isIngested(paper.getId())).isFalse();
+        assertThat(ingestService.isIngested(documentOf(paper).getId())).isFalse();
     }
 
     private Document documentOf(Paper paper) {

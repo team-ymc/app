@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
-public interface PaperContentRepository extends JpaRepository<PaperContent, UUID> {
+public interface DocumentContentRepository extends JpaRepository<DocumentContent, UUID> {
 
     @Modifying
-    @Query("delete from PaperContent c where c.paperId = :paperId")
-    void deleteByPaperId(UUID paperId);
+    @Query("delete from DocumentContent c where c.documentId = :documentId")
+    void deleteByDocumentId(UUID documentId);
 }

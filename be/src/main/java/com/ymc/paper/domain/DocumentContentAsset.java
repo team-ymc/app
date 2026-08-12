@@ -19,19 +19,19 @@ import lombok.Getter;
 @Getter
 @Entity
 @Table(
-        name = "paper_content_asset",
+        name = "document_content_asset",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_paper_content_asset",
-                columnNames = {"paper_id", "asset_key"}))
-public class PaperContentAsset {
+                name = "uk_document_content_asset",
+                columnNames = {"document_id", "asset_key"}))
+public class DocumentContentAsset {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "paper_id", nullable = false, updatable = false)
-    private UUID paperId;
+    @Column(name = "document_id", nullable = false, updatable = false)
+    private UUID documentId;
 
     /** 계약 assets 맵의 키 (예: image_0). 블록 content.assetKey가 이 값을 가리킨다. */
     @Column(name = "asset_key", nullable = false, updatable = false)
@@ -43,22 +43,22 @@ public class PaperContentAsset {
     @Column(name = "media_type", nullable = false)
     private String mediaType;
 
-    protected PaperContentAsset() {
+    protected DocumentContentAsset() {
         // JPA
     }
 
-    private PaperContentAsset(UUID paperId, String assetKey, String s3Key, String mediaType) {
-        this.paperId = paperId;
+    private DocumentContentAsset(UUID documentId, String assetKey, String s3Key, String mediaType) {
+        this.documentId = documentId;
         this.assetKey = assetKey;
         this.s3Key = s3Key;
         this.mediaType = mediaType;
     }
 
-    public static PaperContentAsset of(UUID paperId, String assetKey, String s3Key, String mediaType) {
-        Objects.requireNonNull(paperId, "paperId");
+    public static DocumentContentAsset of(UUID documentId, String assetKey, String s3Key, String mediaType) {
+        Objects.requireNonNull(documentId, "documentId");
         Objects.requireNonNull(assetKey, "assetKey");
         Objects.requireNonNull(s3Key, "s3Key");
         Objects.requireNonNull(mediaType, "mediaType");
-        return new PaperContentAsset(paperId, assetKey, s3Key, mediaType);
+        return new DocumentContentAsset(documentId, assetKey, s3Key, mediaType);
     }
 }
