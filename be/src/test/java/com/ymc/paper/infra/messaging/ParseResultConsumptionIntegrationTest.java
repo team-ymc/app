@@ -121,7 +121,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 """.formatted(unknownId, unknownId));
 
         awaitConsumed(parseResultQueueUrl());
-        assertThat(documentRepository.findByRequestPaperId(unknownId)).isEmpty();
+        assertThat(documentRepository.count()).isZero();
     }
 
     @Test

@@ -60,6 +60,8 @@ class PaperFlowE2ETest extends IntegrationTest {
         JsonNode request = objectMapper.readTree(requests.get(0).body());
         assertThat(request.get("paper_id").asText()).isEqualTo(paperId.toString());
         assertThat(request.get("file_key").asText()).isEqualTo(fileKey);
+        // additionalProperties: false 계약 — 필드가 딱 둘이어야 한다
+        assertThat(request.properties()).hasSize(2);
 
         // 워커가 파싱을 마치고 결과를 돌려준다
         String manifestKey = givenPackageOnS3(paperId);

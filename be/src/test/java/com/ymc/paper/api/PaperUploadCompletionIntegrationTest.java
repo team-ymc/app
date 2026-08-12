@@ -110,6 +110,35 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void 구제_발행_식별자는_재호출한_second가_아니라_최초_first의_paperId다() throws Exception {
+        Paper first = givenPendingPaper("rescue-first.pdf");
+        givenUploadedObject(first);
+        doThrow(new RuntimeException("SQS down")).doCallRealMethod()
+                .when(parseRequestPublisher).publish(any(), any());
+
+        assertThatThrownBy(() -> completionService.complete(first.getId(), TEST_USER_ID))
+                .isInstanceOf(RuntimeException.class);
+
+        Document document = documentRepository
+                .findById(reload(first.getId()).getDocumentId()).orElseThrow();
+        assertThat(document.getStatus()).isEqualTo(DocumentStatus.UPLOADED);   // 반납됨
+
+        // 같은 바이트를 다른 사용자가 다른 파일명으로 업로드 (second) — 구제 발행은 first를 대상으로 나가야 한다
+        Paper second = paperRepository.save(Paper.register(OTHER_USER_ID, "rescue-second.pdf", Instant.now()));
+        givenUploadedObject(second);
+
+        mockMvc.perform(post("/api/papers/{id}/complete", second.getId()).with(otherUserJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSING"));
+
+        verify(parseRequestPublisher, times(2)).publish(first.getId(), first.getFileKey());
+        verify(fileStorage).delete(second.getFileKey());
+        verify(fileStorage, never()).delete(first.getFileKey());
+        assertThat(reload(second.getId()).getDocumentId())
+                .isEqualTo(reload(first.getId()).getDocumentId());
+    }
+
+    @Test
     void 이미_연결된_paper의_재호출은_HEAD없이_현재_상태를_반환한다() throws Exception {
         Paper paper = givenProcessingPaper("idem.pdf");
         clearInvocations(fileStorage, parseRequestPublisher);
