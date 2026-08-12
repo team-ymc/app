@@ -22,6 +22,7 @@ create table paper (
     status      varchar(32)                 not null
         check (status in ('UPLOAD_PENDING', 'UPLOADED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED')),
     error_code  varchar(255),
+    document_id uuid,
     created_at  timestamp(6) with time zone not null,
     updated_at  timestamp(6) with time zone not null,
 

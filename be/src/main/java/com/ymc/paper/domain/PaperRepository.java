@@ -81,4 +81,20 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
             @Param("terminal") PaperStatus terminal,
             @Param("errorCode") String errorCode,
             @Param("now") Instant now);
+
+    /**
+     * 검증 완료된 Paper를 Document에 연결. document_id가 null일 때만 1 row다.
+     * updated_at을 함께 갱신한다 — 연결 순간이 이 Paper의 표시 상태가 바뀐 시각이고,
+     * bulk UPDATE는 JPA auditing을 우회하기 때문이다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.documentId = :documentId,
+                   p.updatedAt = :now
+             where p.id = :paperId
+               and p.documentId is null
+            """)
+    int linkDocument(@Param("paperId") UUID paperId, @Param("documentId") UUID documentId,
+            @Param("now") Instant now);
 }

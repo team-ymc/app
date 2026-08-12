@@ -64,6 +64,10 @@ public class Paper {
     @Column(name = "error_code")
     private String errorCode;
 
+    /** 연결된 공유 Document. 업로드 검증 전에는 null이며 연결은 linkDocument CAS로만 한다. */
+    @Column(name = "document_id")
+    private UUID documentId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

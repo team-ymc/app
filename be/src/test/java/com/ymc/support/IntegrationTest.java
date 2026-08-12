@@ -21,12 +21,14 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
+import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperContentAssetRepository;
 import com.ymc.paper.domain.PaperContentBlockRepository;
@@ -84,6 +86,12 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected PaperRepository paperRepository;
+
+    @Autowired
+    protected DocumentRepository documentRepository;
+
+    @Autowired
+    protected TransactionTemplate tx;
 
     @Autowired
     protected PaperContentRepository paperContentRepository;
@@ -144,6 +152,7 @@ public abstract class IntegrationTest {
         paperContentAssetRepository.deleteAll();
         paperContentRepository.deleteAll();
         paperRepository.deleteAll();
+        documentRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
     }
