@@ -50,7 +50,8 @@ public class PaperController {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         PaperCreated body = PaperCreated.from(
                 registrationService.register(
-                        ownerId, request.filename(), request.contentType(), request.size()));
+                        ownerId, request.filename(), request.contentType(), request.size(),
+                        request.checksumSha256()));
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 

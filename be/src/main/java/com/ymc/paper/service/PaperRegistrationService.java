@@ -1,6 +1,7 @@
 package com.ymc.paper.service;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class PaperRegistrationService {
      */
     @Transactional
     public PaperRegistrationResult register(
-            UUID ownerId, String filename, String contentType, long size) {
+            UUID ownerId, String filename, String contentType, long size, String checksumSha256) {
 
         // 1. PDF 타입 검사
         if (!PDF_CONTENT_TYPE.equals(contentType)) {
@@ -80,11 +81,13 @@ public class PaperRegistrationService {
 
         // S3는 외부 I/O가 발생하지만,
         // presign은 S3 호출이 아니라 로컬 서명 계산이라 트랜잭션 안에서 해도 외부 I/O가 없다.
-        PresignedUpload upload = fileStorage.presignUpload(paper.getFileKey(), contentType, size);
+        PresignedUpload upload = fileStorage.presignUpload(
+                paper.getFileKey(), contentType, size, checksumSha256);
 
         return new PaperRegistrationResult(
                 paper.getId(),
                 paper.getFileKey(),
+                Map.of("Content-Type", contentType, "x-amz-checksum-sha256", checksumSha256),
                 upload.url(),
                 upload.expiresAt(),
                 paper.getStatus(),

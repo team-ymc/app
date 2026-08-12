@@ -1,6 +1,7 @@
 package com.ymc.paper.service;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import com.ymc.paper.domain.PaperStatus;
@@ -9,6 +10,7 @@ import com.ymc.paper.domain.PaperStatus;
 public record PaperRegistrationResult(
         UUID paperId,
         String fileKey,
+        Map<String, String> uploadHeaders,
         String uploadUrl,
         Instant uploadExpiresAt,
         PaperStatus status,

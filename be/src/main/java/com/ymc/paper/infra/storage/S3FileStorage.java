@@ -38,7 +38,8 @@ public class S3FileStorage implements FileStorage {
     private final AwsProperties props;
 
     @Override
-    public PresignedUpload presignUpload(String fileKey, String contentType, long contentLength) {
+    public PresignedUpload presignUpload(
+            String fileKey, String contentType, long contentLength, String checksumSha256) {
         PresignedPutObjectRequest presigned = presigner.presignPutObject(
                 PutObjectPresignRequest.builder()
                         .signatureDuration(props.s3().presignExpiry())
@@ -47,6 +48,7 @@ public class S3FileStorage implements FileStorage {
                                 .key(fileKey)
                                 .contentType(contentType)
                                 .contentLength(contentLength)
+                                .checksumSHA256(checksumSha256)
                                 .build())
                         .build());
         return new PresignedUpload(presigned.url().toString(), presigned.expiration());

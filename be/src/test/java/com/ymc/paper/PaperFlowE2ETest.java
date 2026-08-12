@@ -48,7 +48,7 @@ class PaperFlowE2ETest extends IntegrationTest {
 
         assertStatus(paperId, PaperStatus.UPLOAD_PENDING);
 
-        uploadTo(created.get("uploadUrl").asText());
+        uploadTo(created);
 
         mockMvc.perform(post("/api/papers/{paperId}/complete", paperId).with(userJwt()))
                 .andExpect(status().isOk())
@@ -81,7 +81,7 @@ class PaperFlowE2ETest extends IntegrationTest {
         JsonNode created = createPaper("e2e-failure.pdf");
         UUID paperId = UUID.fromString(created.get("paperId").asText());
 
-        uploadTo(created.get("uploadUrl").asText());
+        uploadTo(created);
         mockMvc.perform(post("/api/papers/{paperId}/complete", paperId).with(userJwt()))
                 .andExpect(status().isOk());
 
@@ -100,17 +100,20 @@ class PaperFlowE2ETest extends IntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "filename", filename,
                                 "contentType", "application/pdf",
-                                "size", FAKE_PDF.length))))
+                                "size", FAKE_PDF.length,
+                                "checksumSha256", checksumOf(FAKE_PDF)))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(response);
     }
 
-    /** presigned URL로 S3에 직접 PUT — BE를 거치지 않는다. 바이트 수는 create에 신고한 값과 같아야 한다. */
-    private void uploadTo(String uploadUrl) throws Exception {
+    /** presigned URL로 S3에 직접 PUT — BE를 거치지 않는다. 바이트 수·checksum은 create에 신고한 값과 같아야 한다. */
+    private void uploadTo(JsonNode created) throws Exception {
         HttpResponse<Void> response = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create(uploadUrl))
+                HttpRequest.newBuilder(URI.create(created.get("uploadUrl").asText()))
                         .header("Content-Type", "application/pdf")
+                        .header("x-amz-checksum-sha256",
+                                created.get("uploadHeaders").get("x-amz-checksum-sha256").asText())
                         .PUT(HttpRequest.BodyPublishers.ofByteArray(FAKE_PDF))
                         .build(),
                 HttpResponse.BodyHandlers.discarding());

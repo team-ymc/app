@@ -173,6 +173,34 @@ public abstract class IntegrationTest {
         return reload(paper.getId());
     }
 
+    /** 등록·업로드 테스트가 공유하는 가짜 PDF 바이트. checksum·size가 이 값 기준으로 맞아야 S3가 받는다. */
+    protected static final byte[] TEST_PDF_BYTES =
+            "%PDF-1.4\n%fake pdf for test\n".getBytes(StandardCharsets.UTF_8);
+
+    /** 표준 Base64 SHA-256 (32 bytes → 44 chars). */
+    protected static String checksumOf(byte[] bytes) {
+        try {
+            return java.util.Base64.getEncoder().encodeToString(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** 형식만 유효한 무작위 checksum — 픽스처 간 unique 충돌 회피용. */
+    protected static String randomChecksum() {
+        byte[] bytes = new byte[32];
+        java.util.concurrent.ThreadLocalRandom.current().nextBytes(bytes);
+        return java.util.Base64.getEncoder().encodeToString(bytes);
+    }
+
+    /** TEST_PDF_BYTES와 정합인 등록 요청 본문. */
+    protected String createPaperJson(String filename) {
+        return """
+                {"filename":"%s","contentType":"application/pdf","size":%d,"checksumSha256":"%s"}"""
+                .formatted(filename, TEST_PDF_BYTES.length, checksumOf(TEST_PDF_BYTES));
+    }
+
     /** FE가 presigned URL로 업로드한 상황을 만든다 (여기선 서버 자격증명으로 바로 넣는다). */
     protected void givenUploadedObject(Paper paper) {
         s3.putObject(
