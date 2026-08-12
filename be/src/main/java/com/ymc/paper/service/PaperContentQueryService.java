@@ -33,6 +33,7 @@ public class PaperContentQueryService {
     private final PaperContentBlockRepository blockRepository;
     private final PaperContentAssetRepository assetRepository;
     private final AssetUrlCache assetUrlCache;
+    private final PaperDocumentViews views;
 
     /**
      * @throws ApiException PAPER_NOT_FOUND(404) — 논문 없음
@@ -46,7 +47,8 @@ public class PaperContentQueryService {
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
-        if (paper.getStatus() != PaperStatus.COMPLETED) {
+        if (PaperDocumentViews.derivedStatus(paper, views.documentOf(paper).orElse(null))
+                != PaperStatus.COMPLETED) {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
                     "논문이 아직 완료 상태가 아닙니다: " + paper.getStatus());
         }

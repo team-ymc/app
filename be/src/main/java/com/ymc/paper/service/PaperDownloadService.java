@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.domain.PaperStatus;
@@ -26,6 +27,7 @@ public class PaperDownloadService {
 
     private final PaperRepository paperRepository;
     private final FileStorage fileStorage;
+    private final PaperDocumentViews views;
 
     /**
      * @throws ApiException {@code PAPER_NOT_FOUND} — 존재하지 않는 paperId
@@ -42,6 +44,10 @@ public class PaperDownloadService {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
 
+        Document document = views.documentOf(paper).orElse(null);
+        if (document != null) {
+            return fileStorage.presignDownload(document.getFileKey(), paper.getFilename());
+        }
         PaperStatus status = paper.getStatus();
         if (status == PaperStatus.UPLOAD_PENDING || status == PaperStatus.EXPIRED) {
             throw new ApiException(

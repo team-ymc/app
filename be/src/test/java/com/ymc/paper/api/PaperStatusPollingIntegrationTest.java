@@ -14,6 +14,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.support.IntegrationTest;
@@ -91,5 +93,20 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{paperId}/status", "not-a-uuid").with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void document에_연결된_paper는_document_상태와_최신_updatedAt을_반환한다() throws Exception {
+        Paper paper = givenPendingPaper("derived.pdf");
+        UUID docId = UUID.randomUUID();
+        // COMPLETED document를 직접 구성 — 결과 재사용으로 UPLOAD_PENDING → COMPLETED 점프가 가능해야 한다
+        documentRepository.save(Document.create(
+                docId, randomChecksum(), paper.getFileKey(), paper.getId(), Instant.now()));
+        tx.execute(s -> documentRepository.markParsed(docId, DocumentStatus.COMPLETED, null, Instant.now()));
+        tx.execute(s -> paperRepository.linkDocument(paper.getId(), docId, Instant.now()));
+
+        mockMvc.perform(get("/api/papers/{id}/status", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 }
