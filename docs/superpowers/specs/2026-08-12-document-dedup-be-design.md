@@ -13,7 +13,9 @@
 동일한 PDF byte를 여러 사용자·파일명으로 등록해도:
 
 - 사용자별 `Paper`는 별도 유지. 검증된 파일, 대표 원본, 파싱 상태·오류·산출물은 `Document` 공유.
-- 같은 SHA-256의 PDF는 기본 파싱을 한 번만 실행.
+- 같은 SHA-256의 PDF는 기본 파싱을 정상 경로에서 한 번만 실행. at-least-once 전달과 발행
+  타임아웃 모호성에 의한 드문 중복 실행은 전제로 수용하고(§4 수용 갭 ②, ADR-002 §5),
+  결과·산출물이 중복 저장되지 않는 것은 소비 멱등성이 보장.
 - 외부 API·인가는 `paperId` 유지. `documentId`·checksum·공유 S3 key는 응답에 노출하지 않는다
   (응답 스키마를 바꾸지 않으므로 구조적으로 보장).
 - BE↔AI 메시지는 기존 `paper_id`·`file_key` 유지.
@@ -96,7 +98,11 @@ LocalStack `S3_SKIP_SIGNATURE_VALIDATION=0` 통합 테스트로 확인한다(§9
            0 row = 동시 생성 패배)으로 한다 — unique 위반 예외에 의존하면 PostgreSQL이
            트랜잭션을 abort시켜 같은 Tx에서 "있음" 경로로 전환할 수 없다. 0 row면 재조회해
            "있음" 경로로 전환.
-   - 있음: paper CAS 연결 (UPDATE paper SET document_id=? WHERE id=? AND document_id IS NULL)
+   - 있음: paper CAS 연결
+           (UPDATE paper SET document_id=?, updated_at=? WHERE id=? AND document_id IS NULL)
+           @Modifying 쿼리는 JPA auditing을 우회하므로 updated_at을 명시한다 — 이게 없으면
+           기존 COMPLETED Document에 연결될 때 updatedAt 파생 규칙(§2)이 연결 이전 시각을
+           반환한다. Document CAS들도 기존 Paper CAS 관용구대로 updated_at을 함께 갱신한다.
            0 row = 같은 Paper의 동시 complete가 먼저 연결함 → 발행 규칙 후 파생 상태 반환
 5. [커밋 후] paper.file_key != document.file_key 인 경우에만 이번 업로드 객체 삭제.
    같으면 이 객체가 대표 원본이므로 절대 삭제하지 않는다(같은 Paper 동시 complete에서 패자가
