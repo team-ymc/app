@@ -6,18 +6,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ymc.support.IntegrationTest;
 
 class DocumentPersistenceIntegrationTest extends IntegrationTest {
-
-    @Autowired
-    DocumentRepository documentRepository;
-
-    @Autowired
-    TransactionTemplate tx;
 
     private UUID insert(String checksum, UUID requestPaperId) {
         UUID id = UUID.randomUUID();
@@ -53,11 +45,21 @@ class DocumentPersistenceIntegrationTest extends IntegrationTest {
 
     @Test
     void 결과_전이는_UPLOADED에서도_PROCESSING에서도_1row고_중복은_0row다() {
+        // UPLOADED 경로 검증
         UUID uploadedDoc = insert(randomChecksum(), UUID.randomUUID());
         assertThat(tx.<Integer>execute(s -> documentRepository.markParsed(
                 uploadedDoc, DocumentStatus.COMPLETED, null, Instant.now()))).isEqualTo(1);
         assertThat(tx.<Integer>execute(s -> documentRepository.markParsed(
                 uploadedDoc, DocumentStatus.FAILED, "X", Instant.now()))).isEqualTo(0);
+
+        // PROCESSING 경로 검증
+        UUID processingDoc = insert(randomChecksum(), UUID.randomUUID());
+        assertThat(tx.<Integer>execute(s -> documentRepository.markProcessing(processingDoc, Instant.now())))
+                .isEqualTo(1);
+        assertThat(tx.<Integer>execute(s -> documentRepository.markParsed(
+                processingDoc, DocumentStatus.FAILED, "PARSE_RETRIES_EXHAUSTED", Instant.now()))).isEqualTo(1);
+        assertThat(tx.<Integer>execute(s -> documentRepository.markParsed(
+                processingDoc, DocumentStatus.COMPLETED, null, Instant.now()))).isEqualTo(0);
     }
 
     @Test
