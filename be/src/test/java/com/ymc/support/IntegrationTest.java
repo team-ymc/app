@@ -201,8 +201,20 @@ public abstract class IntegrationTest {
                 .formatted(filename, TEST_PDF_BYTES.length, checksumOf(TEST_PDF_BYTES));
     }
 
-    /** FE가 presigned URL로 업로드한 상황을 만든다 (여기선 서버 자격증명으로 바로 넣는다). */
+    /** FE가 checksum 서명 presigned URL로 업로드한 상황 (서버 자격증명으로 대신 넣는다). */
     protected void givenUploadedObject(Paper paper) {
+        s3.putObject(
+                PutObjectRequest.builder()
+                        .bucket(awsProperties.s3().bucket())
+                        .key(paper.getFileKey())
+                        .contentType("application/pdf")
+                        .checksumSHA256(checksumOf(TEST_PDF_BYTES))
+                        .build(),
+                RequestBody.fromBytes(TEST_PDF_BYTES));
+    }
+
+    /** checksum 없이 올라간 객체 — UPLOAD_CHECKSUM_MISSING 재현용. */
+    protected void givenUploadedObjectWithoutChecksum(Paper paper) {
         s3.putObject(
                 PutObjectRequest.builder()
                         .bucket(awsProperties.s3().bucket())

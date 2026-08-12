@@ -47,6 +47,7 @@ public class PaperUploadCompletionService {
      * @throws ApiException {@code FORBIDDEN} — 소유자가 아님
      * @throws ApiException {@code UPLOAD_NOT_FOUND} — S3에 객체가 없음. 상태는 UPLOAD_PENDING 유지
      * @throws ApiException {@code FILE_TOO_LARGE} — 실제 객체가 제한을 초과함. 객체는 삭제하고 상태는 유지
+     * @throws ApiException {@code UPLOAD_CHECKSUM_MISSING} — S3가 검증한 checksum이 없음. 상태는 UPLOAD_PENDING 유지
      */
     public PaperStatusView complete(UUID paperId, UUID ownerId) {
         Paper paper = find(paperId);
@@ -73,6 +74,11 @@ public class PaperUploadCompletionService {
                     paperId, uploadedObject.contentLength(), uploadPolicy.maxFileBytes());
             fileStorage.delete(paper.getFileKey());
             throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
+        }
+
+        if (uploadedObject.checksumSha256() == null || uploadedObject.checksumSha256().isBlank()) {
+            throw new ApiException(ErrorCode.UPLOAD_CHECKSUM_MISSING,
+                    "업로드 객체에 검증된 checksum이 없습니다. 같은 파일을 다시 업로드한 뒤 재시도해 주세요.");
         }
 
         // (1) CAS 커밋 — 동시 complete 중 한 건만 주인이 된다

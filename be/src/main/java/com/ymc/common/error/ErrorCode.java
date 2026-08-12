@@ -28,6 +28,9 @@ public enum ErrorCode {
     /** S3에 객체가 없음 (complete) */
     UPLOAD_NOT_FOUND(HttpStatus.CONFLICT),
 
+    /** 객체에 S3가 검증한 SHA-256 checksum이 없음 (complete) */
+    UPLOAD_CHECKSUM_MISSING(HttpStatus.CONFLICT),
+
     /** access token 없음·만료 (FT-001) */
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
 

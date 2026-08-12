@@ -174,11 +174,24 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void S3_검증_checksum이_없으면_409_UPLOAD_CHECKSUM_MISSING_상태유지_발행없음() throws Exception {
+        Paper paper = givenPendingPaper("no-checksum.pdf");
+        givenUploadedObjectWithoutChecksum(paper);
+
+        mockMvc.perform(post("/api/papers/{id}/complete", paper.getId()).with(userJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("UPLOAD_CHECKSUM_MISSING"));
+
+        assertThat(reload(paper.getId()).getStatus()).isEqualTo(PaperStatus.UPLOAD_PENDING);
+        verify(parseRequestPublisher, never()).publish(any(), any());
+    }
+
+    @Test
     @DisplayName("실제 객체가 50 MiB를 넘으면 삭제하고 413 FILE_TOO_LARGE — 파싱 요청은 발행하지 않는다")
     void rejectsAndDeletesOversizedObject() throws Exception {
         Paper paper = givenPendingPaper(FILENAME);
         UploadedObjectMetadata oversized =
-                new UploadedObjectMetadata(uploadPolicy.maxFileBytes() + 1);
+                new UploadedObjectMetadata(uploadPolicy.maxFileBytes() + 1, checksumOf(TEST_PDF_BYTES));
         doReturn(Optional.of(oversized)).when(fileStorage).head(paper.getFileKey());
         doNothing().when(fileStorage).delete(paper.getFileKey());
 
