@@ -10,13 +10,16 @@ function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; statu
 describe('api.js — fetch 계열', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('createPaper: POST /api/papers에 filename·contentType·size를 JSON으로 보낸다', async () => {
+  it('createPaper: POST /api/papers에 filename·contentType·size·checksumSha256을 JSON으로 보낸다', async () => {
     mockFetch({ body: { paperId: 'p1', uploadUrl: 'https://s3/put' } });
-    const res = await createPaper('a.pdf', 'application/pdf', 1234);
+    const res = await createPaper('a.pdf', 'application/pdf', 1234, 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers', expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: 'a.pdf', contentType: 'application/pdf', size: 1234 }),
+      body: JSON.stringify({
+        filename: 'a.pdf', contentType: 'application/pdf', size: 1234,
+        checksumSha256: 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=',
+      }),
     }));
     expect(res.paperId).toBe('p1');
   });
@@ -63,14 +66,19 @@ describe('api.js — fetch 계열', () => {
 
   it('실패 응답: code·httpStatus를 실은 Error를 던진다', async () => {
     mockFetch({ ok: false, status: 409, body: { code: 'DUPLICATE_FILENAME', message: '중복' } });
-    await expect(createPaper('a.pdf', 'application/pdf', 1234)).rejects.toMatchObject({
+    await expect(createPaper('a.pdf', 'application/pdf', 1234, 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=')).rejects.toMatchObject({
       code: 'DUPLICATE_FILENAME', httpStatus: 409, message: '중복',
     });
   });
 });
 
 describe('api.js — uploadToS3 (XHR)', () => {
-  it('PUT + Content-Type application/pdf 명시, 2xx에 resolve (D6)', async () => {
+  const UPLOAD_HEADERS = {
+    'Content-Type': 'application/pdf',
+    'x-amz-checksum-sha256': 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=',
+  } as const;
+
+  function stubXhr(finish: (xhr: { status: number; responseText: string }) => void) {
     const headers: Record<string, string> = {};
     let onload: () => void;
     const xhr = {
@@ -78,16 +86,40 @@ describe('api.js — uploadToS3 (XHR)', () => {
       setRequestHeader: (k: string, v: string) => { headers[k] = v; },
       upload: {},
       status: 0,
-      send: vi.fn(function () { xhr.status = 204; onload(); }),
+      responseText: '',
+      send: vi.fn(function () { finish(xhr); onload(); }),
       set onload(fn: () => void) { onload = fn; },
       set onerror(_fn: () => void) { /* noop */ },
     };
     vi.stubGlobal('XMLHttpRequest', vi.fn(() => xhr));
+    return { xhr, headers };
+  }
 
-    await uploadToS3('https://s3/put', new Blob(['x']));
+  it('PUT + uploadHeaders 맵 전체를 헤더로 전송, 2xx에 resolve (D6)', async () => {
+    const { xhr, headers } = stubXhr((x) => { x.status = 204; });
+
+    await uploadToS3('https://s3/put', new Blob(['x']), UPLOAD_HEADERS);
 
     expect(xhr.open).toHaveBeenCalledWith('PUT', 'https://s3/put');
     expect(headers['Content-Type']).toBe('application/pdf');
+    expect(headers['x-amz-checksum-sha256']).toBe(UPLOAD_HEADERS['x-amz-checksum-sha256']);
     expect(xhr.send).toHaveBeenCalled();
+  });
+
+  it('400 + BadDigest 응답은 checksum 검증 실패 문구의 Error로 reject한다', async () => {
+    stubXhr((x) => {
+      x.status = 400;
+      x.responseText = '<Error><Code>BadDigest</Code></Error>';
+    });
+
+    await expect(uploadToS3('https://s3/put', new Blob(['x']), UPLOAD_HEADERS))
+      .rejects.toThrow('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다');
+  });
+
+  it('그 외 실패는 상태코드를 실은 일반 Error로 reject한다', async () => {
+    stubXhr((x) => { x.status = 403; });
+
+    await expect(uploadToS3('https://s3/put', new Blob(['x']), UPLOAD_HEADERS))
+      .rejects.toThrow('S3 업로드 실패: 403');
   });
 });

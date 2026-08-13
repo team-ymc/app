@@ -2,32 +2,45 @@
 // BE 호출은 authFetch(자동 Bearer + 401 재시도)를 쓴다. S3 presigned PUT은 예외 — 서명 URL이 인가다.
 
 import { authFetch } from './auth';
-import { ApiError, type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse } from './types';
+import {
+  ApiError,
+  type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse,
+  type PaperUploadHeaders,
+} from './types';
 
 // size는 presigned PUT 서명에 박히는 정확한 바이트 수다 — 업로드가 이 값과 다르면 S3가 403으로 거절한다.
-export async function createPaper(filename: string, contentType: string, size: number): Promise<CreatePaperResponse> {
+// checksumSha256도 서명에 들어간다 — 실제 바이트의 digest와 다르면 S3가 400 BadDigest로 거절한다.
+export async function createPaper(
+  filename: string, contentType: string, size: number, checksumSha256: string,
+): Promise<CreatePaperResponse> {
   const res = await authFetch('/api/papers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename, contentType, size }),
+    body: JSON.stringify({ filename, contentType, size, checksumSha256 }),
   });
   if (!res.ok) throw await apiError(res);
-  return res.json(); // { paperId, fileKey, uploadUrl, uploadExpiresAt, status, createdAt }
+  return res.json(); // { paperId, fileKey, uploadUrl, uploadHeaders, uploadExpiresAt, status, createdAt }
 }
 
-// presigned PUT. Content-Type과 바이트 수가 서명값과 정확히 일치해야 한다 (DESIGN.md D6).
-export function uploadToS3(uploadUrl: string, file: Blob, onProgress?: (pct: number) => void): Promise<void> {
+// presigned PUT. headers(create 응답의 uploadHeaders)와 바이트 수가 서명값과 정확히 일치해야 한다.
+export function uploadToS3(
+  uploadUrl: string, file: Blob, headers: PaperUploadHeaders, onProgress?: (pct: number) => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Type', 'application/pdf');
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`S3 업로드 실패: ${xhr.status}`));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      // S3는 checksum 불일치를 400 + <Code>BadDigest</Code> XML로 거절한다
+      if (xhr.status === 400 && xhr.responseText.includes('BadDigest')) {
+        return reject(new Error('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다'));
+      }
+      reject(new Error(`S3 업로드 실패: ${xhr.status}`));
+    };
     xhr.onerror = () => reject(new Error('S3 업로드 네트워크 오류'));
     xhr.send(file);
   });
