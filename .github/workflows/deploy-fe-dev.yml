@@ -1,0 +1,41 @@
+name: Deploy FE (dev)
+
+on:
+  push:
+    branches: [main]
+    paths: ['fe/**']
+  workflow_dispatch:  # 현재 main 재배포용
+
+permissions:
+  id-token: write     # Github에게 OIDC 토큰 발급 요청 - AWS Role Assume
+  contents: read
+
+# 동시 배포 1개
+concurrency:
+  group: deploy-fe-dev
+  cancel-in-progress: false # 진행 중 배포는 취소하지 않고 대기
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fe/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: aws-actions/configure-aws-credentials@v4  # OIDC to AWS STS => 임시 자격 get
+        with:
+          role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: aws s3 sync dist/ "s3://${{ vars.DEV_FE_BUCKET }}" --delete  # build 산출물 버킷과 동기화
+      - run: >  # CDN 캐시 무효화
+          aws cloudfront create-invalidation
+          --distribution-id "${{ vars.DEV_CF_DISTRIBUTION_ID }}"
+          --paths "/*"
