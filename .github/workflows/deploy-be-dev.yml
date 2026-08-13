@@ -22,15 +22,15 @@ jobs:
       run:
         working-directory: be
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
       # 머지 후 main은 PR 시점과 다를 수 있어 배포되는 커밋을 재검증한다.
       - run: ./gradlew test
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
