@@ -22,15 +22,15 @@ jobs:
       run:
         working-directory: fe
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: fe/package-lock.json
       - run: npm ci
       - run: npm run build
-      - uses: aws-actions/configure-aws-credentials@v4  # OIDC to AWS STS => 임시 자격 get
+      - uses: aws-actions/configure-aws-credentials@v6  # OIDC to AWS STS => 임시 자격 get
         with:
           role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}

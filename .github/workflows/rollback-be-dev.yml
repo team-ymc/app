@@ -1,0 +1,59 @@
+name: Rollback BE (dev)
+
+# 정상 기동하지만 기능이 잘못된 버전을 사람이 판단해 되돌리는 워크플로.
+# 기동 실패는 ECS Circuit Breaker가 자동 처리하므로 여기 대상이 아니다.
+on:
+  workflow_dispatch:  # only wf dispatch
+    inputs:
+      task_definition:
+        description: '롤백 대상 (family:revision, 예: papertutor-dev-backend:XX)'
+        required: true
+
+permissions:
+  id-token: write # OIDC 토큰 발급
+  contents: read
+
+# 배포 워크플로와 같은 그룹
+concurrency:
+  group: deploy-be-dev
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      # 대상 revision 조회가 실패하면 중단
+      - name: Show current and target
+        run: |
+          echo "current:"
+          aws ecs describe-services \
+            --cluster "${{ vars.DEV_ECS_CLUSTER }}" \
+            --services "${{ vars.DEV_BE_SERVICE }}" \
+            --query 'services[0].taskDefinition' --output text
+          echo "target: ${{ inputs.task_definition }}"
+          echo "target image:"
+          aws ecs describe-task-definition \
+            --task-definition "${{ inputs.task_definition }}" \
+            --query 'taskDefinition.containerDefinitions[0].image' --output text
+      - name: Update service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ vars.DEV_ECS_CLUSTER }}" \
+            --service "${{ vars.DEV_BE_SERVICE }}" \
+            --task-definition "${{ inputs.task_definition }}" > /dev/null
+      - name: Wait for stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ vars.DEV_ECS_CLUSTER }}" \
+            --services "${{ vars.DEV_BE_SERVICE }}"
+      - name: Show result
+        run: |
+          aws ecs describe-services \
+            --cluster "${{ vars.DEV_ECS_CLUSTER }}" \
+            --services "${{ vars.DEV_BE_SERVICE }}" \
+            --query 'services[0].{taskDefinition:taskDefinition,rollout:deployments[0].rolloutState}' \
+            --output json

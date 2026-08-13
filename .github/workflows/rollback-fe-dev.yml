@@ -1,0 +1,46 @@
+name: Rollback FE (dev)
+
+# 이전 commit을 다시 빌드해 재배포한다. 당시 빌드와 비트 단위 동일성은 보장하지 못하는
+# dev용 절충안 — PROD 준비 시 SHA별 artifact 보관 방식으로 교체 예정.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: '재배포할 APP commit SHA'
+        required: true
+
+permissions:
+  id-token: write # OIDC 토큰 발급
+  contents: read
+
+# 배포 워크플로와 같은 그룹 — 롤백과 배포가 동시에 돌지 않게 한다.
+concurrency:
+  group: deploy-fe-dev
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fe/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: aws s3 sync dist/ "s3://${{ vars.DEV_FE_BUCKET }}" --delete
+      - run: >
+          aws cloudfront create-invalidation
+          --distribution-id "${{ vars.DEV_CF_DISTRIBUTION_ID }}"
+          --paths "/*"
