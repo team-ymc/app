@@ -31,22 +31,20 @@ BE(app#41, main 머지됨)는 `checksumSha256` 없는 create를 400으로 거절
 
 - `uploadToS3(uploadUrl, file, headers, onProgress?)` — Content-Type 하드코딩을 제거하고
   `headers` 맵 전체를 `setRequestHeader`로 전송. 계약이 헤더를 추가해도 FE 무수정.
-- `uploadToS3`는 status 400이면서 응답 body에 `BadDigest`가 있으면
-  `ChecksumMismatchError`(신규, `types.ts`)를 던진다. 다이얼로그는 `instanceof`로 분기 —
-  BE 에러용 `ApiError`와 섞지 않는다(출처가 S3).
+- `uploadToS3`는 status 400이면서 응답 body에 `BadDigest`가 있으면 UI 문구를 실은
+  `Error`를 던진다: "파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다".
+  전용 에러 클래스는 두지 않는다 — 다이얼로그는 분기 없이 message를 그대로 표시한다.
 
 ### `fe/src/routes/bookshelf/UploadDialog.tsx`
 
-phase는 3단계 그대로 두고 `checksum: string | null` state를 추가한다.
+phase·state는 그대로 두고 해시를 `startUpload` 안에서 계산한다 — **추가 state 없음**.
 
-- 파일 선택 시 즉시 해시 시작. 완료 전(`checksum === null`)엔 **업로드 버튼과 파일
-  제거(X) 버튼을 모두 비활성화**하고 파일 카드 보조 라벨을 "파일 검사 중…"으로 표시.
-  해시 중 파일 교체가 불가능하므로 stale 결과 경합(늦게 도착한 해시가 다른 파일에
-  붙는 문제)이 성립하지 않는다 — 세대 토큰·파일 비교 가드 불필요. 잠금 시간은 통상
-  0.5초 미만.
-- 해시 실패(비정상 브라우저 등)는 에러 표시 후 idle 복귀.
-- `startUpload`는 checksum이 준비된 뒤에만 진행하고, S3 PUT에는
-  `created.uploadHeaders`를 그대로 넘긴다.
+- 업로드 클릭 → 'uploading' 전환 → `sha256Base64(selectedFile)` → `createPaper(…, checksum)`
+  → `uploadToS3(…, created.uploadHeaders, …)`. 다이얼로그 수정은 이 함수 한 곳이다.
+- 계산 ~0.5초는 기존 "업로드 중… 0%" 표시가 덮고, uploading phase가 이미 모든
+  상호작용을 잠근다. 선택~사용 사이 비동기 틈이 없으므로 stale 해시 경합이 성립하지
+  않는다 — 잠금·라벨·세대 토큰 전부 불필요.
+- 해시 실패(비정상 브라우저 등)는 기존 catch가 에러 표시 + file-selected 복귀로 처리.
 
 ## 에러 처리
 
@@ -75,8 +73,9 @@ phase는 3단계 그대로 두고 `checksum: string | null` state를 추가한�
   불가. jsdom `Blob`엔 `arrayBuffer()`가 없으므로(실측 2026-08-13) 테스트 셋업에서
   `Blob.prototype.arrayBuffer`를 shim한다. `crypto.subtle`은 Node webcrypto로 존재.
 - `papers.test.ts` — create body의 `checksumSha256`, `uploadToS3`의 헤더 전송·
-  400 BadDigest → `ChecksumMismatchError` 식별 단언.
-- `UploadDialog` — 해시 완료 전 업로드·제거 버튼 비활성화, BadDigest 에러 문구 분기.
+  400 BadDigest → UI 문구 Error 단언.
+- `UploadDialog` — checksum·uploadHeaders 배선(create·PUT에 올바른 값 전달),
+  BadDigest 에러 문구 표시. 2건.
 
 ## 검증
 

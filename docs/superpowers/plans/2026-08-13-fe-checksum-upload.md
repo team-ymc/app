@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 업로드 전 SHA-256을 계산해 create 요청과 presigned PUT 헤더에 싣는다 (계약 0.3.0).
+**Goal:** 업로드 시작 시 SHA-256을 계산해 create 요청과 presigned PUT 헤더에 싣는다 (계약 0.3.0).
 
-**Architecture:** 해시 헬퍼 1개 → API 층(create 4번째 필드, uploadHeaders 전송, BadDigest 식별) → 다이얼로그(해시 중 잠금, 에러 표시). 스펙: `docs/superpowers/specs/2026-08-13-fe-checksum-upload-design.md`.
+**Architecture:** 해시 헬퍼 1개 → API 층(create 4번째 필드, uploadHeaders 전송, BadDigest 식별) → 다이얼로그(`startUpload` 한 곳만 수정, 추가 state 없음). 스펙: `docs/superpowers/specs/2026-08-13-fe-checksum-upload-design.md`.
 
 **Tech Stack:** React 19 + TypeScript, Vitest(jsdom) + @testing-library/react (jest-dom 없음 — `hasAttribute`/`toBeTruthy`로 단언), Web Crypto API.
 
@@ -12,8 +12,8 @@
 
 - 커밋 메시지: `[YMC-282] type(fe): subject` 한 줄. Co-Authored-By 등 attribution 금지.
 - 코드 주석은 제약 설명 1~2줄만. 티켓·스펙 인용 괄호 금지.
-- % 진행률·워커·스트리밍 해시 금지 — 단발 `crypto.subtle.digest`만.
-- UI 문구는 아래 값 그대로: `파일 검사 중…` / `파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다`
+- % 진행률·워커·스트리밍 해시·추가 다이얼로그 state 금지 — 단발 `crypto.subtle.digest`만.
+- BadDigest 에러 문구는 이 값 그대로: `파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다`
 - 작업 디렉터리: `fe/` (모든 npm 명령은 `app/fe`에서).
 
 ---
@@ -86,16 +86,15 @@ git commit -m "[YMC-282] feat(fe): SHA-256 파일 checksum 헬퍼 추가"
 ### Task 2: API 층 — checksum 전달·uploadHeaders 전송·BadDigest 식별
 
 **Files:**
-- Modify: `fe/src/api/types.ts` (CreatePaperResponse, 신규 타입·에러)
+- Modify: `fe/src/api/types.ts` (CreatePaperResponse, PaperUploadHeaders)
 - Modify: `fe/src/api/papers.ts:8-34` (createPaper, uploadToS3)
 - Test: `fe/src/api/papers.test.ts`
 
 **Interfaces:**
 - Produces:
   - `type PaperUploadHeaders = { 'Content-Type': 'application/pdf'; 'x-amz-checksum-sha256': string } & Record<string, string>`
-  - `class ChecksumMismatchError extends Error` — message가 곧 UI 문구.
   - `createPaper(filename: string, contentType: string, size: number, checksumSha256: string): Promise<CreatePaperResponse>` — 응답에 `uploadHeaders: PaperUploadHeaders` 포함.
-  - `uploadToS3(uploadUrl: string, file: Blob, headers: PaperUploadHeaders, onProgress?: (pct: number) => void): Promise<void>`
+  - `uploadToS3(uploadUrl: string, file: Blob, headers: PaperUploadHeaders, onProgress?: (pct: number) => void): Promise<void>` — 400 BadDigest면 UI 문구를 실은 `Error`로 reject.
 
 - [ ] **Step 1: 기존 테스트 수정 + 신규 테스트 작성 (실패 상태로)**
 
@@ -162,14 +161,14 @@ describe('api.js — uploadToS3 (XHR)', () => {
     expect(xhr.send).toHaveBeenCalled();
   });
 
-  it('400 + BadDigest 응답은 ChecksumMismatchError로 reject한다', async () => {
+  it('400 + BadDigest 응답은 checksum 검증 실패 문구의 Error로 reject한다', async () => {
     stubXhr((x) => {
       x.status = 400;
       x.responseText = '<Error><Code>BadDigest</Code></Error>';
     });
 
     await expect(uploadToS3('https://s3/put', new Blob(['x']), UPLOAD_HEADERS))
-      .rejects.toBeInstanceOf(ChecksumMismatchError);
+      .rejects.toThrow('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다');
   });
 
   it('그 외 실패는 상태코드를 실은 일반 Error로 reject한다', async () => {
@@ -181,20 +180,14 @@ describe('api.js — uploadToS3 (XHR)', () => {
 });
 ```
 
-import에 `ChecksumMismatchError` 추가:
-
-```ts
-import { ChecksumMismatchError } from './types';
-```
-
 - [ ] **Step 2: 실패 확인**
 
 Run: `npm run test -- src/api/papers.test.ts`
-Expected: FAIL — `ChecksumMismatchError` export 없음 / 인자 불일치.
+Expected: FAIL — 인자·헤더 시그니처 불일치.
 
 - [ ] **Step 3: types.ts 구현**
 
-`fe/src/api/types.ts`의 `CreatePaperResponse`를 교체하고 아래 타입·에러를 추가:
+`fe/src/api/types.ts`의 `CreatePaperResponse`를 교체하고 타입을 추가:
 
 ```ts
 // 계약 PaperUploadHeaders: 필수 2키 + 향후 서명 헤더 추가 허용. FE는 맵 전체를 그대로 PUT에 싣는다.
@@ -212,14 +205,6 @@ export interface CreatePaperResponse {
   status: PaperStatus;
   createdAt: string;
 }
-
-// S3가 실제 바이트와 checksum 불일치(BadDigest)로 PUT을 거절한 경우. BE 에러(ApiError)와 출처가 다르다.
-export class ChecksumMismatchError extends Error {
-  constructor() {
-    super('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다');
-    this.name = 'ChecksumMismatchError';
-  }
-}
 ```
 
 - [ ] **Step 4: papers.ts 구현**
@@ -229,7 +214,7 @@ export class ChecksumMismatchError extends Error {
 ```ts
 import { authFetch } from './auth';
 import {
-  ApiError, ChecksumMismatchError,
+  ApiError,
   type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse,
   type PaperUploadHeaders,
 } from './types';
@@ -263,7 +248,7 @@ export function uploadToS3(
       if (xhr.status >= 200 && xhr.status < 300) return resolve();
       // S3는 checksum 불일치를 400 + <Code>BadDigest</Code> XML로 거절한다
       if (xhr.status === 400 && xhr.responseText.includes('BadDigest')) {
-        return reject(new ChecksumMismatchError());
+        return reject(new Error('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다'));
       }
       reject(new Error(`S3 업로드 실패: ${xhr.status}`));
     };
@@ -289,14 +274,14 @@ git commit -m "[YMC-282] feat(fe): create에 checksumSha256 전달, presigned PU
 
 ---
 
-### Task 3: UploadDialog — 해시 계산·잠금·에러 표시
+### Task 3: UploadDialog — startUpload에서 해시 계산
 
 **Files:**
-- Modify: `fe/src/routes/bookshelf/UploadDialog.tsx`
+- Modify: `fe/src/routes/bookshelf/UploadDialog.tsx:103-119` (startUpload만)
 - Test: `fe/src/routes/bookshelf/UploadDialog.test.tsx` (신규)
 
 **Interfaces:**
-- Consumes: Task 1 `sha256Base64`, Task 2 `createPaper`(4인자)·`uploadToS3`(headers)·`ChecksumMismatchError`.
+- Consumes: Task 1 `sha256Base64`, Task 2 `createPaper`(4인자)·`uploadToS3`(headers).
 
 - [ ] **Step 1: 실패하는 컴포넌트 테스트 작성**
 
@@ -306,7 +291,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UploadDialog from './UploadDialog';
-import { ChecksumMismatchError } from '../../api/types';
 import { sha256Base64 } from './fileChecksum';
 import { createPaper, uploadToS3 } from '../../api/papers';
 
@@ -316,6 +300,11 @@ vi.mock('../../api/papers', () => ({
 }));
 
 const HASH = 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=';
+const CREATED = {
+  paperId: 'p1', fileKey: 'k', uploadUrl: 'https://s3/put',
+  uploadHeaders: { 'Content-Type': 'application/pdf' as const, 'x-amz-checksum-sha256': HASH },
+  uploadExpiresAt: '', status: 'UPLOAD_PENDING' as const, createdAt: '',
+};
 
 function renderDialog() {
   const qc = new QueryClient();
@@ -326,46 +315,24 @@ function renderDialog() {
   );
 }
 
-function selectPdf(container: HTMLElement) {
+function selectPdfAndUpload(container: HTMLElement) {
   const input = container.querySelector('input[type="file"]')!;
   fireEvent.change(input, {
     target: { files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] },
   });
+  fireEvent.click(screen.getByRole('button', { name: '업로드' }));
 }
 
 describe('UploadDialog — checksum', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('해시가 끝나기 전엔 업로드·제거 버튼이 잠기고 "파일 검사 중…"을 보여준다', async () => {
-    let resolveHash!: (v: string) => void;
-    vi.mocked(sha256Base64).mockReturnValue(new Promise((r) => { resolveHash = r; }));
-    const { container } = renderDialog();
-    selectPdf(container);
-
-    expect(screen.getByText('파일 검사 중…')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '업로드' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: '파일 제거' }).hasAttribute('disabled')).toBe(true);
-
-    resolveHash(HASH);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: '업로드' }).hasAttribute('disabled')).toBe(false));
-    expect(screen.getByRole('button', { name: '파일 제거' }).hasAttribute('disabled')).toBe(false);
-  });
-
-  it('업로드 시 checksum을 create에, uploadHeaders를 S3 PUT에 넘긴다', async () => {
+  it('업로드 시 해시를 create에, uploadHeaders를 S3 PUT에 넘긴다', async () => {
     vi.mocked(sha256Base64).mockResolvedValue(HASH);
-    vi.mocked(createPaper).mockResolvedValue({
-      paperId: 'p1', fileKey: 'k', uploadUrl: 'https://s3/put',
-      uploadHeaders: { 'Content-Type': 'application/pdf', 'x-amz-checksum-sha256': HASH },
-      uploadExpiresAt: '', status: 'UPLOAD_PENDING', createdAt: '',
-    });
+    vi.mocked(createPaper).mockResolvedValue(CREATED);
     vi.mocked(uploadToS3).mockResolvedValue(undefined);
     const { container } = renderDialog();
-    selectPdf(container);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: '업로드' }).hasAttribute('disabled')).toBe(false));
 
-    fireEvent.click(screen.getByRole('button', { name: '업로드' }));
+    selectPdfAndUpload(container);
 
     await waitFor(() => expect(createPaper).toHaveBeenCalledWith('a.pdf', 'application/pdf', 1, HASH));
     await waitFor(() => expect(uploadToS3).toHaveBeenCalledWith(
@@ -376,18 +343,12 @@ describe('UploadDialog — checksum', () => {
 
   it('S3가 BadDigest로 거절하면 checksum 에러 문구를 보여준다', async () => {
     vi.mocked(sha256Base64).mockResolvedValue(HASH);
-    vi.mocked(createPaper).mockResolvedValue({
-      paperId: 'p1', fileKey: 'k', uploadUrl: 'https://s3/put',
-      uploadHeaders: { 'Content-Type': 'application/pdf', 'x-amz-checksum-sha256': HASH },
-      uploadExpiresAt: '', status: 'UPLOAD_PENDING', createdAt: '',
-    });
-    vi.mocked(uploadToS3).mockRejectedValue(new ChecksumMismatchError());
+    vi.mocked(createPaper).mockResolvedValue(CREATED);
+    vi.mocked(uploadToS3).mockRejectedValue(
+      new Error('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다'));
     const { container } = renderDialog();
-    selectPdf(container);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: '업로드' }).hasAttribute('disabled')).toBe(false));
 
-    fireEvent.click(screen.getByRole('button', { name: '업로드' }));
+    selectPdfAndUpload(container);
 
     await waitFor(() =>
       expect(screen.getByText('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다')).toBeTruthy());
@@ -398,11 +359,11 @@ describe('UploadDialog — checksum', () => {
 - [ ] **Step 2: 실패 확인**
 
 Run: `npm run test -- src/routes/bookshelf/UploadDialog.test.tsx`
-Expected: FAIL — "파일 검사 중…" 미표시, createPaper 인자 불일치.
+Expected: FAIL — createPaper 인자 불일치(checksum 미전달).
 
 - [ ] **Step 3: UploadDialog 구현**
 
-`fe/src/routes/bookshelf/UploadDialog.tsx` 수정 사항:
+`fe/src/routes/bookshelf/UploadDialog.tsx` 수정은 두 곳뿐이다.
 
 import 추가:
 
@@ -410,65 +371,17 @@ import 추가:
 import { sha256Base64 } from './fileChecksum';
 ```
 
-state 추가 (기존 state 선언 아래):
-
-```tsx
-const [checksum, setChecksum] = useState<string | null>(null);
-```
-
-`isUploading` 옆에 파생값 추가:
-
-```tsx
-const isHashing = phase === 'file-selected' && checksum === null;
-```
-
-`onFileChosen` 교체 — 선택 즉시 해시 시작:
-
-```tsx
-function onFileChosen(file: File | null) {
-  if (!file) return;
-  const validationError = validatePdfUpload(file);
-  if (validationError) {
-    setSelectedFile(null);
-    setPhase('idle');
-    setError(new Error(validationError));
-    return;
-  }
-  setError(null);
-  setSelectedFile(file);
-  setChecksum(null);
-  setPhase('file-selected');
-  // 해시 중엔 제거·업로드가 잠기므로 결과 도착 시점의 선택 파일은 항상 이 file이다
-  sha256Base64(file).then(
-    (sum) => setChecksum(sum),
-    (e: unknown) => {
-      setError(e);
-      setSelectedFile(null);
-      setPhase('idle');
-    },
-  );
-}
-```
-
-`clearFile`에 checksum 초기화 추가:
-
-```tsx
-function clearFile() {
-  setSelectedFile(null);
-  setChecksum(null);
-  setPhase('idle');
-}
-```
-
-`startUpload` 교체 — checksum 가드 + uploadHeaders 전달:
+`startUpload` 교체:
 
 ```tsx
 async function startUpload() {
-  if (phase !== 'file-selected' || !selectedFile || checksum === null) return;
+  if (phase !== 'file-selected' || !selectedFile) return;
   setPhase('uploading');
   setUploadPct(0);
   setError(null);
   try {
+    // 해시 ~0.5초는 '업로드 중… 0%' 표시가 덮는다. 실패도 아래 catch가 그대로 처리.
+    const checksum = await sha256Base64(selectedFile);
     const created = await createPaper(selectedFile.name, 'application/pdf', selectedFile.size, checksum);
     await uploadToS3(created.uploadUrl, selectedFile, created.uploadHeaders, (pct) => setUploadPct(pct));
     await completeUpload(created.paperId);
@@ -482,56 +395,18 @@ async function startUpload() {
 }
 ```
 
-파일 카드 보조 라벨 교체 (기존 `{isUploading ? … : formatBytes(…)}` 부분):
-
-```tsx
-{isUploading ? `업로드 중… ${uploadPct}%` : isHashing ? '파일 검사 중…' : formatBytes(selectedFile.size)}
-```
-
-파일 제거(X) 버튼에 잠금 추가 (기존 `onClick={clearFile}` 버튼 교체):
-
-```tsx
-<button
-  onClick={clearFile}
-  disabled={isHashing}
-  aria-label="파일 제거"
-  style={{
-    width: '26px',
-    height: '26px',
-    flexShrink: 0,
-    borderRadius: 'var(--radius-control)',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-bg-paper)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: isHashing ? 'not-allowed' : 'pointer',
-    color: 'var(--color-text-muted)',
-    opacity: isHashing ? 0.5 : 1,
-  }}
->
-  <X size={12} />
-</button>
-```
-
-업로드 버튼 disabled 조건 교체:
-
-```tsx
-<Button variant="primary" onClick={startUpload} disabled={phase !== 'file-selected' || checksum === null}>
-```
-
-`describeError`는 수정하지 않는다 — `ChecksumMismatchError.message`가 곧 UI 문구라 기존 `err instanceof Error` 분기로 그대로 표시된다.
+`describeError`, 버튼, 라벨, state는 수정하지 않는다.
 
 - [ ] **Step 4: 통과 확인**
 
 Run: `npm run test -- src/routes/bookshelf/UploadDialog.test.tsx`
-Expected: PASS (3 tests)
+Expected: PASS (2 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add fe/src/routes/bookshelf/UploadDialog.tsx fe/src/routes/bookshelf/UploadDialog.test.tsx
-git commit -m "[YMC-282] feat(fe): 업로드 다이얼로그 해시 계산·잠금·checksum 에러 표시"
+git commit -m "[YMC-282] feat(fe): 업로드 시작 시 checksum 계산·uploadHeaders 전송"
 ```
 
 ---
