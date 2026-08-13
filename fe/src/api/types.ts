@@ -12,10 +12,17 @@ export interface Paper {
   updatedAt: string;
 }
 
+// 계약 PaperUploadHeaders: 필수 2키 + 향후 서명 헤더 추가 허용. FE는 맵 전체를 그대로 PUT에 싣는다.
+export type PaperUploadHeaders = {
+  'Content-Type': 'application/pdf';
+  'x-amz-checksum-sha256': string;
+} & Record<string, string>;
+
 export interface CreatePaperResponse {
   paperId: string;
   fileKey: string;
   uploadUrl: string;
+  uploadHeaders: PaperUploadHeaders;
   uploadExpiresAt: string;
   status: PaperStatus;
   createdAt: string;

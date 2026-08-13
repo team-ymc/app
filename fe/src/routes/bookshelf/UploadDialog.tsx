@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { X, UploadSimple, FileText } from '@phosphor-icons/react';
 import { Button } from '../../design/components/Button';
 import { createPaper, uploadToS3, completeUpload } from '../../api/papers';
+import { sha256Base64 } from './fileChecksum';
 import { ApiError } from '../../api/types';
 import { validatePdfUpload } from './uploadValidation';
 
@@ -106,8 +107,10 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
     setUploadPct(0);
     setError(null);
     try {
-      const created = await createPaper(selectedFile.name, 'application/pdf', selectedFile.size);
-      await uploadToS3(created.uploadUrl, selectedFile, (pct) => setUploadPct(pct));
+      // 해시 ~0.5초는 '업로드 중… 0%' 표시가 덮는다. 실패도 아래 catch가 그대로 처리.
+      const checksum = await sha256Base64(selectedFile);
+      const created = await createPaper(selectedFile.name, 'application/pdf', selectedFile.size, checksum);
+      await uploadToS3(created.uploadUrl, selectedFile, created.uploadHeaders, (pct) => setUploadPct(pct));
       await completeUpload(created.paperId);
       queryClient.invalidateQueries({ queryKey: ['papers'] });
       onClose();
