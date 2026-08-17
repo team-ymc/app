@@ -245,6 +245,9 @@ export default function BookshelfPage() {
             </div>
           </div>
 
+          {/* 시연용 목업 진입점 — 시연 후 이 블록과 public/demo/를 함께 제거한다 */}
+          {!keyword.trim() && <DemoMockupRow />}
+
           {/* R4 Paper list */}
           {hasResults && (
             isGridView ? (
@@ -596,6 +599,72 @@ function PaperListRow({ paper, onSelect }: { paper: Paper; onSelect: (paper: Pap
       </div>
       <StatusBadge paper={paper} />
     </div>
+  );
+}
+
+// 시연용 목업 진입점 — 시연 후 제거. react-router Link가 아니라 <a>여야 SPA를 벗어나 정적 파일로 간다.
+function DemoMockupRow() {
+  const [hover, setHover] = useState(false);
+  return (
+    <a
+      href="/demo/paper/study.html"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        padding: '14px 16px',
+        marginBottom: '10px',
+        background: 'var(--color-bg-surface)',
+        border: `1px solid ${hover ? 'var(--color-primary)' : 'var(--color-border)'}`,
+        borderRadius: 'var(--radius-structural)',
+        textDecoration: 'none',
+        transition: 'border-color 150ms ease',
+      }}
+    >
+      <div
+        style={{
+          width: '52px',
+          height: '68px',
+          flexShrink: 0,
+          background: 'var(--color-bg-paper)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '2px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <FileText size={22} color="var(--color-text-muted)" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '16px',
+            fontWeight: 600,
+            color: 'var(--color-text-heading)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          Attention Is All You Need
+        </div>
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: '12px',
+          color: 'var(--color-text-muted)',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        미리보기
+      </div>
+    </a>
   );
 }
 
