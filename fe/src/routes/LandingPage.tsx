@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../design/components/Button';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 
+const accentGradient = {
+  background: 'linear-gradient(120deg, #2E9E6B 0%, #2C5EAA 55%, #7C4DBE 100%)',
+  WebkitBackgroundClip: 'text',
+  backgroundClip: 'text',
+  color: 'transparent',
+} as const;
+
 export default function LandingPage() {
   const { status, startLogin, initialError } = useAuth();
+  const navigate = useNavigate();
   const [signupHover, setSignupHover] = useState(false);
-
-  if (status === 'authed') return <Navigate to="/library" replace />;
 
   return (
     <div
@@ -58,28 +64,28 @@ export default function LandingPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '36px',
+          gap: '44px',
           padding: '32px',
-          maxWidth: '480px',
+          maxWidth: '760px',
           textAlign: 'center',
           position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: 'var(--font-serif)', color: 'var(--color-text-heading)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'var(--font-serif)', color: 'var(--color-text-heading)' }}>
           <div
             style={{
-              fontSize: 'var(--display-lg-size)',
-              fontWeight: 'var(--display-lg-weight)',
-              lineHeight: 'var(--display-lg-line)',
-              letterSpacing: 'var(--display-lg-tracking)',
+              fontSize: 'var(--hero-display-size)',
+              fontWeight: 'var(--hero-display-weight)',
+              lineHeight: 'var(--hero-display-line)',
+              letterSpacing: 'var(--hero-display-tracking)',
             }}
           >
-            <span style={{ color: 'var(--color-primary)' }}>업로드</span>만 하세요.
+            <span style={accentGradient}>어떤 문서</span>든,
             <br />
-            <span style={{ color: 'var(--color-primary)' }}>이해</span>시켜드립니다.
+            나만의 <span style={accentGradient}>AI 튜터</span>로
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 400, lineHeight: 1.6, color: 'var(--color-text-muted)', letterSpacing: '0.005em' }}>
-            Just upload. We will make you understand.
+          <div style={{ fontSize: '19px', fontWeight: 400, lineHeight: 1.6, color: 'var(--color-text-muted)', letterSpacing: '0.005em' }}>
+            Any document, your own AI tutor.
           </div>
         </div>
 
@@ -89,35 +95,51 @@ export default function LandingPage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
-          <Button variant="primary" onClick={startLogin}>
-            <span style={{ whiteSpace: 'nowrap' }}>로그인</span>
-          </Button>
-          <button
-            type="button"
-            onClick={startLogin}
-            onMouseEnter={() => setSignupHover(true)}
-            onMouseLeave={() => setSignupHover(false)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '48px',
-              padding: '0 24px',
-              background: signupHover ? 'var(--color-primary-subtle)' : 'transparent',
-              color: 'var(--color-primary)',
-              fontFamily: 'var(--font-sans)',
-              fontSize: 'var(--ui-strong-size)',
-              fontWeight: 'var(--ui-strong-weight)',
-              borderRadius: 'var(--radius-pill)',
-              border: signupHover ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
-              cursor: 'pointer',
-              transition: 'border-color 150ms ease, background 150ms ease',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            회원가입
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '8px' }}>
+          {status === 'authed' ? (
+            <Button
+              variant="primary"
+              onClick={() => navigate('/library')}
+              style={{ height: '56px', padding: '0 72px', fontSize: '17px' }}
+            >
+              <span style={{ whiteSpace: 'nowrap' }}>내 서재로</span>
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="primary"
+                onClick={startLogin}
+                style={{ height: '56px', padding: '0 40px', fontSize: '17px' }}
+              >
+                <span style={{ whiteSpace: 'nowrap' }}>로그인</span>
+              </Button>
+              <button
+                type="button"
+                onClick={startLogin}
+                onMouseEnter={() => setSignupHover(true)}
+                onMouseLeave={() => setSignupHover(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '56px',
+                  padding: '0 40px',
+                  background: signupHover ? 'var(--color-primary-subtle)' : 'transparent',
+                  color: 'var(--color-primary)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '17px',
+                  fontWeight: 'var(--ui-strong-weight)',
+                  borderRadius: 'var(--radius-pill)',
+                  border: signupHover ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  cursor: 'pointer',
+                  transition: 'border-color 150ms ease, background 150ms ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                회원가입
+              </button>
+            </>
+          )}
         </div>
       </div>
 
