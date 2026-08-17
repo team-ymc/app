@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+    options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/radius.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/tokens/shadows.css">
+  <link rel="stylesheet" href="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/styles.css">
+  <script src="_ds/paper-teacher-design-system-1a53a7a7-d059-48b5-b12a-0094ed1cc07b/_ds_bundle.js"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    body{margin:0}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    @keyframes ptDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-4px);opacity:1}}
+    @keyframes ptStudyModalIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .pt-composer::-webkit-scrollbar{width:5px}
+    .pt-composer::-webkit-scrollbar-thumb{background:var(--color-border);border-radius:4px}
+    .pt-composer::-webkit-scrollbar-track{background:transparent}
+    .pt-paper-wrap article{padding:28px 36px !important}
+    .pt-paper-content{border-top:1px solid var(--color-border);padding-top:20px}
+    .pt-paper-content h2:not(:first-of-type){border-top:1px solid var(--color-border);padding-top:24px}
+    .pt-paper-content .pt-minor-heading{font-family:var(--font-serif);font-size:16px;font-weight:600;line-height:1.4;color:var(--color-text-heading);margin:-4px 0 -4px;scroll-margin-top:24px}
+    .pt-paper-wrap h1,.pt-paper-content .pt-study-heading-label{cursor:pointer}
+    .pt-paper-wrap h1{width:fit-content;max-width:100%;border-radius:2px;transition:color 150ms ease,background-color 150ms ease,box-shadow 150ms ease}
+    .pt-paper-content .pt-study-heading-label{border-radius:2px;padding:1px 3px;margin:-1px -3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:color 150ms ease,background-color 150ms ease,box-shadow 150ms ease}
+    .pt-paper-wrap h1:hover,.pt-paper-wrap h1[data-study-target="true"]{color:var(--color-primary) !important;background:var(--color-primary-subtle);box-shadow:0 0 0 4px var(--color-primary-subtle)}
+    .pt-paper-content .pt-study-heading-label:hover,.pt-paper-content h2[data-study-target="true"] .pt-study-heading-label,.pt-paper-content h3[data-study-target="true"] .pt-study-heading-label,.pt-paper-content h4[data-study-target="true"] .pt-study-heading-label{color:var(--color-primary);background:var(--color-primary-subtle);box-shadow:0 0 0 4px var(--color-primary-subtle)}
+    .pt-paper-content ::selection{background:var(--color-primary-subtle);color:var(--color-text-heading)}
+    .pt-paper-content p{white-space:pre-line}
+    .pt-paper-content .pt-paper-list{display:flex;flex-direction:column;gap:12px;margin:0;padding-left:24px}
+    .pt-paper-content .pt-paper-list li{padding-left:5px}
+    .pt-paper-content .pt-paper-list li::marker{color:var(--color-primary)}
+    .pt-paper-content .pt-reference{font-size:13px;line-height:1.6;padding-left:18px;text-indent:-18px}
+    .pt-paper-content .pt-author-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 24px;padding:8px 0 4px}
+    .pt-paper-content .pt-author-name{font-family:var(--font-serif);font-weight:600;color:var(--color-text-heading);margin-bottom:4px}
+    .pt-paper-content .pt-author-meta{font-family:var(--font-sans);font-size:12px;line-height:1.55;color:var(--color-text-muted);overflow-wrap:anywhere}
+    .pt-paper-content .pt-figure-caption,.pt-paper-content .pt-table-caption{font-family:var(--font-sans);font-size:13px;line-height:1.55;color:var(--color-text-muted);text-align:center}
+    .pt-paper-content .pt-figure-caption{margin:8px -10px -8px;padding:8px 10px 9px;border-top:1px solid var(--color-border)}
+    .pt-paper-content .pt-table-caption{padding:10px 24px 12px;border-bottom:1px solid var(--color-border);background:var(--color-bg-paper)}
+    .pt-paper-content .pt-caption-label{font-weight:600;color:var(--color-text-heading)}
+    .pt-paper-content .pt-content-frame{background:var(--color-bg-surface);border:1px solid var(--color-border);border-radius:4px;padding:8px 10px}
+    .pt-paper-content .pt-context-target{cursor:pointer;transition:border-color 150ms ease,box-shadow 150ms ease}
+    .pt-paper-content .pt-context-target:hover,.pt-paper-content .pt-context-target[data-context-target="true"]{border-color:var(--color-primary);box-shadow:0 0 0 3px var(--color-primary-subtle)}
+    .pt-paper-content .pt-figure-frame{box-sizing:border-box;margin-inline:auto}
+    .pt-paper-content .pt-paper-image{display:block;width:100%;background-repeat:no-repeat;background-position:center;background-size:contain}
+    .pt-paper-content .pt-table-wrap{overflow:hidden;padding:0;border-radius:5px;background:var(--color-bg-paper)}
+    .pt-paper-content .pt-table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--color-border) transparent}
+    .pt-paper-content .pt-paper-table{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--font-sans);font-size:13px;line-height:1.45;color:var(--color-text-body);font-variant-numeric:tabular-nums}
+    .pt-paper-content .pt-paper-table th{padding:11px 14px;background:var(--color-bg-paper);color:var(--color-text-heading);font-weight:400;vertical-align:middle;white-space:normal}
+    .pt-paper-content .pt-paper-table tr:first-child th{border-top:2px solid var(--color-text-heading)}
+    .pt-paper-content .pt-paper-table .pt-table-header-final th{border-bottom:1px solid var(--color-text-heading)}
+    .pt-paper-content .pt-paper-table td{padding:10px 14px;border-bottom:1px solid var(--color-border);vertical-align:middle;background:var(--color-bg-paper);font-weight:400}
+    .pt-paper-content .pt-paper-table .pt-table-group-start td{border-top:1px solid var(--color-text-muted)}
+    .pt-paper-content .pt-paper-table.pt-table-matrix{font-size:11.5px;line-height:1.35}
+    .pt-paper-content .pt-paper-table.pt-table-matrix th{padding:8px 5px}
+    .pt-paper-content .pt-paper-table.pt-table-matrix td{padding:7px 5px}
+    .pt-paper-content .pt-paper-table tr:last-child td{border-bottom:2px solid var(--color-text-heading)}
+    .pt-paper-content .pt-equation{overflow-x:auto;text-align:center}
+    .pt-paper-content .pt-equation mjx-container[display="true"]{margin:.25em 0 !important}
+    .pt-student-msg div{background:var(--color-bg-surface) !important;color:var(--color-text-body) !important;border:none !important;border-radius:14px 14px 4px 14px !important;padding:11px 15px !important}
+    @media(max-width:800px){.pt-paper-content .pt-author-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  </style>
+</helmet>
+
+<div style="height:100vh;width:100%;display:flex;flex-direction:column;background:var(--color-bg-canvas);font-family:var(--font-sans);overflow:hidden">
+
+  <!-- R1 Global top bar -->
+  <div style="height:52px;flex-shrink:0;background:var(--color-bg-walnut);color:var(--color-on-dark);display:flex;align-items:stretch">
+    <div style="flex:1;min-width:0;display:flex;align-items:center;padding:0 20px 0 16px;gap:16px">
+      <a href="/" style="display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none;color:inherit">
+        <span style="font-family:var(--font-serif);font-weight:600;font-size:16px;letter-spacing:-0.005em;white-space:nowrap">Paper Teacher</span>
+      </a>
+      <div style="width:1px;height:18px;background:rgba(255,253,247,0.18);flex-shrink:0"></div>
+      <a href="/library" style="display:flex;align-items:center;gap:6px;background:transparent;border:none;padding:7px 10px;border-radius:9999px;color:var(--color-on-dark);font-family:var(--font-sans);font-size:13px;font-weight:600;cursor:pointer;transition:background 150ms ease;white-space:nowrap;flex-shrink:0;text-decoration:none" style-hover="background:rgba(255,253,247,0.12)">
+        <i class="ph ph-arrow-left" style="font-size:14px"></i>
+        서재로
+      </a>
+      <div style="width:1px;height:18px;background:rgba(255,253,247,0.18);flex-shrink:0"></div>
+      <div style="font-family:var(--font-serif);font-size:15px;font-weight:600;color:var(--color-on-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;opacity:0.92">{{ paperTitle }}</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <a href="./knowledge-graph/0.0v3/viz.html" aria-label="지식 그래프" title="지식 그래프" style="height:32px;display:flex;align-items:center;justify-content:center;gap:7px;flex-shrink:0;background:rgba(255,253,247,0.08);border:1px solid rgba(255,253,247,0.18);border-radius:8px;color:rgba(255,253,247,0.88);padding:0 10px 0 8px;cursor:pointer;font-family:var(--font-sans);font-size:12px;font-weight:600;white-space:nowrap;text-decoration:none;transition:background 150ms ease,color 150ms ease,border-color 150ms ease" style-hover="background:rgba(255,253,247,0.16);border-color:rgba(255,253,247,0.32);color:var(--color-on-dark)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+            <path d="M5.2 6.6 10.7 4M13.2 4.4l5 3.1M5.5 8.7l2.2 6M10 15.8l6.1 1M18.4 9.5l-.9 5M9 14.6l2.5-8.4M12.9 6.2l3.9 1.9M9.7 16.8l2.3 2.1M16.1 17.8l-2.2 1.4"></path>
+            <circle cx="4.5" cy="7.6" r="2"></circle>
+            <circle cx="12" cy="3.8" r="1.8"></circle>
+            <circle cx="19" cy="8.3" r="2"></circle>
+            <circle cx="8.5" cy="16.2" r="2.1"></circle>
+            <circle cx="17" cy="17" r="2"></circle>
+            <circle cx="12.8" cy="20" r="1.4"></circle>
+          </svg>
+          <span>지식 그래프</span>
+        </a>
+        <button type="button" onClick="{{ toggleTranslate }}" aria-label="{{ translationButtonLabel }}" title="{{ translationButtonLabel }}" aria-pressed="{{ translationActive }}" style="{{ translationTopBarStyle }}" style-hover="{{ translationTopBarHoverStyle }}">
+          <i class="ph ph-translate" style="font-size:17px"></i>
+          <span>번역</span>
+        </button>
+      </div>
+    </div>
+    <div style="{{ topBarRightStyle }}">
+      <button aria-label="프로필" title="프로필" style="width:32px;height:32px;border-radius:9999px;border:1px solid rgba(255,253,247,0.25);background:var(--color-bg-walnut-raised);color:var(--color-on-dark);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 150ms ease" style-hover="background:rgba(255,253,247,0.12)">
+        <i class="ph ph-user" style="font-size:15px"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- R2 Study work area -->
+  <div style="flex:1;display:flex;min-height:0;overflow:hidden">
+
+    <!-- R3 TOC nav rail -->
+    <div style="{{ railStyle }}">
+      <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="{{ tocIcon }}" label="{{ tocLabel }}" size="32" onClick="{{ toggleToc }}" hint-size="32px,32px"></x-import>
+      <sc-if value="{{ tocOpen }}">
+        <div style="display:flex;flex:1;min-height:0;overflow-y:auto;flex-direction:column;gap:2px;width:100%;padding-right:4px">
+          <sc-for list="{{ toc }}" as="item" hint-placeholder-count="9">
+            <button onClick="{{ item.onClick }}" style="{{ item.rowStyle }}">{{ item.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- R4 Paper viewer -->
+    <div ref="{{ paperViewerRef }}" onClick="{{ handlePaperClick }}" onMouseUp="{{ handlePaperMouseUp }}" onScroll="{{ handleViewerScroll }}" style="flex:1;min-width:0;overflow-y:auto;background:var(--color-bg-canvas);padding:8px 8px 24px;display:flex;justify-content:center">
+      <div class="pt-paper-wrap" style="width:100%;max-width:1000px">
+      <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.PaperSheet" title="{{ paperTitle }}" hint-size="100%,9200px" style="width:100%;max-width:1000px">
+        <div class="pt-paper-content" style="display:flex;flex-direction:column;gap:24px">
+          <sc-if value="{{ paperLoading }}">
+            <div style="padding:64px 0;text-align:center;font-family:var(--font-sans);font-size:14px;color:var(--color-text-muted)">논문을 불러오는 중입니다.</div>
+          </sc-if>
+          <sc-if value="{{ paperLoadFailed }}">
+            <div style="padding:64px 0;text-align:center;font-family:var(--font-sans);font-size:14px;color:var(--color-text-muted)">{{ paperError }}</div>
+          </sc-if>
+          <sc-for list="{{ blocks }}" as="block" hint-placeholder-count="14">
+            <sc-if value="{{ block.isHeading }}">
+              <h2 id="{{ block.id }}" data-block-id="{{ block.blockId }}" style="font-family:var(--font-serif);font-size:var(--heading-size);font-weight:var(--heading-weight);line-height:var(--heading-line);letter-spacing:var(--heading-tracking);color:var(--color-text-heading);margin:0;scroll-margin-top:24px"><span class="pt-study-heading-label">{{ block.text }}</span></h2>
+            </sc-if>
+            <sc-if value="{{ block.isSubheading }}">
+              <h3 id="{{ block.id }}" data-block-id="{{ block.blockId }}" style="font-family:var(--font-serif);font-size:var(--subheading-size);font-weight:var(--subheading-weight);line-height:var(--subheading-line);letter-spacing:var(--subheading-tracking);color:var(--color-text-heading);margin:0;scroll-margin-top:24px"><span class="pt-study-heading-label">{{ block.text }}</span></h3>
+            </sc-if>
+            <sc-if value="{{ block.isMinorHeading }}">
+              <h4 id="{{ block.id }}" class="pt-minor-heading" data-block-id="{{ block.blockId }}"><span class="pt-study-heading-label">{{ block.text }}</span></h4>
+            </sc-if>
+            <sc-if value="{{ block.isPara }}">
+              <p style="margin:0"><sc-for list="{{ block.segments }}" as="segment"><span data-block-id="{{ segment.blockId }}">{{ segment.text }}</span></sc-for></p>
+            </sc-if>
+            <sc-if value="{{ block.isList }}">
+              <ul class="pt-paper-list">
+                <sc-for list="{{ block.items }}" as="item" hint-placeholder-count="3">
+                  <li data-block-id="{{ item.blockId }}">{{ item.text }}</li>
+                </sc-for>
+              </ul>
+            </sc-if>
+            <sc-if value="{{ block.isAuthors }}">
+              <div class="pt-author-grid" data-block-id="{{ block.blockId }}">
+                <sc-for list="{{ block.authors }}" as="author" hint-placeholder-count="8">
+                  <div>
+                    <div class="pt-author-name">{{ author.name }}</div>
+                    <div class="pt-author-meta">{{ author.affiliation }}<br>{{ author.email }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ block.isReference }}">
+              <p class="pt-reference" data-block-id="{{ block.blockId }}" style="margin:0">{{ block.text }}</p>
+            </sc-if>
+            <sc-if value="{{ block.isImage }}">
+              <figure id="{{ block.id }}" class="pt-content-frame pt-figure-frame pt-context-target" data-block-id="{{ block.blockId }}" data-context-kind="image" style="{{ block.figureStyle }}">
+                <div class="pt-paper-image" role="img" aria-label="{{ block.alt }}" style="{{ block.imageStyle }}"></div>
+                <sc-if value="{{ block.hasCaption }}">
+                  <figcaption class="pt-figure-caption" data-block-id="{{ block.captionBlockId }}"><span class="pt-caption-label">{{ block.captionLabel }}.</span> {{ block.captionText }}</figcaption>
+                </sc-if>
+              </figure>
+            </sc-if>
+            <sc-if value="{{ block.isEquation }}">
+              <div id="{{ block.id }}" class="pt-content-frame pt-equation pt-context-target" data-block-id="{{ block.blockId }}" data-context-kind="formula">
+                <div style="font-family:var(--font-serif);font-size:16px;color:var(--color-text-heading)">{{ block.text }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ block.isTable }}">
+              <div id="{{ block.id }}" class="pt-content-frame pt-table-wrap pt-context-target" data-block-id="{{ block.blockId }}" data-context-kind="table">
+                <sc-if value="{{ block.hasCaption }}">
+                  <div class="pt-table-caption" data-block-id="{{ block.captionBlockId }}"><span class="pt-caption-label">{{ block.captionLabel }}.</span> {{ block.captionText }}</div>
+                </sc-if>
+                <div class="pt-table-scroll">
+                  <table class="pt-paper-table {{ block.tableClass }}" style="{{ block.tableStyle }}">
+                    <sc-for list="{{ block.rows }}" as="row" hint-placeholder-count="4">
+                      <tr class="{{ row.rowClass }}">
+                        <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="4">
+                          <sc-if value="{{ cell.isHeader }}">
+                            <th colSpan="{{ cell.colSpan }}" rowSpan="{{ cell.rowSpan }}" style="{{ cell.alignStyle }}">{{ cell.text }}</th>
+                          </sc-if>
+                          <sc-if value="{{ cell.isBody }}">
+                            <td colSpan="{{ cell.colSpan }}" rowSpan="{{ cell.rowSpan }}" style="{{ cell.alignStyle }}">{{ cell.text }}</td>
+                          </sc-if>
+                        </sc-for>
+                      </tr>
+                    </sc-for>
+                  </table>
+                </div>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </x-import>
+      </div>
+    </div>
+
+    <!-- Resizable splitter -->
+    <sc-if value="{{ chatOpen }}">
+      <div onMouseDown="{{ startResize }}" style="width:6px;flex-shrink:0;cursor:col-resize;background:transparent;position:relative" style-hover="background:var(--color-primary-subtle)">
+        <div style="position:absolute;top:0;bottom:0;left:2px;width:1px;background:var(--color-border)"></div>
+      </div>
+    </sc-if>
+
+    <!-- R5 AI chat panel -->
+    <div style="{{ chatPanelStyle }}">
+      <sc-if value="{{ chatOpen }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--color-border);flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:2px">
+            <div style="position:relative">
+              <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="clock-counter-clockwise" label="이전 대화 기록" size="36" onClick="{{ toggleHistory }}" hint-size="36px,36px"></x-import>
+              <sc-if value="{{ historyOpen }}">
+                <div style="position:absolute;top:42px;left:0;width:220px;background:var(--color-bg-paper);border:1px solid var(--color-border);border-radius:8px;box-shadow:var(--shadow-menu);padding:6px;z-index:10;display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ historyList }}" as="h" hint-placeholder-count="2">
+                    <button onClick="{{ h.onClick }}" style="text-align:left;padding:9px 10px;border:none;background:transparent;border-radius:6px;font-family:var(--font-sans);font-size:13px;color:var(--color-text-body);cursor:pointer" style-hover="background:var(--color-primary-subtle)">{{ h.title }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="note-pencil" label="새 대화" size="36" onClick="{{ newConversation }}" hint-size="36px,36px"></x-import>
+          </div>
+          <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="sidebar-simple" label="AI 튜터 접기" size="36" onClick="{{ toggleChat }}" hint-size="36px,36px"></x-import>
+        </div>
+
+        <div ref="{{ notebookWrapRef }}" style="flex:1;min-height:0;overflow:hidden;display:flex">
+        <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.TutorNotebook" hint-size="100%,100%" style="flex:1;min-height:0">
+          <sc-if value="{{ hasMessages }}">
+            <sc-for list="{{ messages }}" as="msg" hint-placeholder-count="0">
+              <sc-if value="{{ msg.isUser }}">
+                <div class="pt-student-msg" style="display:flex;justify-content:flex-end">
+                  <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.StudentMessage" hint-size="auto,auto">{{ msg.text }}</x-import>
+                </div>
+              </sc-if>
+              <sc-if value="{{ msg.isAssistant }}">
+                <sc-if value="{{ msg.loading }}">
+                  <div style="display:flex;gap:4px;padding:6px 0">
+                    <span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-muted);display:inline-block;animation:ptDotBounce 1.2s infinite ease-in-out"></span>
+                    <span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-muted);display:inline-block;animation:ptDotBounce 1.2s infinite ease-in-out;animation-delay:0.15s"></span>
+                    <span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-muted);display:inline-block;animation:ptDotBounce 1.2s infinite ease-in-out;animation-delay:0.3s"></span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ msg.notLoading }}">
+                  <div style="border-left:2px solid var(--color-accent-brass);padding-left:12px">
+                    <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.NotebookSection" hint-size="auto,auto">{{ msg.text }}</x-import>
+                  </div>
+                </sc-if>
+              </sc-if>
+            </sc-for>
+          </sc-if>
+        </x-import>
+        </div>
+
+        <div style="padding:14px 16px 16px;flex-shrink:0;position:relative">
+          <div style="position:absolute;left:0;right:0;top:-16px;height:16px;background:linear-gradient(to bottom, transparent, var(--color-bg-paper));pointer-events:none"></div>
+          <sc-if value="{{ hasContext }}">
+            <div style="margin-bottom:8px;position:relative;display:inline-block">
+              <div onClick="{{ toggleContextTooltip }}" style="{{ contextChipStyle }}">
+                <span style="{{ contextChipIconStyle }}">
+                  <sc-if value="{{ contextIsSelection }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+                      <path d="M8 4.5H5.5a1 1 0 0 0-1 1V8M16 4.5h2.5a1 1 0 0 1 1 1V8M8 19.5H5.5a1 1 0 0 1-1-1V16M16 19.5h2.5a1 1 0 0 0 1-1V16"></path>
+                      <path d="M8.5 10h7M8.5 14h7"></path>
+                    </svg>
+                  </sc-if>
+                  <sc-if value="{{ contextIsImage }}"><i class="ph ph-image" style="font-size:15px"></i></sc-if>
+                  <sc-if value="{{ contextIsTable }}"><i class="ph ph-table" style="font-size:15px"></i></sc-if>
+                  <sc-if value="{{ contextIsFormula }}"><i class="ph ph-function" style="font-size:15px"></i></sc-if>
+                </span>
+                <span style="{{ contextLabelStyle }}">{{ contextLabel }}</span>
+                <button onClick="{{ onClearContextClick }}" aria-label="{{ contextRemoveLabel }}" style="{{ contextClearButtonStyle }}">
+                  <i class="ph ph-x" style="font-size:12px"></i>
+                </button>
+              </div>
+              <sc-if value="{{ contextHover }}">
+                <div style="{{ contextTooltipStyle }}">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid var(--color-border)">
+                    <div style="display:flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--color-text-heading)">
+                      <sc-if value="{{ contextIsSelection }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;fill:none;stroke:var(--color-text-muted);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+                          <path d="M8 4.5H5.5a1 1 0 0 0-1 1V8M16 4.5h2.5a1 1 0 0 1 1 1V8M8 19.5H5.5a1 1 0 0 1-1-1V16M16 19.5h2.5a1 1 0 0 0 1-1V16"></path>
+                          <path d="M8.5 10h7M8.5 14h7"></path>
+                        </svg>
+                      </sc-if>
+                      <sc-if value="{{ contextIsImage }}"><i class="ph ph-image" style="font-size:14px;color:var(--color-success)"></i></sc-if>
+                      <sc-if value="{{ contextIsTable }}"><i class="ph ph-table" style="font-size:14px;color:var(--color-primary)"></i></sc-if>
+                      <sc-if value="{{ contextIsFormula }}"><i class="ph ph-function" style="font-size:14px;color:var(--color-accent-brass)"></i></sc-if>
+                      <span>{{ contextPreviewLabel }}</span>
+                    </div>
+                    <button onClick="{{ closeContextTooltip }}" aria-label="닫기" style="background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);padding:3px;display:flex;align-items:center;border-radius:4px">
+                      <i class="ph ph-x" style="font-size:13px"></i>
+                    </button>
+                  </div>
+                  <div style="padding:12px">
+                    <div style="{{ contextPreviewStyle }}">{{ composerContextText }}</div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+          <div style="{{ composerBoxStyle }}">
+            <textarea class="pt-composer" ref="{{ chatInputRef }}" value="{{ chatInput }}" onChange="{{ handleInputChange }}" onKeyDown="{{ handleKeyDown }}" onFocus="{{ handleComposerFocus }}" onBlur="{{ handleComposerBlur }}" rows="1" style="flex:1;min-width:0;resize:none;border:none;outline:none;background:transparent;padding:8px 0;font-family:var(--font-sans);font-size:15px;line-height:1.5;color:var(--color-text-body);min-height:22px;max-height:150px;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--color-border) transparent"></textarea>
+            <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="paper-plane-tilt" label="질문 보내기" size="34" onClick="{{ handleSend }}" disabled="{{ isStreaming }}" hint-size="34px,34px" style="flex-shrink:0;margin-bottom:2px"></x-import>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ chatCollapsed }}">
+        <div style="padding-top:12px;display:flex;justify-content:center">
+          <x-import component-from-global-scope="PaperTeacherDesignSystem_1a53a7.IconButton" icon="sidebar-simple" label="AI 튜터 열기" size="36" onClick="{{ toggleChat }}" hint-size="36px,36px"></x-import>
+        </div>
+      </sc-if>
+    </div>
+
+  </div>
+
+  <!-- Heading study action -->
+  <sc-if value="{{ headingStudyActionVisible }}">
+    <button data-heading-study-action="true" onClick="{{ onHeadingStudyAction }}" style="{{ headingStudyActionStyle }}" style-hover="background:var(--color-primary)">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+        <path d="M3.5 5.7c3.6-.9 6.4-.1 8.5 1.8v11c-2.1-1.9-4.9-2.7-8.5-1.8v-11Z"></path>
+        <path d="M20.5 5.7c-3.6-.9-6.4-.1-8.5 1.8v11c2.1-1.9 4.9-2.7 8.5-1.8v-11Z"></path>
+        <path d="M6.3 9.3c1-.1 2 .1 2.9.6M6.3 12c1-.1 2 .1 2.9.6M17.7 9.3c-1-.1-2 .1-2.9.6M17.7 12c-1-.1-2 .1-2.9.6"></path>
+      </svg>
+      학습하기
+    </button>
+  </sc-if>
+
+  <!-- Figure / table / formula ask action -->
+  <sc-if value="{{ contentAskActionVisible }}">
+    <button data-content-ask-action="true" onClick="{{ onContentAskAction }}" style="{{ contentAskActionStyle }}" style-hover="background:var(--color-primary)">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+        <path d="M7.2 4.5h9.6a3.2 3.2 0 0 1 3.2 3.2v5.7a3.2 3.2 0 0 1-3.2 3.2h-4.7L8 19.5v-2.9h-.8A3.2 3.2 0 0 1 4 13.4V7.7a3.2 3.2 0 0 1 3.2-3.2Z"></path>
+        <path d="M10.45 9.2a1.6 1.6 0 1 1 2.1 1.52c-.52.2-.55.58-.55 1.08M12 13.55h.01"></path>
+      </svg>
+      질문하기
+    </button>
+  </sc-if>
+
+  <!-- Selection popup: Ask -->
+  <sc-if value="{{ selectionToolbarVisible }}">
+    <div ref="{{ selectionToolbarRef }}" style="{{ selectionToolbarStyle }}">
+      <button onClick="{{ onSelectionAsk }}" style="{{ selToolbarBtnStyle }}" style-hover="{{ selToolbarBtnHoverStyle }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0">
+          <path d="M7.2 4.5h9.6a3.2 3.2 0 0 1 3.2 3.2v5.7a3.2 3.2 0 0 1-3.2 3.2h-4.7L8 19.5v-2.9h-.8A3.2 3.2 0 0 1 4 13.4V7.7a3.2 3.2 0 0 1 3.2-3.2Z"></path>
+          <path d="M10.45 9.2a1.6 1.6 0 1 1 2.1 1.52c-.52.2-.55.58-.55 1.08M12 13.55h.01"></path>
+        </svg>
+        질문하기
+      </button>
+    </div>
+  </sc-if>
+
+  <!-- Ask: current chat vs new chat -->
+  <sc-if value="{{ askPopupVisible }}">
+    <div ref="{{ askPopupRef }}" style="{{ askPopupStyle }}">
+      <button onClick="{{ onAskCurrentChat }}" style="{{ askPopupRowStyle }}" style-hover="background:var(--color-primary-subtle)">
+        <span style="width:26px;height:26px;border-radius:50%;background:var(--color-primary-subtle);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ph ph-arrow-bend-up-left" style="font-size:13px;color:var(--color-primary)"></i>
+        </span>
+        <span style="font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--color-text-heading)">현재 채팅</span>
+      </button>
+      <div style="height:1px;background:var(--color-border);margin:2px 6px"></div>
+      <button onClick="{{ onAskNewChat }}" style="{{ askPopupRowStyle }}" style-hover="background:var(--color-primary-subtle)">
+        <span style="width:26px;height:26px;border-radius:50%;background:var(--color-primary-subtle);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ph ph-note-pencil" style="font-size:13px;color:var(--color-primary)"></i>
+        </span>
+        <span style="font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--color-text-heading)">새 채팅</span>
+      </button>
+    </div>
+  </sc-if>
+
+  <!-- Direct translation popup -->
+  <sc-if value="{{ translationPopupVisible }}">
+    <div ref="{{ translationPopupRef }}" style="{{ translationPopupStyle }}">
+      <button onClick="{{ closeTranslationPopup }}" aria-label="닫기" style="position:absolute;top:10px;right:10px;background:transparent;border:none;cursor:pointer;color:var(--color-text-muted);padding:2px;display:flex;align-items:center">
+        <i class="ph ph-x" style="font-size:14px"></i>
+      </button>
+      <div style="font-family:var(--font-serif);font-size:13px;line-height:1.6;color:var(--color-text-muted);padding-right:18px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--color-border)">{{ translationPopupOriginal }}</div>
+      <div style="font-family:var(--font-serif);font-size:15px;line-height:1.7;color:var(--color-text-body)">{{ translationPopupTranslated }}</div>
+    </div>
+  </sc-if>
+
+  <!-- Study session preparation -->
+  <sc-if value="{{ studySessionVisible }}">
+    <div onClick="{{ closeStudySession }}" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(43,34,27,0.28);backdrop-filter:blur(2px);padding:24px;box-sizing:border-box;z-index:110">
+      <div role="dialog" aria-modal="true" aria-label="{{ studySessionDialogTitle }}" onClick="{{ stopStudySessionClick }}" style="position:relative;width:420px;max-width:100%;box-sizing:border-box;background:var(--color-bg-paper);border:1px solid var(--color-border);border-radius:16px;box-shadow:0 22px 60px rgba(43,34,27,0.22);padding:24px;animation:ptStudyModalIn 180ms ease-out">
+        <button type="button" onClick="{{ closeStudySession }}" aria-label="닫기" style="position:absolute;top:14px;right:14px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;border-radius:9999px;background:transparent;color:var(--color-text-muted);cursor:pointer" style-hover="background:var(--color-bg-surface);color:var(--color-text-heading)">
+          <i class="ph ph-x" style="font-size:15px"></i>
+        </button>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding-right:24px">
+          <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:12px;background:var(--color-primary-subtle);color:var(--color-primary)">
+            <sc-if value="{{ studySessionPreparing }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round">
+                <path d="M3.5 5.7c3.6-.9 6.4-.1 8.5 1.8v11c-2.1-1.9-4.9-2.7-8.5-1.8v-11Z"></path>
+                <path d="M20.5 5.7c-3.6-.9-6.4-.1-8.5 1.8v11c2.1-1.9 4.9-2.7 8.5-1.8v-11Z"></path>
+                <path d="M6.4 9.6c1-.1 1.9.1 2.8.6M15 9.9c.8-.3 1.7-.4 2.6-.3"></path>
+              </svg>
+            </sc-if>
+            <sc-if value="{{ studySessionReady }}">
+              <i class="ph ph-check" style="font-size:23px"></i>
+            </sc-if>
+          </div>
+          <div style="min-width:0;padding-top:1px">
+            <div style="font-family:var(--font-sans);font-size:17px;font-weight:700;line-height:1.35;letter-spacing:-0.015em;color:var(--color-text-heading)">{{ studySessionDialogTitle }}</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;display:flex;align-items:center;gap:9px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--color-primary) 34%,var(--color-border));border-left:3px solid var(--color-primary);border-radius:9px;background:var(--color-primary-subtle);color:var(--color-primary)">
+          <i class="ph ph-bookmark-simple" aria-hidden="true" style="font-size:17px;flex-shrink:0"></i>
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-serif);font-size:15px;font-weight:700;line-height:1.4;color:var(--color-text-heading)">{{ studySessionSectionTitle }}</span>
+        </div>
+        <div role="progressbar" aria-label="학습 세션 준비 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ studySessionProgress }}" style="height:7px;margin-top:18px;overflow:hidden;border-radius:9999px;background:var(--color-primary-subtle)">
+          <div style="{{ studySessionProgressStyle }}"></div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const PAPER_CONFIG = {
+  paperId:'0.0v3',
+  title:'Attention Is All You Need',
+  meta:'Vaswani et al. — NeurIPS 2017 · arXiv:1706.03762v7',
+  documentUrl:'../ymc-documents/papers/0.0v3/frontend/document.json',
+  translationUrl:'./paper-0.0v3.ko.json',
+  assetBaseUrl:'../ymc-documents/papers/0.0v3/',
+  assetPaths:{
+    image_0:'assets/images/p0000-b0002/p0001-b0010/image_0.jpg',
+    image_1:'assets/images/p0000-b0002/p0001-b0010/p0002-b0006/image_1.jpg',
+    formula_0:'assets/formulas/p0000-b0002/p0001-b0010/p0002-b0006/p0003-b0003/formula_0.tex',
+    formula_1:'assets/formulas/p0000-b0002/p0001-b0010/p0002-b0006/p0003-b0010/formula_1.tex',
+    formula_2:'assets/formulas/p0000-b0002/p0001-b0010/p0002-b0006/p0003-b0010/formula_2.tex',
+    formula_3:'assets/formulas/p0000-b0002/p0001-b0010/p0004-b0011/formula_3.tex',
+    table_0:'assets/tables/p0000-b0002/p0001-b0010/p0004-b0016/table_0.html',
+    formula_4:'assets/formulas/p0000-b0002/p0001-b0010/p0005-b0002/formula_4.tex',
+    formula_5:'assets/formulas/p0000-b0002/p0001-b0010/p0005-b0002/formula_5.tex',
+    formula_6:'assets/formulas/p0000-b0002/p0006-b0003/p0006-b0009/formula_6.tex',
+    table_1:'assets/tables/p0000-b0002/p0006-b0003/p0006-b0014/table_1.html',
+    table_2:'assets/tables/p0000-b0002/p0007-b0004/p0007-b0010/table_2.html',
+    table_3:'assets/tables/p0000-b0002/p0007-b0004/p0008-b0005/table_3.html',
+    image_2:'assets/images/p0000-b0002/p0009-b0011/image_2.jpg',
+    image_3:'assets/images/p0000-b0002/p0009-b0011/image_3.jpg',
+    image_4:'assets/images/p0000-b0002/p0009-b0011/image_4.jpg'
+  },
+  authors:[
+    { name:'Ashish Vaswani*', affiliation:'Google Brain', email:'avaswani@google.com' },
+    { name:'Noam Shazeer*', affiliation:'Google Brain', email:'noam@google.com' },
+    { name:'Niki Parmar*', affiliation:'Google Research', email:'nikip@google.com' },
+    { name:'Jakob Uszkoreit*', affiliation:'Google Research', email:'usz@google.com' },
+    { name:'Llion Jones*', affiliation:'Google Research', email:'llion@google.com' },
+    { name:'Aidan N. Gomez* †', affiliation:'University of Toronto', email:'aidan@cs.toronto.edu' },
+    { name:'Łukasz Kaiser*', affiliation:'Google Brain', email:'lukaszkaiser@google.com' },
+    { name:'Illia Polosukhin*', affiliation:'', email:'illia.polosukhin@gmail.com' }
+  ]
+};
+
+const HISTORY = [
+  { id:'h1', title:'초록 요약 관련 대화', messages:[
+      { isUser:true, isAssistant:false, text:'초록 내용 요약해줘' },
+      { isUser:false, isAssistant:true, label:'핵심 아이디어', text:'이 논문은 약한 문장 단위 대응만으로 텍스트와 시각 정보를 정렬하는 대조 학습 방법을 제안합니다.' }
+    ] },
+  { id:'h2', title:'대조 학습 수식 관련 대화', messages:[
+      { isUser:true, isAssistant:false, text:'수식 (1)이 뭘 의미하는지 설명해줘' },
+      { isUser:false, isAssistant:true, label:'예시', text:'수식 (1)은 대조 학습의 손실함수로, 문단 임베딩이 대응하는 영역에는 가깝게 나머지 영역에는 멀어지도록 만듭니다.' }
+    ] }
+];
+
+const PAPER_SHEET_PROPS = { style:{ padding:'28px 36px', maxWidth:'1000px' } };
+const STUDENT_MSG_PROPS = { style:{ background:'var(--color-primary-subtle)', border:'none', borderRadius:'14px 14px 4px 14px', padding:'11px 15px', fontSize:'15px', lineHeight:'1.6' } };
+
+const CANNED = {
+  summary: { q:'이 논문의 핵심을 요약해줘', label:'핵심 아이디어',
+    a:'이 논문은 그림과 캡션처럼 문서에 이미 존재하는 약한 문장 단위 대응만으로 텍스트와 시각 정보를 정렬할 수 있음을 보입니다. 핵심은 무거운 쌍 지도 데이터 없이도 공유 잠재 공간을 학습하는 대조 학습 목적함수입니다.' },
+  translate: { q:'이 섹션을 한국어로 번역해줘', label:'예시',
+    a:'초록의 첫 문장을 번역하면: 본 연구는 밀도 높은 쌍 지도 없이 시각 표현과 텍스트 표현을 정렬하는 방법을 다룬다. 이런 방식으로 선택한 문단을 문장 단위로 번역해 드릴 수 있습니다.' },
+  background: { q:'대조 학습이 뭔지 배경 지식을 알려줘', label:'이해도 확인',
+    a:'대조 학습은 서로 관련된 샘플은 가깝게, 관련 없는 샘플은 멀게 임베딩하도록 학습하는 방식입니다. 이 논문에서는 문단과 그에 대응하는 그림 영역을 가까이, 나머지 영역들과는 멀어지도록 학습합니다. 이 논문의 수식 (1)이 어떤 항을 최소화하는지 더 설명해볼까요?' },
+  default: { label:'핵심 아이디어',
+    a:'좋은 질문입니다. 이 논문의 맥락에서 보면, 제안된 방법은 적은 양의 짝지어진 데이터로도 완전 지도 방식에 가까운 정렬 성능을 얻는 것을 목표로 합니다. 더 구체적으로 어떤 부분이 궁금하신가요?' }
+};
+
+class Component extends DCLogic {
+  paperViewerRef = React.createRef();
+  notebookWrapRef = React.createRef();
+  chatInputRef = React.createRef();
+  selectionToolbarRef = React.createRef();
+  translationPopupRef = React.createRef();
+  askPopupRef = React.createRef();
+  streamTimer = null;
+  studySessionTimer = null;
+  paperAbortController = null;
+  pendingRange = null;
+  pendingText = '';
+  pendingContextKind = 'selection';
+  state = { tocOpen:false, activeSection:'', translated:false, chatOpen:true, chatWidthOpen:400, historyOpen:false, messages:[], chatInput:'', isStreaming:false, history: HISTORY.slice(), composerFocused:false, paperBlocks:[], translations:{ title:'', blocks:{} }, paperLoading:true, paperError:'', selectionToolbar:{ visible:false, x:0, y:0 }, translationPopup:{ visible:false, x:0, y:0, original:'', translated:'' }, askPopup:{ visible:false, x:0, y:0 }, headingStudyAction:{ visible:false, x:0, y:0, targetId:'', title:'', placement:'right' }, studySession:{ visible:false, sectionTitle:'', progress:0, stage:'' }, contentAskAction:{ visible:false, x:0, y:0, targetId:'', kind:'', text:'' }, composerContext:null, contextHover:false };
+
+  componentDidMount(){
+    document.addEventListener('mousedown', this.handleDocMouseDown, true);
+    this.loadPaper();
+  }
+
+  componentWillUnmount(){
+    if (this.streamTimer) clearInterval(this.streamTimer);
+    if (this.studySessionTimer) clearInterval(this.studySessionTimer);
+    if (this.paperAbortController) this.paperAbortController.abort();
+    document.removeEventListener('mousedown', this.handleDocMouseDown, true);
+  }
+
+  assetUrl(assetKey){
+    const path = PAPER_CONFIG.assetPaths[assetKey];
+    if (!path) throw new Error(`Missing mock asset path for ${assetKey}.`);
+    return PAPER_CONFIG.assetBaseUrl + path;
+  }
+
+  async loadPaper(){
+    this.paperAbortController = new AbortController();
+    try {
+      const [response, translationResponse] = await Promise.all([
+        fetch(PAPER_CONFIG.documentUrl, { signal:this.paperAbortController.signal }),
+        fetch(PAPER_CONFIG.translationUrl, { signal:this.paperAbortController.signal })
+      ]);
+      if (!response.ok) throw new Error(`Document request failed with ${response.status}.`);
+      if (!translationResponse.ok) throw new Error(`Translation request failed with ${translationResponse.status}.`);
+      const [documentData, translationData] = await Promise.all([response.json(), translationResponse.json()]);
+      if (documentData.schema_version !== 1 || !Array.isArray(documentData.blocks)) {
+        throw new Error('Unsupported frontend document format.');
+      }
+      if (translationData.paper_id !== PAPER_CONFIG.paperId || !translationData.blocks || typeof translationData.blocks !== 'object') {
+        throw new Error('Unsupported paper translation format.');
+      }
+
+      const textAssetKeys = Array.from(new Set(documentData.blocks
+        .filter(block => block.block_content && (block.block_content.format === 'table' || block.block_content.format === 'formula'))
+        .map(block => block.block_content.asset_key)));
+      const textAssets = {};
+      await Promise.all(textAssetKeys.map(async assetKey => {
+        const assetResponse = await fetch(this.assetUrl(assetKey), { signal:this.paperAbortController.signal });
+        if (!assetResponse.ok) throw new Error(`Asset request failed for ${assetKey}.`);
+        textAssets[assetKey] = await assetResponse.text();
+      }));
+
+      const parsedBlocks = documentData.blocks
+        .map(block => this.toPaperBlock(block, textAssets))
+        .filter(Boolean);
+      const paperBlocks = this.organizePaperBlocks(parsedBlocks);
+      const firstHeading = paperBlocks.find(block => block.type === 'heading' || block.type === 'subheading');
+      this.setState({
+        paperBlocks,
+        translations:translationData,
+        paperLoading:false,
+        paperError:'',
+        activeSection:firstHeading ? firstHeading.id : ''
+      }, this.typesetPaper);
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+      this.setState({
+        paperBlocks:[],
+        paperLoading:false,
+        paperError:'논문 파일을 불러오지 못했습니다. 이 페이지를 프로젝트의 로컬 서버에서 열어 주세요.'
+      });
+    }
+  }
+
+  parseTable(html){
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+    const rowElements = Array.from(parsed.querySelectorAll('tr'));
+    const firstRowCells = rowElements[0] ? Array.from(rowElements[0].children) : [];
+    const headerRowCount = firstRowCells.some(cell => (cell.colSpan || 1) > 1 || (cell.rowSpan || 1) > 1) ? 2 : 1;
+    let columnCount = 0;
+    const rows = rowElements.map((row, rowIndex) => {
+      let columnIndex = 0;
+      const header = rowIndex < headerRowCount;
+      const cells = Array.from(row.children).map(cell => {
+        const text = (cell.textContent || '').trim();
+        columnIndex += cell.colSpan || 1;
+        return {
+          text,
+          colSpan:cell.colSpan || 1,
+          rowSpan:cell.rowSpan || 1,
+          isHeader:header,
+          isBody:!header,
+          align:'center'
+        };
+      });
+      columnCount = Math.max(columnCount, columnIndex);
+      const firstText = cells.find(cell => cell.text)?.text || '';
+      const groupStart = !header && (cells.some(cell => cell.rowSpan > 1) || /^\([A-Z]\)$/.test(firstText));
+      const classes = [header ? 'pt-table-header-row' : '', rowIndex === headerRowCount - 1 ? 'pt-table-header-final' : '', groupStart ? 'pt-table-group-start' : ''].filter(Boolean);
+      return { header, cells, rowClass:classes.join(' ') };
+    });
+    return { rows, columnCount };
+  }
+
+  captionParts(text){
+    const match = String(text || '').trim().match(/^((?:Figure|Table)\s+\d+)\s*:\s*(.*)$/i);
+    return match ? { captionLabel:match[1], captionText:match[2] } : { captionLabel:'Figure', captionText:String(text || '').trim() };
+  }
+
+  attachCaption(block, caption){
+    return { ...block, ...this.captionParts(caption.text), captionBlockId:caption.blockId };
+  }
+
+  isParagraphContinuation(previous, next){
+    const before = String(previous.text || '').trim();
+    const after = String(next.text || '').trim();
+    return before.length > 0 && after.length > 0 && !/[.!?][\])}"'’”]*$/.test(before) && /^[a-z]/.test(after);
+  }
+
+  mergeParagraphs(first, second){
+    const secondSegments = (second.segments || [{ blockId:second.blockId, text:second.text }]).map((segment, index) => ({
+      ...segment,
+      text:(index === 0 ? ' ' : '') + segment.text
+    }));
+    return {
+      ...first,
+      text:`${String(first.text || '').trim()} ${String(second.text || '').trim()}`,
+      segments:[...(first.segments || [{ blockId:first.blockId, text:first.text }]), ...secondSegments]
+    };
+  }
+
+  organizePaperBlocks(blocks){
+    const grouped = [];
+    for (let index = 0; index < blocks.length; index += 1) {
+      const current = blocks[index];
+      const next = blocks[index + 1];
+      if (current.type === 'caption' && next && (next.type === 'image' || next.type === 'table')) {
+        grouped.push(this.attachCaption(next, current));
+        index += 1;
+      } else if ((current.type === 'image' || current.type === 'table') && next && next.type === 'caption') {
+        grouped.push(this.attachCaption(current, next));
+        index += 1;
+      } else {
+        grouped.push(current);
+      }
+    }
+
+    const organized = [];
+    for (let index = 0; index < grouped.length; index += 1) {
+      const current = grouped[index];
+      if (current.type !== 'para') {
+        organized.push(current);
+        continue;
+      }
+
+      let paragraph = current;
+      const deferredMedia = [];
+      while (index + 1 < grouped.length) {
+        let nextIndex = index + 1;
+        const media = [];
+        while (nextIndex < grouped.length && (grouped[nextIndex].type === 'image' || grouped[nextIndex].type === 'table')) {
+          media.push(grouped[nextIndex]);
+          nextIndex += 1;
+        }
+        const continuation = grouped[nextIndex];
+        if (!continuation || continuation.type !== 'para' || !this.isParagraphContinuation(paragraph, continuation)) break;
+        paragraph = this.mergeParagraphs(paragraph, continuation);
+        deferredMedia.push(...media);
+        index = nextIndex;
+      }
+      organized.push(paragraph, ...deferredMedia);
+    }
+    const structured = [];
+    for (let index = 0; index < organized.length; index += 1) {
+      const current = organized[index];
+      if (current.type !== 'listItem') {
+        structured.push(current);
+        continue;
+      }
+      const items = [];
+      while (index < organized.length && organized[index].type === 'listItem') {
+        items.push({ blockId:organized[index].blockId, text:organized[index].text });
+        index += 1;
+      }
+      index -= 1;
+      structured.push({ ...current, type:'list', items });
+    }
+    const attentionVisualizationsIndex = structured.findIndex(block => block.text === 'Attention Visualizations');
+    if (attentionVisualizationsIndex >= 0) {
+      structured.splice(attentionVisualizationsIndex, 0, {
+        id:'appendix',
+        blockId:'',
+        pageIndex:structured[attentionVisualizationsIndex].pageIndex,
+        label:'synthetic_heading',
+        type:'heading',
+        text:'Appendix'
+      });
+    }
+    return structured;
+  }
+
+  toPaperBlock(block, textAssets){
+    const content = block.block_content || {};
+    const base = {
+      id:block.block_id,
+      blockId:block.block_id,
+      pageIndex:block.page_index,
+      label:block.block_label
+    };
+
+    if (content.format === 'text') {
+      if (block.block_label === 'doc_title') return null;
+      if (block.global_block_order >= 1 && block.global_block_order <= 3) return null;
+      if (content.text.trim() === 'Attention Visualizations') return { ...base, type:'subheading', text:content.text };
+      if (block.heading_level != null) {
+        const type = block.heading_level === 2 ? 'heading' : (block.heading_level === 3 ? 'subheading' : 'minorHeading');
+        return { ...base, type, text:content.text };
+      }
+      if (block.block_label === 'figure_title') return { ...base, type:'caption', text:content.text };
+      if (block.block_label === 'reference_content') return { ...base, type:'reference', text:content.text };
+      if (/^-\s+/.test(content.text.trim())) return { ...base, type:'listItem', text:content.text.trim().replace(/^-\s+/, '') };
+      return { ...base, type:'para', text:content.text, segments:[{ blockId:block.block_id, text:content.text }] };
+    }
+
+    const assetKey = content.asset_key;
+    if (content.format === 'image') {
+      const bbox = Array.isArray(block.block_bbox) ? block.block_bbox : [0, 0, 1, 1];
+      const width = Math.max(1, bbox[2] - bbox[0]);
+      const height = Math.max(1, bbox[3] - bbox[1]);
+      return { ...base, type:'image', assetUrl:this.assetUrl(assetKey), aspectRatio:`${width} / ${height}`, aspectValue:width / height, alt:`Figure from page ${block.page_index + 1}` };
+    }
+    if (content.format === 'formula') {
+      return { ...base, type:'equation', text:`\\[${textAssets[assetKey] || ''}\\]` };
+    }
+    if (content.format === 'table') {
+      return { ...base, type:'table', ...this.parseTable(textAssets[assetKey] || '') };
+    }
+    return null;
+  }
+
+  typesetPaper = () => {
+    const run = (attempt) => {
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        const root = this.paperViewerRef.current;
+        window.MathJax.typesetPromise(root ? [root] : undefined).catch(() => {});
+        return;
+      }
+      if (attempt < 20) setTimeout(() => run(attempt + 1), 150);
+    };
+    requestAnimationFrame(() => run(0));
+  };
+
+  clearHeadingStudyTarget = () => {
+    const viewer = this.paperViewerRef.current;
+    if (viewer) viewer.querySelectorAll('[data-study-target="true"]').forEach(element => element.removeAttribute('data-study-target'));
+    this.setState({ headingStudyAction:{ visible:false, x:0, y:0, targetId:'', title:'', placement:'right' } });
+  };
+
+  clearContentAskTarget = () => {
+    const viewer = this.paperViewerRef.current;
+    if (viewer) viewer.querySelectorAll('[data-context-target="true"]').forEach(element => element.removeAttribute('data-context-target'));
+    this.setState({ contentAskAction:{ visible:false, x:0, y:0, targetId:'', kind:'', text:'' } });
+  };
+
+  contextTextForBlock(blockId, kind){
+    const block = this.state.paperBlocks.find(item => item.blockId === blockId);
+    if (!block) return kind === 'image' ? '선택한 이미지' : (kind === 'table' ? '선택한 표' : '선택한 수식');
+    if (kind === 'image') {
+      return block.captionText ? `${block.captionLabel || 'Figure'}. ${block.captionText}` : (block.alt || '선택한 이미지');
+    }
+    if (kind === 'formula') return block.text || '선택한 수식';
+    const caption = block.captionText ? `${block.captionLabel || 'Table'}. ${block.captionText}` : '선택한 표';
+    const tableText = (block.rows || []).map(row => row.cells.map(cell => cell.text).join(' | ')).join('\n');
+    return this.truncate(`${caption}${tableText ? `\n${tableText}` : ''}`, 1400);
+  }
+
+  handlePaperClick = (e) => {
+    const viewer = this.paperViewerRef.current;
+    if (!viewer || !e.target || !e.target.closest) return;
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed) return;
+
+    const contentTarget = e.target.closest('.pt-context-target[data-context-kind]');
+    if (contentTarget && viewer.contains(contentTarget)) {
+      const targetId = contentTarget.getAttribute('data-block-id') || contentTarget.id;
+      const kind = contentTarget.getAttribute('data-context-kind');
+      const isSameTarget = this.state.contentAskAction.targetId === targetId;
+      viewer.querySelectorAll('[data-context-target="true"]').forEach(element => element.removeAttribute('data-context-target'));
+      if (this.state.headingStudyAction.visible) this.clearHeadingStudyTarget();
+      if (isSameTarget) {
+        this.setState({ contentAskAction:{ visible:false, x:0, y:0, targetId:'', kind:'', text:'' } });
+        return;
+      }
+
+      contentTarget.setAttribute('data-context-target', 'true');
+      const rect = contentTarget.getBoundingClientRect();
+      this.setState({
+        askPopup:{ visible:false, x:0, y:0 },
+        selectionToolbar:{ visible:false, x:0, y:0 },
+        contentAskAction:{
+          visible:true,
+          x:rect.right - 8,
+          y:rect.top + 8,
+          targetId,
+          kind,
+          text:this.contextTextForBlock(targetId, kind)
+        }
+      });
+      return;
+    }
+
+    if (this.state.contentAskAction.targetId) this.clearContentAskTarget();
+    if (this.state.askPopup.visible) this.hideAskPopup();
+    const headingLabel = e.target.closest('.pt-study-heading-label');
+    const heading = headingLabel ? headingLabel.closest('h2,h3,h4') : e.target.closest('h1');
+    if (!heading || !viewer.contains(heading)) {
+      if (this.state.headingStudyAction.visible) this.clearHeadingStudyTarget();
+      return;
+    }
+
+    const targetId = heading.id || `paper-heading-${String(heading.textContent || '').trim()}`;
+    const isSameTarget = this.state.headingStudyAction.visible && this.state.headingStudyAction.targetId === targetId;
+    viewer.querySelectorAll('[data-study-target="true"]').forEach(element => element.removeAttribute('data-study-target'));
+    if (isSameTarget) {
+      this.setState({ headingStudyAction:{ visible:false, x:0, y:0, targetId:'', title:'', placement:'right' } });
+      return;
+    }
+
+    heading.setAttribute('data-study-target', 'true');
+    const label = heading.querySelector('.pt-study-heading-label') || heading;
+    const rect = label.getBoundingClientRect();
+    const viewerRect = viewer.getBoundingClientRect();
+    const placement = rect.right + 104 <= viewerRect.right - 12 ? 'right' : 'below';
+    const x = placement === 'right' ? rect.right + 10 : rect.right;
+    const y = placement === 'right' ? rect.top + rect.height / 2 : rect.bottom + 8;
+    this.setState({ headingStudyAction:{ visible:true, x, y, targetId, title:String(heading.textContent || '').trim(), placement } });
+  };
+
+  onHeadingStudyAction = (e) => {
+    if (e) e.stopPropagation();
+    const sectionTitle = this.state.headingStudyAction.title || PAPER_CONFIG.title;
+    if (this.studySessionTimer) clearInterval(this.studySessionTimer);
+    const viewer = this.paperViewerRef.current;
+    if (viewer) viewer.querySelectorAll('[data-study-target="true"]').forEach(element => element.removeAttribute('data-study-target'));
+    this.setState({
+      headingStudyAction:{ visible:false, x:0, y:0, targetId:'', title:'', placement:'right' },
+      studySession:{ visible:true, sectionTitle, progress:4, stage:'섹션 구조를 살펴보고 있어요' }
+    });
+    this.studySessionTimer = setInterval(() => {
+      this.setState(previous => {
+        if (!previous.studySession.visible || previous.studySession.progress >= 100) return null;
+        const current = previous.studySession.progress;
+        const progress = Math.min(100, current + (current < 48 ? 5 : (current < 82 ? 3 : 2)));
+        const stage = progress < 45
+          ? '섹션 구조를 살펴보고 있어요'
+          : (progress < 78 ? '핵심 개념을 정리하고 있어요' : (progress < 100 ? '확인 문제를 구성하고 있어요' : '학습 세션 준비가 완료되었어요'));
+        if (progress >= 100 && this.studySessionTimer) {
+          clearInterval(this.studySessionTimer);
+          this.studySessionTimer = null;
+        }
+        return { studySession:{ ...previous.studySession, progress, stage } };
+      });
+    }, 600);
+  };
+
+  closeStudySession = () => {
+    if (this.studySessionTimer) clearInterval(this.studySessionTimer);
+    this.studySessionTimer = null;
+    this.setState({ studySession:{ visible:false, sectionTitle:'', progress:0, stage:'' } });
+  };
+
+  stopStudySessionClick = (e) => { if (e) e.stopPropagation(); };
+
+  onContentAskAction = (e) => {
+    if (e) e.stopPropagation();
+    const action = this.state.contentAskAction;
+    if (!action.text || !action.kind) return;
+    this.pendingText = action.text;
+    this.pendingContextKind = action.kind;
+    this.setState({
+      contentAskAction:{ ...action, visible:false },
+      askPopup:{ visible:true, x:action.x - 42, y:action.y }
+    });
+  };
+
+  handleDocMouseDown = (e) => {
+    const tb = this.selectionToolbarRef.current;
+    const tp = this.translationPopupRef.current;
+    const ap = this.askPopupRef.current;
+    const headingStudyAction = e.target && e.target.closest ? e.target.closest('[data-heading-study-action="true"]') : null;
+    const contentAskAction = e.target && e.target.closest ? e.target.closest('[data-content-ask-action="true"]') : null;
+    if ((tb && tb.contains(e.target)) || (tp && tp.contains(e.target)) || (ap && ap.contains(e.target)) || headingStudyAction || contentAskAction) return;
+    const viewer = this.paperViewerRef.current;
+    if (viewer && viewer.contains(e.target)) return;
+    if (this.state.selectionToolbar.visible) this.hideSelectionToolbar();
+    if (this.state.translationPopup.visible) this.closeTranslationPopup();
+    if (this.state.askPopup.visible) this.hideAskPopup();
+    if (this.state.headingStudyAction.visible) this.clearHeadingStudyTarget();
+    if (this.state.contentAskAction.targetId) this.clearContentAskTarget();
+  };
+
+  hideAskPopup = () => this.setState({ askPopup:{ visible:false, x:0, y:0 } });
+
+  closeTranslationPopup = () => this.setState({ translationPopup:{ visible:false, x:0, y:0, original:'', translated:'' } });
+
+  handleViewerScroll = () => {
+    if (this.state.selectionToolbar.visible) this.hideSelectionToolbar();
+    if (this.state.askPopup.visible) this.hideAskPopup();
+    if (this.state.headingStudyAction.visible) this.clearHeadingStudyTarget();
+    if (this.state.contentAskAction.targetId) this.clearContentAskTarget();
+  };
+
+  hideSelectionToolbar(){
+    this.setState({ selectionToolbar:{ visible:false, x:0, y:0 } });
+  }
+
+  handlePaperMouseUp = () => {
+    requestAnimationFrame(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { this.hideSelectionToolbar(); return; }
+      const text = sel.toString().trim();
+      if (!text) { this.hideSelectionToolbar(); return; }
+      const range = sel.getRangeAt(0);
+      const viewer = this.paperViewerRef.current;
+      if (!viewer) return;
+      const rect = range.getBoundingClientRect();
+      const vRect = viewer.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) { this.hideSelectionToolbar(); return; }
+      let x = rect.left + rect.width / 2;
+      let y = rect.top;
+      x = Math.max(vRect.left + 132, Math.min(x, vRect.right - 132));
+      this.pendingRange = range.cloneRange();
+      this.pendingText = text;
+      this.setState({ selectionToolbar:{ visible:true, x, y } });
+    });
+  };
+
+  applyHighlightFlash(){
+    const range = this.pendingRange;
+    if (!range) return;
+    try {
+      const mark = document.createElement('span');
+      mark.style.background = 'var(--color-primary-subtle)';
+      mark.style.transition = 'background 900ms ease';
+      mark.style.borderRadius = '2px';
+      range.surroundContents(mark);
+      setTimeout(() => { mark.style.background = 'transparent'; }, 650);
+    } catch (e) { /* selection spans multiple elements; skip flash */ }
+  }
+
+  truncate(text, n){
+    return text.length > n ? text.slice(0, n).trim() + '\u2026' : text;
+  }
+
+  mockTranslate(text){
+    return '\uC120\uD0DD\uD558\uC2E0 \uBB38\uC7A5\uC744 \uD55C\uAD6D\uC5B4\uB85C \uC625\uAE30\uBA74 \uC790\uC5F0\uC2A4\uB7EC\uC6B4 \uD559\uC220 \uBB38\uCCB4\uB85C \uBC88\uC5ED\uB429\uB2C8\uB2E4. (\uBCF8 \uBAA9\uC5C5\uC5D0\uC11C\uB294 \uC608\uC2DC \uBC88\uC5ED\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.)';
+  }
+
+  onSelectionTranslate = () => {
+    const text = this.pendingText;
+    if (!text) return;
+    const x = this.state.selectionToolbar.x, y = this.state.selectionToolbar.y;
+    this.applyHighlightFlash();
+    window.getSelection().removeAllRanges();
+    this.hideSelectionToolbar();
+    this.setState({ translationPopup:{ visible:true, x, y, original:this.truncate(text, 220), translated:this.mockTranslate(text) } });
+  };
+
+  onSelectionAsk = () => {
+    if (!this.pendingText) return;
+    const x = this.state.selectionToolbar.x, y = this.state.selectionToolbar.y;
+    this.pendingContextKind = 'selection';
+    this.hideSelectionToolbar();
+    this.setState({ askPopup:{ visible:true, x, y } });
+  };
+
+  onSelectionStudy = () => {};
+
+  pasteIntoComposer(text){
+    const quoted = `\u201C${this.truncate(text, 300)}\u201D\n`;
+    this.setState({ chatInput: quoted }, () => {
+      const el = this.chatInputRef.current;
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }
+
+  attachContext(text, kind = 'selection'){
+    this.setState({ composerContext:{ text, kind }, contextHover:false, chatInput:'' }, () => {
+      const el = this.chatInputRef.current;
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }
+
+  clearContext = () => this.setState({ composerContext:null, contextHover:false });
+  onClearContextClick = (e) => { e.stopPropagation(); this.clearContext(); };
+  toggleContextTooltip = () => this.setState(s => ({ contextHover: !s.contextHover }));
+  closeContextTooltip = () => this.setState({ contextHover:false });
+
+  onAskCurrentChat = () => {
+    const text = this.pendingText;
+    if (!text) return;
+    const kind = this.pendingContextKind || 'selection';
+    if (kind === 'selection') {
+      this.applyHighlightFlash();
+      window.getSelection().removeAllRanges();
+    }
+    this.hideAskPopup();
+    if (this.state.contentAskAction.targetId) this.clearContentAskTarget();
+    if (!this.state.chatOpen) this.setState({ chatOpen:true });
+    this.attachContext(text, kind);
+  };
+
+  onAskNewChat = () => {
+    const text = this.pendingText;
+    if (!text) return;
+    const kind = this.pendingContextKind || 'selection';
+    if (kind === 'selection') {
+      this.applyHighlightFlash();
+      window.getSelection().removeAllRanges();
+    }
+    this.hideAskPopup();
+    if (this.state.contentAskAction.targetId) this.clearContentAskTarget();
+    if (!this.state.chatOpen) this.setState({ chatOpen:true });
+    this.newConversation();
+    this.attachContext(text, kind);
+  };
+
+  componentDidUpdate(prevProps, prevState){
+    if (!prevState) return;
+    const prevMsgs = prevState.messages || [], msgs = this.state.messages || [];
+    const prevLast = prevMsgs[prevMsgs.length - 1];
+    const last = msgs[msgs.length - 1];
+    if (prevMsgs.length !== msgs.length || (last && prevLast && last.text !== prevLast.text)) {
+      this.scrollChatToBottom();
+    }
+  }
+
+  scrollChatToBottom(){
+    requestAnimationFrame(() => {
+      const root = this.notebookWrapRef.current;
+      if (!root) return;
+      const scrollDiv = root.querySelector('[style*="overflow-y"]') || root;
+      scrollDiv.scrollTop = scrollDiv.scrollHeight;
+    });
+  }
+
+  goToSection = (id) => {
+    this.setState({ activeSection:id });
+    requestAnimationFrame(() => {
+      const container = this.paperViewerRef.current;
+      const el = container && document.getElementById(id);
+      if (!container || !el) return;
+      const targetTop = container.scrollTop + (el.getBoundingClientRect().top - container.getBoundingClientRect().top) - 24;
+      container.scrollTo({ top: targetTop, behavior:'smooth' });
+    });
+  };
+
+  toggleToc = () => this.setState(s => ({ tocOpen: !s.tocOpen }));
+  toggleTranslate = () => this.setState(s => ({
+    translated:!s.translated,
+    translationPopup:{ visible:false, x:0, y:0, original:'', translated:'' }
+  }), this.typesetPaper);
+  toggleChat = () => this.setState(s => ({ chatOpen: !s.chatOpen }));
+  toggleHistory = () => this.setState(s => ({ historyOpen: !s.historyOpen }));
+
+  handleInputChange = (e) => {
+    const val = e.target.value;
+    this.setState({ chatInput: val });
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  };
+
+  handleComposerFocus = () => this.setState({ composerFocused:true });
+  handleComposerBlur = () => this.setState({ composerFocused:false });
+
+  handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      this.handleSend();
+    }
+  };
+
+  resetComposerHeight(){
+    if (this.chatInputRef.current) this.chatInputRef.current.style.height = '44px';
+  }
+
+  loadHistory = (id) => {
+    const h = this.state.history.find(x => x.id === id);
+    if (!h) return;
+    if (this.streamTimer) clearInterval(this.streamTimer);
+    this.setState({ messages: h.messages.map(m => ({ ...m })), historyOpen:false, isStreaming:false, chatInput:'' });
+    this.resetComposerHeight();
+  };
+
+  startResize = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = this.state.chatWidthOpen;
+    const onMove = (ev) => {
+      let w = startWidth + (startX - ev.clientX);
+      w = Math.max(280, Math.min(640, w));
+      this.setState({ chatWidthOpen: w });
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  pushUser(text){
+    this.setState(s => ({ messages: [...s.messages, { isUser:true, isAssistant:false, text }] }));
+  }
+
+  pushLoading(){
+    this.setState(s => ({ messages: [...s.messages, { isUser:false, isAssistant:true, loading:true, text:'' }], isStreaming:true }));
+  }
+
+  beginStreaming(fullText){
+    this.setState(s => {
+      const msgs = s.messages.slice();
+      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], loading:false };
+      return { messages: msgs };
+    });
+    const words = fullText.split(' ');
+    let i = 0;
+    this.streamTimer = setInterval(() => {
+      i++;
+      const done = i >= words.length;
+      this.setState(s => {
+        const msgs = s.messages.slice();
+        const last = { ...msgs[msgs.length - 1] };
+        last.text = words.slice(0, i).join(' ') + (done ? '' : ' \u258C');
+        msgs[msgs.length - 1] = last;
+        return { messages: msgs, isStreaming: !done };
+      });
+      if (done) clearInterval(this.streamTimer);
+    }, 45);
+  }
+
+  sendChip = (key) => {
+    if (this.state.isStreaming) return;
+    const c = CANNED[key];
+    this.pushUser(c.q);
+    this.pushLoading();
+    setTimeout(() => this.beginStreaming(c.a), 700);
+  };
+
+  handleSend = () => {
+    const text = this.state.chatInput.trim();
+    const ctx = this.state.composerContext;
+    if (!text || this.state.isStreaming) return;
+    const full = ctx ? `\u201C${this.truncate(ctx.text, 300)}\u201D\n\n${text}` : text;
+    this.pushUser(full);
+    this.setState({ chatInput:'', composerContext:null, contextHover:false });
+    this.resetComposerHeight();
+    this.pushLoading();
+    setTimeout(() => this.beginStreaming(CANNED.default.a), 700);
+  };
+
+  newConversation = () => {
+    if (this.streamTimer) clearInterval(this.streamTimer);
+    this.setState(s => {
+      let history = s.history;
+      if (s.messages.length) {
+        const firstUser = s.messages.find(m => m.isUser);
+        const raw = firstUser ? firstUser.text : '대화';
+        const title = raw.length > 22 ? raw.slice(0, 22) + '…' : raw;
+        history = [{ id:'c' + Date.now(), title, messages: s.messages.map(m => ({ ...m })) }, ...s.history];
+      }
+      return { messages:[], isStreaming:false, chatInput:'', history };
+    });
+    this.resetComposerHeight();
+  };
+
+  renderVals(){
+    const t = this.state.translated;
+    const sourceBlocks = this.state.paperBlocks;
+    const translationBlocks = (this.state.translations && this.state.translations.blocks) || {};
+    const translatedText = (blockId, fallback) => t && blockId && translationBlocks[blockId] ? translationBlocks[blockId] : fallback;
+    const blockText = (block) => {
+      if (block.type === 'heading' || block.type === 'subheading' || block.type === 'minorHeading') return block.text || '';
+      return translatedText(block.blockId, block.text || '');
+    };
+    const blocks = sourceBlocks.map(b => ({
+      isHeading: b.type === 'heading', isSubheading: b.type === 'subheading', isMinorHeading: b.type === 'minorHeading', isPara: b.type === 'para', isList: b.type === 'list', isAuthors: b.type === 'authors',
+      isReference: b.type === 'reference', isImage: b.type === 'image',
+      isEquation: b.type === 'equation', isTable: b.type === 'table',
+      id: b.id || '',
+      blockId: b.blockId || '',
+      text: b.type === 'table' ? '' : blockText(b),
+      assetUrl: b.assetUrl || '',
+      alt: b.alt || '',
+      segments: b.type === 'para' ? b.segments.map(segment => {
+        const leadingSpace = (segment.text.match(/^\s*/) || [''])[0];
+        return { ...segment, text:leadingSpace + translatedText(segment.blockId, segment.text).trimStart() };
+      }) : [],
+      items: b.type === 'list' ? b.items.map(item => ({ ...item, text:translatedText(item.blockId, item.text) })) : [],
+      hasCaption: Boolean(b.captionText),
+      captionBlockId: b.captionBlockId || '',
+      captionLabel: b.captionLabel || '',
+      captionText: b.captionText || '',
+      figureStyle: b.type === 'image' ? `width:min(100%,${Math.round(Math.min(640, b.aspectValue * 460) + 22)}px)` : '',
+      imageStyle: b.type === 'image' ? `aspect-ratio:${b.aspectRatio};background-image:url("${b.assetUrl}")` : '',
+      tableClass: b.type === 'table' && b.columnCount > 7 ? 'pt-table-matrix' : '',
+      tableStyle: b.type === 'table' && b.columnCount > 7 ? 'min-width:680px' : '',
+      authors: b.authors || [],
+      rows: b.type === 'table' ? b.rows.map(r => ({
+        rowClass: r.rowClass,
+        cells: r.cells.map(c => ({
+          text: c.text,
+          colSpan: c.colSpan,
+          rowSpan: c.rowSpan,
+          isHeader: c.isHeader,
+          isBody: c.isBody,
+          alignStyle: `text-align:${c.align}`
+        }))
+      })) : null
+    }));
+    const toc = sourceBlocks.filter(b => b.type === 'heading' || b.type === 'subheading' || b.type === 'minorHeading').map(b => {
+      const active = b.id === this.state.activeSection;
+      const sub = b.type === 'subheading';
+      const minor = b.type === 'minorHeading';
+      return {
+        label: blockText(b),
+        onClick: () => this.goToSection(b.id),
+        rowStyle: `display:flex;align-items:center;width:100%;text-align:left;padding:${minor ? '6px 10px 6px 42px' : (sub ? '7px 10px 7px 26px' : '9px 10px')};border:none;border-radius:6px;background:${active ? 'var(--color-primary-subtle)' : 'transparent'};color:${active ? 'var(--color-primary)' : 'var(--color-text-body)'};font-family:var(--font-sans);font-size:${minor ? '12px' : (sub ? '12.5px' : '13px')};font-weight:${active ? '600' : '400'};cursor:pointer;transition:background 150ms ease`
+      };
+    });
+    const tocOpen = this.state.tocOpen;
+    const chatOpen = this.state.chatOpen;
+    const collapsedWidth = 44;
+    const openWidth = this.state.chatWidthOpen;
+    const chatWidth = chatOpen ? openWidth : collapsedWidth;
+    const rightZoneWidth = chatOpen ? (openWidth + 6) : collapsedWidth;
+    const messages = this.state.messages.map(m => ({ ...m, notLoading: !m.loading }));
+    const historyList = this.state.history.map(h => ({ title: h.title, onClick: () => this.loadHistory(h.id) }));
+    const composerContext = this.state.composerContext;
+    const contextKind = composerContext ? composerContext.kind : 'selection';
+    const contextConfigs = {
+      selection:{ label:'인용', previewLabel:'선택한 내용', color:'var(--color-text-body)', soft:'var(--color-bg-surface)', border:'var(--color-border)' },
+      image:{ label:'이미지', previewLabel:'이미지', color:'var(--color-success)', soft:'color-mix(in srgb,var(--color-success) 17%,var(--color-bg-paper))', border:'color-mix(in srgb,var(--color-success) 48%,var(--color-border))' },
+      table:{ label:'표', previewLabel:'표', color:'var(--color-primary)', soft:'color-mix(in srgb,var(--color-primary) 16%,var(--color-bg-paper))', border:'color-mix(in srgb,var(--color-primary) 48%,var(--color-border))' },
+      formula:{ label:'수식', previewLabel:'수식', color:'var(--color-accent-brass)', soft:'color-mix(in srgb,var(--color-accent-brass) 19%,var(--color-bg-paper))', border:'color-mix(in srgb,var(--color-accent-brass) 52%,var(--color-border))' }
+    };
+    const contextConfig = contextConfigs[contextKind] || contextConfigs.selection;
+    return {
+      paperTitle: PAPER_CONFIG.title,
+      paperMeta: PAPER_CONFIG.meta,
+      paperLoading: this.state.paperLoading,
+      paperLoadFailed: !!this.state.paperError,
+      paperError: this.state.paperError,
+      blocks, toc, tocOpen, chatOpen, chatCollapsed: !chatOpen,
+      historyOpen: this.state.historyOpen, historyList, toggleHistory: this.toggleHistory,
+      startResize: this.startResize,
+      chatInputRef: this.chatInputRef,
+      handleKeyDown: this.handleKeyDown,
+      handleComposerFocus: this.handleComposerFocus,
+      handleComposerBlur: this.handleComposerBlur,
+      composerBoxStyle: `display:flex;align-items:flex-end;gap:4px;border:1px solid ${this.state.composerFocused ? 'var(--color-primary)' : 'var(--color-border)'};border-radius:14px;background:var(--color-bg-paper);padding:5px 5px 5px 14px;transition:border-color 150ms ease`,
+      railStyle: `width:${tocOpen ? '260px' : '44px'};flex-shrink:0;background:var(--color-bg-surface);border-right:1px solid var(--color-border);display:flex;flex-direction:column;align-items:${tocOpen ? 'flex-start' : 'center'};padding:10px ${tocOpen ? '16px' : '0'};gap:12px;overflow:hidden;box-sizing:border-box;transition:width 200ms ease`,
+      tocIcon: tocOpen ? 'x' : 'list',
+      tocLabel: tocOpen ? '목차 닫기' : '목차 열기',
+      toggleToc: this.toggleToc,
+      toggleTranslate: this.toggleTranslate,
+      translationActive: t,
+      translationButtonLabel: t ? '영문 원문 보기' : '논문 번역',
+      translationTopBarStyle: `height:32px;display:flex;align-items:center;justify-content:center;gap:7px;flex-shrink:0;background:${t ? 'var(--color-bg-paper)' : 'rgba(255,253,247,0.08)'};border:1px solid ${t ? 'var(--color-bg-paper)' : 'rgba(255,253,247,0.18)'};border-radius:8px;color:${t ? 'var(--color-primary)' : 'rgba(255,253,247,0.88)'};padding:0 10px 0 8px;cursor:pointer;font-family:var(--font-sans);font-size:12px;font-weight:600;white-space:nowrap;transition:background 150ms ease,color 150ms ease,border-color 150ms ease`,
+      translationTopBarHoverStyle: t ? `background:var(--color-bg-surface);border-color:var(--color-bg-surface);color:var(--color-primary)` : `background:rgba(255,253,247,0.16);border-color:rgba(255,253,247,0.32);color:var(--color-on-dark)`,
+      topBarRightStyle: `width:${rightZoneWidth}px;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:${chatOpen ? 'flex-end' : 'center'};padding:${chatOpen ? '0 20px' : '0 6px'};border-left:1px solid rgba(255,253,247,0.14)`,
+      chatPanelStyle: `width:${chatWidth}px;box-sizing:border-box;flex-shrink:0;display:flex;flex-direction:column;background:var(--color-bg-paper);border-left:1px solid var(--color-border);overflow:hidden`,
+      toggleChat: this.toggleChat,
+      paperViewerRef: this.paperViewerRef,
+      notebookWrapRef: this.notebookWrapRef,
+      messages, hasMessages: messages.length > 0, noMessages: messages.length === 0,
+      chatInput: this.state.chatInput,
+      handleInputChange: this.handleInputChange,
+      handleSend: this.handleSend,
+      isStreaming: this.state.isStreaming,
+      sendBtnStyle: `width:44px;height:44px;flex-shrink:0;border-radius:9999px;border:none;background:var(--color-primary);color:var(--color-on-primary);display:flex;align-items:center;justify-content:center;cursor:${this.state.isStreaming ? 'not-allowed' : 'pointer'};opacity:${this.state.isStreaming ? 0.5 : 1};transition:background 150ms ease`,
+      sendSummary: () => this.sendChip('summary'),
+      sendTranslate: () => this.sendChip('translate'),
+      sendBackground: () => this.sendChip('background'),
+      newConversation: this.newConversation,
+      handlePaperClick: this.handlePaperClick,
+      handlePaperMouseUp: this.handlePaperMouseUp,
+      handleViewerScroll: this.handleViewerScroll,
+      headingStudyActionVisible: this.state.headingStudyAction.visible,
+      headingStudyActionStyle: `position:fixed;left:${this.state.headingStudyAction.x}px;top:${this.state.headingStudyAction.y}px;transform:${this.state.headingStudyAction.placement === 'below' ? 'translate(-100%,0)' : 'translate(0,-50%)'};display:inline-flex;align-items:center;gap:6px;background:var(--color-bg-walnut);border:none;border-radius:var(--radius-control);box-shadow:var(--shadow-menu);color:var(--color-on-dark);font-family:var(--font-sans);font-size:12px;font-weight:600;padding:7px 10px;white-space:nowrap;cursor:pointer;z-index:76;transition:background 150ms ease`,
+      onHeadingStudyAction: this.onHeadingStudyAction,
+      studySessionVisible: this.state.studySession.visible,
+      studySessionPreparing: this.state.studySession.progress < 100,
+      studySessionReady: this.state.studySession.progress >= 100,
+      studySessionDialogTitle: this.state.studySession.progress >= 100 ? '학습 세션이 준비됐어요' : '학습 세션을 준비하고 있어요',
+      studySessionSectionTitle: this.state.studySession.sectionTitle,
+      studySessionProgress: this.state.studySession.progress,
+      studySessionProgressStyle: `height:100%;width:${this.state.studySession.progress}%;border-radius:inherit;background:var(--color-primary);transition:width 560ms ease`,
+      closeStudySession: this.closeStudySession,
+      stopStudySessionClick: this.stopStudySessionClick,
+      contentAskActionVisible: this.state.contentAskAction.visible,
+      contentAskActionStyle: `position:fixed;left:${this.state.contentAskAction.x}px;top:${this.state.contentAskAction.y}px;transform:translate(-100%,0);display:inline-flex;align-items:center;gap:6px;background:var(--color-bg-walnut);border:none;border-radius:var(--radius-control);box-shadow:var(--shadow-menu);color:var(--color-on-dark);font-family:var(--font-sans);font-size:12px;font-weight:600;padding:7px 10px;white-space:nowrap;cursor:pointer;z-index:76;transition:background 150ms ease`,
+      onContentAskAction: this.onContentAskAction,
+      selectionToolbarRef: this.selectionToolbarRef,
+      selectionToolbarVisible: this.state.selectionToolbar.visible,
+      showSelectionTranslate: !this.state.translated,
+      selectionToolbarStyle: `position:fixed;left:${this.state.selectionToolbar.x}px;top:${this.state.selectionToolbar.y}px;transform:translate(-50%, calc(-100% - 10px));display:inline-flex;background:var(--color-bg-walnut);border-radius:var(--radius-control);box-shadow:var(--shadow-menu);padding:4px;gap:2px;z-index:80`,
+      selToolbarBtnStyle: `display:flex;align-items:center;gap:6px;background:transparent;border:none;cursor:pointer;color:var(--color-on-dark);font-family:var(--font-sans);font-size:13px;font-weight:600;padding:8px 12px;border-radius:var(--radius-structural);white-space:nowrap;transition:background 150ms ease`,
+      selToolbarBtnHoverStyle: `background:rgba(255,253,247,0.14)`,
+      onSelectionTranslate: this.onSelectionTranslate,
+      onSelectionAsk: this.onSelectionAsk,
+      onSelectionStudy: this.onSelectionStudy,
+      translationPopupRef: this.translationPopupRef,
+      translationPopupVisible: this.state.translationPopup.visible,
+      translationPopupOriginal: this.state.translationPopup.original,
+      translationPopupTranslated: this.state.translationPopup.translated,
+      closeTranslationPopup: this.closeTranslationPopup,
+      translationPopupStyle: `position:fixed;left:${this.state.translationPopup.x}px;top:${this.state.translationPopup.y}px;transform:translate(-50%, calc(-100% - 10px));width:300px;box-sizing:border-box;background:var(--color-bg-paper);border:1px solid var(--color-border);border-radius:var(--radius-control);box-shadow:var(--shadow-menu);padding:14px 16px;z-index:80;position:fixed`,
+      askPopupRef: this.askPopupRef,
+      askPopupVisible: this.state.askPopup.visible,
+      onAskCurrentChat: this.onAskCurrentChat,
+      onAskNewChat: this.onAskNewChat,
+      askPopupStyle: `position:fixed;left:${this.state.askPopup.x}px;top:${this.state.askPopup.y}px;transform:translate(-50%, calc(-100% - 10px));width:max-content;box-sizing:border-box;background:var(--color-bg-paper);border:1px solid var(--color-border);border-radius:10px;box-shadow:var(--shadow-menu);padding:4px;display:flex;flex-direction:column;z-index:80`,
+      askPopupRowStyle: `display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;text-align:left;white-space:nowrap;padding:7px 12px 7px 7px;border:none;background:transparent;border-radius:7px;cursor:pointer;transition:background 150ms ease`,
+      hasContext: !!this.state.composerContext,
+      composerContextText: composerContext ? composerContext.text : '',
+      contextIsSelection: contextKind === 'selection',
+      contextIsImage: contextKind === 'image',
+      contextIsTable: contextKind === 'table',
+      contextIsFormula: contextKind === 'formula',
+      contextLabel: contextConfig.label,
+      contextPreviewLabel: contextConfig.previewLabel,
+      contextRemoveLabel: `${contextConfig.label} 제거`,
+      contextHover: this.state.contextHover,
+      onContextHoverEnter: this.onContextHoverEnter,
+      onContextHoverLeave: this.onContextHoverLeave,
+      toggleContextTooltip: this.toggleContextTooltip,
+      closeContextTooltip: this.closeContextTooltip,
+      onClearContextClick: this.onClearContextClick,
+      clearContext: this.clearContext,
+      contextChipStyle: `display:inline-flex;align-items:center;gap:7px;background:var(--color-bg-paper);border:1px solid ${contextConfig.border};border-radius:9px;padding:4px 7px 4px 4px;font-family:var(--font-sans);color:${contextConfig.color};cursor:pointer;box-shadow:0 2px 6px color-mix(in srgb,${contextConfig.color} 12%,transparent);transition:border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease`,
+      contextChipIconStyle: `width:25px;height:25px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:6px;background:${contextConfig.soft};color:${contextConfig.color}`,
+      contextLabelStyle: `font-size:12.5px;font-weight:600;line-height:1;color:${contextConfig.color};letter-spacing:-0.01em`,
+      contextClearButtonStyle: `width:22px;height:20px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-left:1px solid ${contextConfig.border};cursor:pointer;color:${contextConfig.color};padding:0 0 0 6px;margin-left:1px;opacity:.72`,
+      contextPreviewStyle: `max-height:156px;overflow-y:auto;overflow-wrap:anywhere;white-space:pre-wrap;background:var(--color-bg-surface);border-left:2px solid ${contextConfig.color};border-radius:2px 6px 6px 2px;padding:10px 12px;font-family:var(--font-serif);font-size:13px;line-height:1.65;color:var(--color-text-body)`,
+      contextTooltipStyle: `position:absolute;bottom:calc(100% + 8px);left:0;width:320px;max-width:calc(100vw - 48px);box-sizing:border-box;background:var(--color-bg-paper);border:1px solid var(--color-border);border-radius:10px;box-shadow:var(--shadow-menu);overflow:hidden;color:var(--color-text-body);z-index:90`
+    };
+  }
+}
+</script>
+</body>
+</html>
