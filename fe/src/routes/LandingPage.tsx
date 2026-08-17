@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../design/components/Button';
 import { PaperStackMark } from '../design/components/PaperStackMark';
@@ -51,12 +51,12 @@ export default function LandingPage() {
           zIndex: 5,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
           <PaperStackMark size={22} color="var(--color-on-dark)" />
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>
             Paper Teacher
           </span>
-        </div>
+        </Link>
       </div>
 
       <div
