@@ -10,6 +10,8 @@ export interface Paper {
   status: PaperStatus;
   createdAt: string;
   updatedAt: string;
+  /** 마지막 접근 시각. 접근 이력이 없으면 null. */
+  lastAccessedAt: string | null;
 }
 
 // 계약 PaperUploadHeaders: 필수 2키 + 향후 서명 헤더 추가 허용. FE는 맵 전체를 그대로 PUT에 싣는다.

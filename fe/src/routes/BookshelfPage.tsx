@@ -18,6 +18,7 @@ import { IconButton } from '../design/components/IconButton';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { usePapersQuery } from './bookshelf/usePapersQuery';
 import { filterPapers, paginate } from './bookshelf/paperFilters';
+import { accessDisplay } from './bookshelf/paperDateLabel';
 import UploadDialog from './bookshelf/UploadDialog';
 import type { Paper, PaperStatus } from '../api/types';
 
@@ -519,9 +520,10 @@ function IndeterminateBar() {
 function StatusBadge({ paper }: { paper: Paper }) {
   const phase = statusPhase(paper.status);
   if (phase === 'completed') {
+    const { prefix, iso } = accessDisplay(paper);
     return (
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-        등록일 · {formatDate(paper.createdAt)}
+        {prefix} · {formatDate(iso)}
       </div>
     );
   }
