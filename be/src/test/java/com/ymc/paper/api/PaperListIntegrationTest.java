@@ -41,6 +41,21 @@ class PaperListIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("lastAccessedAt: 접근 전에는 null 키로 내려가고, 접근 후에는 시각이 내려간다")
+    void returnsLastAccessedAt() throws Exception {
+        Paper untouched = givenPendingPaper("untouched.pdf");
+        Paper accessed = givenPendingPaper("accessed.pdf");
+        tx.executeWithoutResult(s -> reload(accessed.getId()).markAccessed(Instant.now()));
+
+        mockMvc.perform(get("/api/papers").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.papers[?(@.filename=='accessed.pdf')].lastAccessedAt")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.notNullValue())))
+                .andExpect(jsonPath("$.papers[?(@.filename=='untouched.pdf')].lastAccessedAt")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+    }
+
+    @Test
     @DisplayName("다른 사용자의 논문은 목록에 나오지 않는다 — 소유자 필터링 (YMC-215)")
     void 다른_사용자_논문은_안_보인다() throws Exception {
         givenPendingPaper("mine.pdf");

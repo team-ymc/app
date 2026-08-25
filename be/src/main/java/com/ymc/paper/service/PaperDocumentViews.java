@@ -53,7 +53,7 @@ public class PaperDocumentViews {
                             ? null : documents.get(p.getDocumentId());
                     return new PaperListView(p.getId(), p.getFilename(),
                             derivedStatus(p, document), p.getCreatedAt(),
-                            derivedUpdatedAt(p, document));
+                            derivedUpdatedAt(p, document), p.getLastAccessedAt());
                 })
                 .toList();
     }

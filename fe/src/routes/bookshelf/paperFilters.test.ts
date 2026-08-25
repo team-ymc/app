@@ -3,7 +3,7 @@ import { filterPapers, paginate } from './paperFilters';
 import type { Paper } from '../../api/types';
 
 const p = (filename: string): Paper =>
-  ({ paperId: filename, filename, status: 'COMPLETED', createdAt: '', updatedAt: '' });
+  ({ paperId: filename, filename, status: 'COMPLETED', createdAt: '', updatedAt: '', lastAccessedAt: null });
 
 test('filterPapers는 파일명 부분일치·대소문자 무시', () => {
   const papers = [p('Attention.pdf'), p('BERT.pdf')];

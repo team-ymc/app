@@ -20,6 +20,7 @@ import com.ymc.chat.domain.ChatSession;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.service.PaperAccessRecorder;
 import com.ymc.paper.service.PaperChatAccessValidator;
 
 /**
@@ -33,16 +34,19 @@ import com.ymc.paper.service.PaperChatAccessValidator;
 public class ChatCommandService {
 
     private final PaperChatAccessValidator paperChatAccessValidator;
+    private final PaperAccessRecorder paperAccessRecorder;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final TransactionTemplate requiresNewTx;
 
     public ChatCommandService(
             PaperChatAccessValidator paperChatAccessValidator,
+            PaperAccessRecorder paperAccessRecorder,
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             PlatformTransactionManager transactionManager) {
         this.paperChatAccessValidator = paperChatAccessValidator;
+        this.paperAccessRecorder = paperAccessRecorder;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
@@ -73,6 +77,7 @@ public class ChatCommandService {
         Instant now = Instant.now();
         int userSeq = chatMessageRepository.findMaxSeqBySessionId(session.getId()).orElse(0) + 1;
         session.recordActivity(now);
+        paperAccessRecorder.recordAccess(paperId, now);
         ChatMessage assistant;
         try {
             chatMessageRepository.save(

@@ -64,6 +64,10 @@ public class Paper {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** 소유자가 마지막으로 접근한 시각(학습 페이지 진입·채팅 발송). 접근 이력이 없으면 null. */
+    @Column(name = "last_accessed_at")
+    private Instant lastAccessedAt;
+
     protected Paper() {
         // JPA
     }
@@ -90,5 +94,9 @@ public class Paper {
             throw new IllegalArgumentException("filename은 비어 있을 수 없습니다.");
         }
         return new Paper(UUID.randomUUID(), ownerId, filename, now);
+    }
+
+    public void markAccessed(Instant now) {
+        this.lastAccessedAt = Objects.requireNonNull(now, "now");
     }
 }
