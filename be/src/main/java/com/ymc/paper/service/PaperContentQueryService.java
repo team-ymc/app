@@ -1,5 +1,6 @@
 package com.ymc.paper.service;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class PaperContentQueryService {
      * @throws ApiException FORBIDDEN(403) — 소유자가 아님
      * @throws ApiException PAPER_NOT_READY(409) — COMPLETED가 아니거나 아직 미적재
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public PaperContentView getContent(UUID paperId, UUID ownerId) {
         Paper paper = paperRepository.findById(paperId).orElseThrow(
                 () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
@@ -56,6 +57,8 @@ public class PaperContentQueryService {
         }
         DocumentContent content = contentRepository.findById(document.getId()).orElseThrow(
                 () -> new ApiException(ErrorCode.PAPER_NOT_READY, "본문이 아직 적재되지 않았습니다."));
+
+        paper.markAccessed(Instant.now()); // 최신 조회 시간 갱신
 
         List<PaperContentView.Block> blocks = blockRepository
                 .findAllByDocumentIdOrderByGlobalOrderAsc(document.getId()).stream()

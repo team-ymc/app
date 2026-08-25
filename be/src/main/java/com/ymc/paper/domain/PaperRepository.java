@@ -21,8 +21,13 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
      */
     boolean existsByOwnerIdAndFilename(UUID ownerId, String filename);
 
-    /** 서재 목록. 고정 owner 전체 (정렬·페이징 없음, 계약대로 단순 전체). */
-    List<Paper> findAllByOwnerId(UUID ownerId);
+    /** 서재 목록. 최근 접근순 — 접근 이력이 없으면 등록 시각을 접근 시각처럼 취급한다 (계약 `GET /api/papers`). */
+    @Query("""
+            select p from Paper p
+             where p.ownerId = :ownerId
+             order by coalesce(p.lastAccessedAt, p.createdAt) desc
+            """)
+    List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
 
     /**
      * 검증 완료된 Paper를 Document에 연결. document_id가 null일 때만 1 row다.

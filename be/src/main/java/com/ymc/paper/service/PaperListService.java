@@ -10,7 +10,7 @@ import com.ymc.paper.domain.PaperRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/** 서재 목록 조회 (FT-002). 소유자는 인증 주체다 (YMC-215). 정렬·페이지네이션 없음(계약). */
+/** 서재 목록 조회 (FT-002). 소유자는 인증 주체다 (YMC-215). 최근 접근순, 페이지네이션 없음(계약). */
 @Service
 @RequiredArgsConstructor
 public class PaperListService {
@@ -20,6 +20,6 @@ public class PaperListService {
 
     @Transactional(readOnly = true)
     public List<PaperListView> list(UUID ownerId) {
-        return views.listViews(paperRepository.findAllByOwnerId(ownerId));
+        return views.listViews(paperRepository.findAllByOwnerIdOrderByRecentAccess(ownerId));
     }
 }
