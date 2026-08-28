@@ -167,7 +167,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
         // 첫 수신은 DB 타임아웃, 그 뒤로는 정상 — 예외가 리스너 밖으로 나가야 재전달된다
         doThrow(new QueryTimeoutException("DB 타임아웃"))       // 첫 호출에서 QueryTOE
                 .doCallRealMethod()                           // 실제 메서드 호출
-                .when(documentTransitions).markParsed(eq(documentId), any(), any());
+                .when(documentTransitions).markParsedAndSettle(eq(documentId), any(), any());
 
         // 메시지 발행
         publishParseResult("""
@@ -175,7 +175,7 @@ class ParseResultConsumptionIntegrationTest extends IntegrationTest {
                 """.formatted(paper.getId(), manifestKey));
 
         awaitDocumentStatus(paper.getId(), DocumentStatus.COMPLETED);
-        verify(documentTransitions, atLeast(2)).markParsed(eq(documentId), any(), any());
+        verify(documentTransitions, atLeast(2)).markParsedAndSettle(eq(documentId), any(), any());
     }
 
     private Document documentOf(Paper paper) {

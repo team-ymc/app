@@ -5,9 +5,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * 상태 전이는 전부 조건부 UPDATE(CAS) — 변경 row 수가 1일 때만 후속 동작. Paper CAS와 같은 관용구다.
@@ -17,6 +20,11 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Optional<Document> findByChecksumSha256(String checksumSha256);
 
     Optional<Document> findByRequestPaperId(UUID requestPaperId);
+
+    /** 연결·종결 직렬화용 잠금 조회 — 종결 UPDATE와 이 잠금이 같은 행에서 만난다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.checksumSha256 = :checksumSha256")
+    Optional<Document> findWithLockByChecksumSha256(@Param("checksumSha256") String checksumSha256);
 
     /**
      * checksum 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이 트랜잭션을

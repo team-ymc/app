@@ -36,7 +36,7 @@ class ChatUsageIntegrationTest extends IntegrationTest {
         Paper paper = paperRepository.save(Paper.register(TEST_USER_ID, filename, Instant.now()));
         Document document = givenLinkedDocument(paper);
         documentTransitions.markProcessing(document.getId());
-        documentTransitions.markParsed(document.getId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(document.getId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 

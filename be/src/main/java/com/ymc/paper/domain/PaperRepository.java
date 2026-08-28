@@ -65,4 +65,7 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
             """)
     int deleteExpiredByOwnerAndFilename(@Param("ownerId") UUID ownerId,
             @Param("filename") String filename);
+
+    @Query("select p.id from Paper p where p.documentId = :documentId")
+    List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
 }

@@ -34,7 +34,7 @@ class ChatCommandServiceTest extends IntegrationTest {
     /** 파싱 완료(COMPLETED) 논문 — 채팅 가능 상태. */
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("chat-target.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -190,7 +190,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 com.ymc.paper.domain.Paper.register(otherOwner, "others-dup.pdf", Instant.now()));
         Document othersDocument = givenLinkedDocument(othersPaper);
         documentTransitions.markProcessing(othersDocument.getId());
-        documentTransitions.markParsed(othersDocument.getId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(othersDocument.getId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문"))
@@ -208,7 +208,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
 
         Paper secondPaper = givenProcessingPaper("second-paper.pdf");
-        documentTransitions.markParsed(secondPaper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(secondPaper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))

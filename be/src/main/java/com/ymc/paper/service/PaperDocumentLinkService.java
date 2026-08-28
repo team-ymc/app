@@ -8,7 +8,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
+import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +25,7 @@ public class PaperDocumentLinkService {
 
     private final DocumentRepository documentRepository;
     private final PaperRepository paperRepository;
+    private final UsageService usageService;
 
     public record LinkOutcome(Document document, boolean linkedToExisting) {
     }
@@ -31,11 +35,16 @@ public class PaperDocumentLinkService {
         Instant now = Instant.now();
         boolean created = documentRepository.insertIfAbsent(
                 UUID.randomUUID(), checksumSha256, fileKey, paperId, now) == 1;
-        Document document = documentRepository.findByChecksumSha256(checksumSha256)
+        // 잠금 조회 — 종결 전이와 직렬화해 "연결 직후 종결"의 정산 누락을 막는다
+        Document document = documentRepository.findWithLockByChecksumSha256(checksumSha256)
                 .orElseThrow(() -> new IllegalStateException(
                         "생성 직후 조회에 실패한 document: paperId=" + paperId));
-        // 0 row = 같은 Paper의 동시 complete가 먼저 연결 — 결과가 같으므로 그대로 진행
         paperRepository.linkDocument(paperId, document.getId(), now);
+        if (document.getStatus() == DocumentStatus.COMPLETED) {
+            usageService.confirm(UsageType.PAPER_REGISTRATION, paperId, null);
+        } else if (document.getStatus() == DocumentStatus.FAILED) {
+            usageService.release(UsageType.PAPER_REGISTRATION, paperId);
+        }
         return new LinkOutcome(document, !created);
     }
 }

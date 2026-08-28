@@ -66,7 +66,7 @@ class AiRelayIntegrationTest extends IntegrationTest {
 
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("relay-" + UUID.randomUUID() + ".pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 

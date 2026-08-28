@@ -10,7 +10,6 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 
 import com.ymc.paper.domain.Paper;
 import com.ymc.support.IntegrationTest;
@@ -59,7 +58,6 @@ class PaperExpiryIntegrationTest extends IntegrationTest {
 
     @Test
     @DisplayName("같은 파일명 재등록이 만료 row를 대체한다")
-    @Disabled("Task 7에서 활성화")
     void reregisterReplacesExpiredRow() throws Exception {
         Paper expired = givenExpiredPaper("retry.pdf");
 
@@ -75,7 +73,6 @@ class PaperExpiryIntegrationTest extends IntegrationTest {
 
     @Test
     @DisplayName("만료 안 된 같은 파일명은 여전히 DUPLICATE_FILENAME")
-    @Disabled("Task 7에서 활성화")
     void nonExpiredDuplicateStillRejected() throws Exception {
         givenPendingPaper("dup.pdf");
 

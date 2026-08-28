@@ -1,0 +1,144 @@
+package com.ymc.paper.api;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentStatus;
+import com.ymc.paper.domain.Paper;
+import com.ymc.paper.service.DocumentTransitions;
+import com.ymc.paper.service.PaperDocumentLinkService;
+import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
+import com.ymc.support.IntegrationTest;
+
+class PaperUsageIntegrationTest extends IntegrationTest {
+
+    @Autowired
+    PaperDocumentLinkService linkService;
+
+    @Autowired
+    UsageService usageService;
+
+    private UsageRecordStatus recordStatusOf(UUID paperId) {
+        return usageRecordRepository
+                .findByUsageTypeAndSourceId(UsageType.PAPER_REGISTRATION, paperId)
+                .orElseThrow().getStatus();
+    }
+
+    private Paper givenReservedPendingPaper(String filename) {
+        Paper paper = givenPendingPaper(filename);
+        tx.executeWithoutResult(s -> usageService.reserve(
+                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId()));
+        return paper;
+    }
+
+    @Test
+    @DisplayName("등록은 RESERVED를 남기고, 한도(월 3회) 초과는 429 — Paper·URL 미생성")
+    void registerReservesAndRejectsAtLimit() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/api/papers")
+                            .contentType("application/json")
+                            .content(createPaperJson("p" + i + ".pdf"))
+                            .with(userJwt()))
+                    .andExpect(status().isCreated());
+        }
+        assertThat(usageRecordRepository.count()).isEqualTo(3);
+
+        mockMvc.perform(post("/api/papers")
+                        .contentType("application/json")
+                        .content(createPaperJson("p4.pdf"))
+                        .with(userJwt()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("PAPER_USAGE_LIMIT_EXCEEDED"));
+        assertThat(paperRepository.count()).isEqualTo(3);
+        assertThat(usageRecordRepository.count()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("COMPLETED document 재사용 연결은 즉시 confirm")
+    void reuseCompletedConfirms() {
+        Paper first = givenReservedPendingPaper("origin.pdf");
+        Document document = givenLinkedDocument(first);
+        documentTransitions.markProcessing(document.getId());
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.COMPLETED, null));
+        assertThat(recordStatusOf(first.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
+        tx.executeWithoutResult(s -> usageService.reserve(
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+        tx.executeWithoutResult(s -> linkService.linkOrCreate(
+                second.getId(), second.getFileKey(), document.getChecksumSha256()));
+
+        assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("FAILED document 재사용 연결은 즉시 release")
+    void reuseFailedReleases() {
+        Paper first = givenReservedPendingPaper("origin.pdf");
+        Document document = givenLinkedDocument(first);
+        documentTransitions.markProcessing(document.getId());
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.FAILED, "PARSE_FAILED"));
+        assertThat(recordStatusOf(first.getId())).isEqualTo(UsageRecordStatus.RELEASED);
+
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
+        tx.executeWithoutResult(s -> usageService.reserve(
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+        tx.executeWithoutResult(s -> linkService.linkOrCreate(
+                second.getId(), second.getFileKey(), document.getChecksumSha256()));
+
+        assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.RELEASED);
+    }
+
+    @Test
+    @DisplayName("파싱 종결이 연결된 모든 Paper를 한 번에 정산한다")
+    void terminalSettlesAllLinkedPapers() {
+        Paper first = givenReservedPendingPaper("a.pdf");
+        Document document = givenLinkedDocument(first);
+        // 파싱 중 같은 파일을 올린 두 번째 사용자
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "b.pdf", Instant.now()));
+        tx.executeWithoutResult(s -> usageService.reserve(
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+        tx.executeWithoutResult(s ->
+                paperRepository.linkDocument(second.getId(), document.getId(), Instant.now()));
+        documentTransitions.markProcessing(document.getId());
+
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.COMPLETED, null));
+
+        assertThat(recordStatusOf(first.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+        assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("중복 종결 신호는 정산을 다시 만들지 않는다")
+    void duplicateTerminalIsNoop() {
+        Paper paper = givenReservedPendingPaper("a.pdf");
+        Document document = givenLinkedDocument(paper);
+        documentTransitions.markProcessing(document.getId());
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.COMPLETED, null));
+
+        Boolean second = tx.execute(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.FAILED, "LATE"));
+
+        assertThat(second).isFalse();
+        assertThat(recordStatusOf(paper.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+}

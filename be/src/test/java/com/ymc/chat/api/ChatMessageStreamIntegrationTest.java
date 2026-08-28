@@ -41,7 +41,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
 
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("chat-e2e.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -183,7 +183,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
                 UUID.randomUUID(), "others.pdf", Instant.now()));
         Document othersDocument = givenLinkedDocument(others);
         documentTransitions.markProcessing(othersDocument.getId());
-        documentTransitions.markParsed(othersDocument.getId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(othersDocument.getId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(post("/api/papers/{paperId}/chat/messages", others.getId())
                         .with(userJwt())

@@ -36,7 +36,7 @@ public class ParseResultService {
         }
         UUID documentId = found.get().getId();
 
-        boolean transitioned = transitions.markParsed(documentId, terminal, errorCode);
+        boolean transitioned = transitions.markParsedAndSettle(documentId, terminal, errorCode);
         if (transitioned) {
             log.info("파싱 결과 반영: requestPaperId={}, documentId={}, status={}",
                     requestPaperId, documentId, terminal);
