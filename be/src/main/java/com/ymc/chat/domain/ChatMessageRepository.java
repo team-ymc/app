@@ -49,11 +49,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     /** 히스토리 조회 (계약 listChatSessionMessages). 정렬 키는 seq — ix_chat_message_session_seq. */
     List<ChatMessage> findAllBySessionIdOrderBySeqAsc(UUID sessionId);
 
-    /** 세션 삭제 시 소속 메시지 일괄 삭제 (YMC-260). 영속성 컨텍스트를 거치지 않는 bulk다. */
-    @Modifying(clearAutomatically = true)
-    @Query("delete from ChatMessage m where m.session.id = :sessionId")
-    int deleteBySessionId(UUID sessionId);
-
     /** 정리 스케줄러의 정체 GENERATING 스캔. */
     List<ChatMessage> findAllByRoleAndStatusAndCreatedAtBefore(
             ChatMessageRole role, ChatMessageStatus status, Instant cutoff);

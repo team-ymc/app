@@ -45,6 +45,10 @@ public class ChatSession {
     @Column(name = "last_message_at", nullable = false)
     private Instant lastMessageAt;
 
+    /** 논리 삭제 시각. 메시지 row는 남긴다 — 진행 중 답변의 종결 전이와 사용량 정산이 계속되어야 한다. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected ChatSession() {
         // JPA
     }
@@ -72,6 +76,14 @@ public class ChatSession {
     /** 메시지 쌍 저장 시 호출 — 목록 정렬 키 갱신. */
     public void recordActivity(Instant now) {
         this.lastMessageAt = now;
+    }
+
+    public void markDeleted(Instant now) {
+        this.deletedAt = now;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     /**

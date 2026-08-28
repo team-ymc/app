@@ -19,6 +19,8 @@ create table chat_session (
     created_at      timestamp(6) with time zone not null,
     -- 마지막 메시지 저장 시각 — 세션 목록 정렬 키. 메시지 쌍 저장 시 갱신 (YMC-260).
     last_message_at timestamp(6) with time zone not null,
+    -- 논리 삭제 시각 (null = 삭제 안 됨)
+    deleted_at      timestamp(6) with time zone,
 
     primary key (id)
 );

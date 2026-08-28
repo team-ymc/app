@@ -37,7 +37,7 @@ public class ChatQueryService {
     public List<ChatSession> listSessions(UUID ownerId, UUID paperId) {
         paperChatAccessValidator.validateOwned(paperId, ownerId);
         return chatSessionRepository
-                .findAllByOwnerIdAndPaperIdOrderByLastMessageAtDesc(ownerId, paperId);
+                .findAllByOwnerIdAndPaperIdAndDeletedAtIsNullOrderByLastMessageAtDesc(ownerId, paperId);
     }
 
     @Transactional(readOnly = true)
@@ -45,8 +45,8 @@ public class ChatQueryService {
         paperChatAccessValidator.validateOwned(paperId, ownerId);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(ChatQueryService::sessionNotFound);
-        if (!session.belongsTo(ownerId, paperId)) {
-            throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
+        if (!session.belongsTo(ownerId, paperId) || session.isDeleted()) {
+            throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션·삭제된 세션도 404 (계약)
         }
         return chatMessageRepository.findAllBySessionIdOrderBySeqAsc(sessionId);
     }

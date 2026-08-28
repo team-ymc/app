@@ -2,6 +2,7 @@
 package com.ymc.chat.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,6 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
 import com.ymc.chat.service.ChatStartResult;
+import com.ymc.chat.service.DuplicateChatMessageException;
+import com.ymc.common.error.ApiException;
+import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
@@ -146,8 +150,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("세션 삭제 — 204 후 세션·소속 메시지가 모두 사라지고 다른 세션은 남는다")
-    void deleteSessionCascadesMessages() throws Exception {
+    @DisplayName("세션 삭제 — 204 후 deleted_at이 찍히고 세션·메시지 row는 남는다")
+    void deleteSessionMarksDeletedAndKeepsMessages() throws Exception {
         Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
         ChatStartResult target = givenCompletedExchange(TEST_USER_ID, paper, null, "지울 세션");
         ChatStartResult keep = givenCompletedExchange(TEST_USER_ID, paper, null, "남길 세션");
@@ -157,14 +161,16 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNoContent());
 
-        assertThat(chatSessionRepository.findById(target.sessionId())).isEmpty();
-        assertThat(chatMessageRepository.findAll())
-                .allMatch(m -> m.getSession().getId().equals(keep.sessionId()));
-        assertThat(chatSessionRepository.findById(keep.sessionId())).isPresent();
+        assertThat(chatSessionRepository.findById(target.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNotNull());
+        assertThat(chatSessionRepository.findById(keep.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNull());
+        // 메시지는 삭제되지 않는다 — target·keep 각 2건
+        assertThat(chatMessageRepository.count()).isEqualTo(4);
     }
 
     @Test
-    @DisplayName("GENERATING assistant가 있어도 삭제된다")
+    @DisplayName("GENERATING assistant가 있어도 삭제된다 — row는 GENERATING인 채 남는다")
     void deleteSessionWhileGenerating() throws Exception {
         Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
         ChatStartResult started = chatCommandService.start(
@@ -176,8 +182,9 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNoContent());
 
-        assertThat(chatSessionRepository.count()).isZero();
-        assertThat(chatMessageRepository.count()).isZero();
+        assertThat(chatSessionRepository.findById(started.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNotNull());
+        assertThat(chatMessageRepository.count()).isEqualTo(2);
     }
 
     @Test
@@ -196,5 +203,92 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
 
         assertThat(chatSessionRepository.findById(othersSession.sessionId())).isPresent();
         assertThat(chatMessageRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("삭제된 세션은 목록에서 빠진다")
+    void listSessionsExcludesDeleted() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        ChatStartResult kept = givenCompletedExchange(TEST_USER_ID, paper, null, "남은 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(get("/api/papers/{paperId}/chat/sessions", paper.getId())
+                        .with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sessionId").value(kept.sessionId().toString()));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 히스토리는 404 CHAT_SESSION_NOT_FOUND")
+    void listMessagesOfDeletedSessionNotFound() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(get("/api/papers/{paperId}/chat/sessions/{sessionId}/messages",
+                        paper.getId(), removed.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션으로 start하면 404 CHAT_SESSION_NOT_FOUND")
+    void startOnDeletedSessionNotFound() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                TEST_USER_ID, paper.getId(), removed.sessionId(), UUID.randomUUID(), "새 질문"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).code())
+                        .isEqualTo(ErrorCode.CHAT_SESSION_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("이미 삭제된 세션의 재삭제는 404 CHAT_SESSION_NOT_FOUND")
+    void deleteTwiceNotFound() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",
+                        paper.getId(), removed.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 진행 중 답변도 종결 전이가 계속된다")
+    void transitionsSurviveSessionDeletion() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
+
+        boolean owner = chatMessageTransitions.complete(
+                started.assistantMessageId(), "늦은 답변", started.clientMessageId(), null);
+
+        assertThat(owner).isTrue();
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 clientMessageId 재전송은 기존 멱등 응답 그대로다")
+    void duplicateResendIntoDeletedSessionStaysIdempotent() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        UUID clientMessageId = UUID.randomUUID();
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "질문");
+        chatMessageTransitions.complete(
+                started.assistantMessageId(), "답변", started.clientMessageId(), null);
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                TEST_USER_ID, paper.getId(), started.sessionId(), clientMessageId, "질문"))
+                .isInstanceOf(DuplicateChatMessageException.class);
     }
 }
