@@ -68,6 +68,10 @@ public class Paper {
     @Column(name = "last_accessed_at")
     private Instant lastAccessedAt;
 
+    /** 정리 스케줄러가 채우는 만료 시각. 정상 경로에서는 항상 null이다. */
+    @Column(name = "expired_at")
+    private Instant expiredAt;
+
     protected Paper() {
         // JPA
     }

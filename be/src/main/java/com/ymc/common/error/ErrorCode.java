@@ -31,6 +31,9 @@ public enum ErrorCode {
     /** 객체에 S3가 검증한 SHA-256 checksum이 없음 (complete) */
     UPLOAD_CHECKSUM_MISSING(HttpStatus.CONFLICT),
 
+    /** 만료 처리된 논문의 complete — 재등록 필요 (FT-011) */
+    UPLOAD_EXPIRED(HttpStatus.CONFLICT),
+
     /** access token 없음·만료 (FT-001) */
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
 
