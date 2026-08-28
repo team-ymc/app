@@ -25,7 +25,7 @@ create table paper (
     -- 소유자가 마지막으로 접근한 시각
     last_accessed_at timestamp(6) with time zone,
     -- 정리 스케줄러의 만료 시각 (null = 만료 아님). 값이 있으면 상태가 EXPIRED로 파생된다
-    expired_at  timestamp(6) with time zone,
+    expired_at       timestamp(6) with time zone,
 
     primary key (id),
 

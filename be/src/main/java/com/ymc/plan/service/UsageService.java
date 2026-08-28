@@ -95,17 +95,25 @@ public class UsageService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void confirmAll(UsageType usageType, List<UUID> sourceIds) {
-        if (!sourceIds.isEmpty()) {
-            recordRepository.settleAll(usageType, sourceIds,
-                    UsageRecordStatus.CONFIRMED, Instant.now());
+        if (sourceIds.isEmpty()) {
+            return;
+        }
+        int updated = recordRepository.settleAll(usageType, sourceIds,
+                UsageRecordStatus.CONFIRMED, Instant.now());
+        if (updated != sourceIds.size()) {
+            log.debug("일괄 정산 {} 중 {}건만 전이 — 나머지는 기정산·부재", sourceIds.size(), updated);
         }
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void releaseAll(UsageType usageType, List<UUID> sourceIds) {
-        if (!sourceIds.isEmpty()) {
-            recordRepository.settleAll(usageType, sourceIds,
-                    UsageRecordStatus.RELEASED, Instant.now());
+        if (sourceIds.isEmpty()) {
+            return;
+        }
+        int updated = recordRepository.settleAll(usageType, sourceIds,
+                UsageRecordStatus.RELEASED, Instant.now());
+        if (updated != sourceIds.size()) {
+            log.debug("일괄 정산 {} 중 {}건만 전이 — 나머지는 기정산·부재", sourceIds.size(), updated);
         }
     }
 

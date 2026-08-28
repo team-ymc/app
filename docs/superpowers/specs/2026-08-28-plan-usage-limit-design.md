@@ -53,7 +53,7 @@ dev는 ddl-auto가 생성, prod용 수기 DDL은 `be/docs/db/plan.sql`. prod 첫
 | 컬럼 | 타입·제약 | 설명 |
 |---|---|---|
 | `id` | uuid PK | BE 생성 |
-| `user_id` | uuid not null, FK → users | |
+| `user_id` | uuid not null | |
 | `plan_code` | varchar(16) not null | 현재 `PRO`만. 판정 쿼리·인덱스가 이 컬럼을 조건으로 쓴다 |
 | `started_at` / `ended_at` | timestamptz not null | `[started_at, ended_at)` — 종료 시각 미포함 |
 | `created_at` | timestamptz not null | |
@@ -81,7 +81,7 @@ plan_code를 키에 넣는 이유: 월 중 플랜이 바뀌어도 집계가 섞�
 | 컬럼 | 타입·제약 | 설명 |
 |---|---|---|
 | `id` | uuid PK | |
-| `bucket_id` | uuid not null, FK → usage_bucket, index | |
+| `bucket_id` | uuid not null, index | |
 | `usage_type` | varchar(32) not null | 유니크 제약용 (ADR-006 그대로) |
 | `source_id` | uuid not null | AI: `clientMessageId`, 문서: `paperId` |
 | `status` | varchar(16) not null | `RESERVED → CONFIRMED / RELEASED` |
