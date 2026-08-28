@@ -53,7 +53,13 @@ public enum ErrorCode {
     CLIENT_MESSAGE_ID_CONFLICT(HttpStatus.CONFLICT),
 
     /** 같은 clientMessageId·같은 content 재전송 — 기존 실행 상태 반환 (FT-007) */
-    DUPLICATE_MESSAGE(HttpStatus.CONFLICT);
+    DUPLICATE_MESSAGE(HttpStatus.CONFLICT),
+
+    /** 채팅 월간 사용량 한도 초과 (FT-011) */
+    CHAT_USAGE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
+
+    /** 문서 등록 월간 사용량 한도 초과 (FT-011) */
+    PAPER_USAGE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS);
 
     private final HttpStatus status;
 
