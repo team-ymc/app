@@ -12,8 +12,9 @@ import jakarta.persistence.LockModeType;
 
 public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> {
 
-    /** 목록 조회 (계약 listChatSessions). 정렬 키는 비정규화된 lastMessageAt. */
-    List<ChatSession> findAllByOwnerIdAndPaperIdOrderByLastMessageAtDesc(UUID ownerId, UUID paperId);
+    /** 목록 조회 (계약 listChatSessions). 삭제된 세션은 제외. 정렬 키는 비정규화된 lastMessageAt. */
+    List<ChatSession> findAllByOwnerIdAndPaperIdAndDeletedAtIsNullOrderByLastMessageAtDesc(
+            UUID ownerId, UUID paperId);
 
     /**
      * 세션 행을 PESSIMISTIC_WRITE로 잠근다 (SELECT ... FOR UPDATE).

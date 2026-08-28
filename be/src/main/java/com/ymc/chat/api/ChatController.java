@@ -85,7 +85,7 @@ public class ChatController {
                 .toList();
     }
 
-    /** 계약 deleteChatSession — 세션·소속 메시지 삭제. */
+    /** 계약 deleteChatSession — 세션 논리 삭제. */
     @DeleteMapping("/sessions/{sessionId}")
     public ResponseEntity<Void> deleteSession(
             @AuthenticationPrincipal Jwt jwt,
