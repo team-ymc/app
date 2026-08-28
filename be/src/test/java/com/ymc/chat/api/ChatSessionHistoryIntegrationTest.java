@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
 import com.ymc.chat.service.ChatStartResult;
+import com.ymc.chat.service.DuplicateChatMessageException;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Document;
@@ -258,5 +259,33 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 진행 중 답변도 종결 전이가 계속된다")
+    void transitionsSurviveSessionDeletion() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
+
+        boolean owner = chatMessageTransitions.complete(started.assistantMessageId(), "늦은 답변");
+
+        assertThat(owner).isTrue();
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 clientMessageId 재전송은 기존 멱등 응답 그대로다")
+    void duplicateResendIntoDeletedSessionStaysIdempotent() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        UUID clientMessageId = UUID.randomUUID();
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "질문");
+        chatMessageTransitions.complete(started.assistantMessageId(), "답변");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                TEST_USER_ID, paper.getId(), started.sessionId(), clientMessageId, "질문"))
+                .isInstanceOf(DuplicateChatMessageException.class);
     }
 }
