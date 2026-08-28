@@ -61,6 +61,21 @@ paper:
     # 단일 PDF 상한. 계약의 CreatePaperRequest.size 최대값, FE의 MAX_PDF_UPLOAD_BYTES와 같은 값을 둔다
     max-file-size: ${MAX_UPLOAD_FILE_SIZE:50MB}
 
+# FT-011 플랜·사용량 — 값은 베타 초기 정책. 배포 정책값(env)으로 덮는다
+plan:
+  policy:
+    free:
+      ai-query: { mode: MONTHLY, limit: 100 }
+      paper-registration: { mode: MONTHLY, limit: 3 }
+    pro:
+      ai-query: { mode: MONTHLY, limit: 1000 }
+      paper-registration: { mode: MONTHLY, limit: 100 }
+  cleanup:
+    interval: 10m                    # 정리 실행 주기
+    chat-generating-deadline: 30m    # GENERATING 스캔 — run deadline(10m)+emitter(11m)보다 크게
+    upload-pending-deadline: 1h      # UPLOAD_PENDING 스캔 — presigned(10m)보다 크게
+    processing-deadline: 3h          # UPLOADED·PROCESSING 스캔 — 워커 deadline(3600s) 기준(dev)
+
 # AWS 설정 — 기본값은 공통이며 배포 환경에서는 AI와 같은 환경변수명으로 덮어쓴다.
 aws:
   region: ${AWS_DEFAULT_REGION:ap-northeast-2}
