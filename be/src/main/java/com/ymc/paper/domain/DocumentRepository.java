@@ -1,6 +1,8 @@
 package com.ymc.paper.domain;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,4 +86,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("terminal") DocumentStatus terminal,
             @Param("errorCode") String errorCode,
             @Param("now") Instant now);
+
+    /** 정리 스케줄러의 정체 UPLOADED·PROCESSING 스캔. */
+    @Query("select d.id from Document d where d.status in :statuses and d.updatedAt < :cutoff")
+    List<UUID> findStaleIds(@Param("statuses") Collection<DocumentStatus> statuses,
+            @Param("cutoff") Instant cutoff);
+
+    /** 테스트 전용 — 전이 시각을 과거로 되돌려 스캔 기준 통과를 재현한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("update Document d set d.updatedAt = :at where d.id = :id")
+    void backdateUpdatedAt(@Param("id") UUID id, @Param("at") Instant at);
 }

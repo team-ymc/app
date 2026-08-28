@@ -53,4 +53,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     @Modifying(clearAutomatically = true)
     @Query("delete from ChatMessage m where m.session.id = :sessionId")
     int deleteBySessionId(UUID sessionId);
+
+    /** 정리 스케줄러의 정체 GENERATING 스캔. */
+    List<ChatMessage> findAllByRoleAndStatusAndCreatedAtBefore(
+            ChatMessageRole role, ChatMessageStatus status, Instant cutoff);
 }

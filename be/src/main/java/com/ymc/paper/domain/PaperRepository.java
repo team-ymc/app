@@ -68,4 +68,11 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
     @Query("select p.id from Paper p where p.documentId = :documentId")
     List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
+
+    /** 정리 스케줄러의 정체 UPLOAD_PENDING 스캔 — document 미연결, 아직 만료 전. */
+    @Query("""
+            select p.id from Paper p
+             where p.documentId is null and p.expiredAt is null and p.createdAt < :cutoff
+            """)
+    List<UUID> findStaleUploadPendingIds(@Param("cutoff") Instant cutoff);
 }
