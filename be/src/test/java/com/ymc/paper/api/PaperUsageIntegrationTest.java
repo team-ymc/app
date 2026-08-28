@@ -7,8 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -140,5 +146,61 @@ class PaperUsageIntegrationTest extends IntegrationTest {
 
         assertThat(second).isFalse();
         assertThat(recordStatusOf(paper.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+
+    /**
+     * 연결(linkOrCreate)과 종결(markParsedAndSettle)이 같은 document를 동시에 건드리는 경쟁.
+     * linkOrCreate의 잠금 조회(findWithLockByChecksumSha256)가 종결의 UPDATE와 같은 행을 두고
+     * 경합하므로, 어느 쪽이 먼저 커밋하든 document 행 잠금이 둘을 직렬화한다 — 승자 순서와 무관하게
+     * 두 Paper 모두 정산(CONFIRMED)까지 도달해야 한다 (linkOrCreate의 즉시 confirm 분기 또는
+     * confirmAll 일괄 정산 중 하나로).
+     */
+    @RepeatedTest(5)
+    @DisplayName("연결·종결 경쟁 — document 행 잠금으로 직렬화되어 두 Paper 모두 정산된다")
+    void linkAndTerminalRaceSettlesBothPapers() throws Exception {
+        Paper first = givenReservedPendingPaper("origin.pdf");
+        Document document = givenLinkedDocument(first);
+        documentTransitions.markProcessing(document.getId());
+
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
+        tx.executeWithoutResult(s -> usageService.reserve(
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> linking = pool.submit(() -> {
+                ready.countDown();
+                awaitLatch(start);
+                tx.executeWithoutResult(s -> linkService.linkOrCreate(
+                        second.getId(), second.getFileKey(), document.getChecksumSha256()));
+            });
+            Future<?> settling = pool.submit(() -> {
+                ready.countDown();
+                awaitLatch(start);
+                tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                        document.getId(), DocumentStatus.COMPLETED, null));
+            });
+            ready.await();
+            start.countDown();
+            linking.get(10, TimeUnit.SECONDS);
+            settling.get(10, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdown();
+        }
+
+        assertThat(recordStatusOf(first.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+        assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 }
