@@ -139,25 +139,24 @@ public class ChatCommandService {
     }
 
     /**
-     * 세션과 소속 메시지를 삭제한다 (설계 §1·§3). GENERATING 중이어도 삭제한다 — 진행 중이던
-     * relay의 조건부 UPDATE(markCompleted/markFailed)는 0행으로 끝나며 무해하다.
+     * 세션을 논리 삭제한다. 메시지 row는 남긴다 — GENERATING 중이어도 삭제할 수 있고,
+     * 진행 중이던 relay의 종결 전이(markCompleted/markFailed)는 그대로 이어진다.
      *
-     * <p>{@code findWithLockById}로 start와 직렬화한다 — 잠금 없이 bulk delete와 start의
-     * 메시지 insert가 교차하면 삭제된 세션을 참조하는 insert가 FK 위반으로 5xx가 된다.
+     * <p>{@code findWithLockById}로 start와 직렬화한다 — 삭제 커밋 후 start는
+     * 삭제된 세션을 보고 404를 반환한다.
      *
      * @throws ApiException PAPER_NOT_FOUND / FORBIDDEN — 논문 검증 실패
-     * @throws ApiException CHAT_SESSION_NOT_FOUND — 세션 없음·소유/논문 불일치
+     * @throws ApiException CHAT_SESSION_NOT_FOUND — 세션 없음·소유/논문 불일치·이미 삭제됨
      */
     @Transactional
     public void deleteSession(UUID ownerId, UUID paperId, UUID sessionId) {
         paperChatAccessValidator.validateOwned(paperId, ownerId);
         ChatSession session = chatSessionRepository.findWithLockById(sessionId)
                 .orElseThrow(this::sessionNotFound);
-        if (!session.belongsTo(ownerId, paperId)) {
-            throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션도 404 (계약)
+        if (!session.belongsTo(ownerId, paperId) || session.isDeleted()) {
+            throw sessionNotFound(); // 존재 여부를 숨긴다 — 남의 세션·삭제된 세션도 404 (계약)
         }
-        chatMessageRepository.deleteBySessionId(sessionId);
-        chatSessionRepository.delete(session);
+        session.markDeleted(Instant.now());
     }
 
     private ApiException sessionNotFound() {

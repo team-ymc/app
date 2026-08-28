@@ -145,8 +145,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("세션 삭제 — 204 후 세션·소속 메시지가 모두 사라지고 다른 세션은 남는다")
-    void deleteSessionCascadesMessages() throws Exception {
+    @DisplayName("세션 삭제 — 204 후 deleted_at이 찍히고 세션·메시지 row는 남는다")
+    void deleteSessionMarksDeletedAndKeepsMessages() throws Exception {
         Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
         ChatStartResult target = givenCompletedExchange(TEST_USER_ID, paper, null, "지울 세션");
         ChatStartResult keep = givenCompletedExchange(TEST_USER_ID, paper, null, "남길 세션");
@@ -156,14 +156,16 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNoContent());
 
-        assertThat(chatSessionRepository.findById(target.sessionId())).isEmpty();
-        assertThat(chatMessageRepository.findAll())
-                .allMatch(m -> m.getSession().getId().equals(keep.sessionId()));
-        assertThat(chatSessionRepository.findById(keep.sessionId())).isPresent();
+        assertThat(chatSessionRepository.findById(target.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNotNull());
+        assertThat(chatSessionRepository.findById(keep.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNull());
+        // 메시지는 삭제되지 않는다 — target·keep 각 2건
+        assertThat(chatMessageRepository.count()).isEqualTo(4);
     }
 
     @Test
-    @DisplayName("GENERATING assistant가 있어도 삭제된다")
+    @DisplayName("GENERATING assistant가 있어도 삭제된다 — row는 GENERATING인 채 남는다")
     void deleteSessionWhileGenerating() throws Exception {
         Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
         ChatStartResult started = chatCommandService.start(
@@ -175,8 +177,9 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isNoContent());
 
-        assertThat(chatSessionRepository.count()).isZero();
-        assertThat(chatMessageRepository.count()).isZero();
+        assertThat(chatSessionRepository.findById(started.sessionId()))
+                .hasValueSatisfying(s -> assertThat(s.getDeletedAt()).isNotNull());
+        assertThat(chatMessageRepository.count()).isEqualTo(2);
     }
 
     @Test
