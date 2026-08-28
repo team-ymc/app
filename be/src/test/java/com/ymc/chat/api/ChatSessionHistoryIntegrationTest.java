@@ -2,6 +2,7 @@
 package com.ymc.chat.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
 import com.ymc.chat.service.ChatStartResult;
+import com.ymc.common.error.ApiException;
+import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
@@ -198,5 +201,62 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
 
         assertThat(chatSessionRepository.findById(othersSession.sessionId())).isPresent();
         assertThat(chatMessageRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("삭제된 세션은 목록에서 빠진다")
+    void listSessionsExcludesDeleted() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        ChatStartResult kept = givenCompletedExchange(TEST_USER_ID, paper, null, "남은 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(get("/api/papers/{paperId}/chat/sessions", paper.getId())
+                        .with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sessionId").value(kept.sessionId().toString()));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션의 히스토리는 404 CHAT_SESSION_NOT_FOUND")
+    void listMessagesOfDeletedSessionNotFound() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(get("/api/papers/{paperId}/chat/sessions/{sessionId}/messages",
+                        paper.getId(), removed.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("삭제된 세션으로 start하면 404 CHAT_SESSION_NOT_FOUND")
+    void startOnDeletedSessionNotFound() {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        assertThatThrownBy(() -> chatCommandService.start(
+                TEST_USER_ID, paper.getId(), removed.sessionId(), UUID.randomUUID(), "새 질문"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).code())
+                        .isEqualTo(ErrorCode.CHAT_SESSION_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("이미 삭제된 세션의 재삭제는 404 CHAT_SESSION_NOT_FOUND")
+    void deleteTwiceNotFound() throws Exception {
+        Paper paper = givenCompletedPaper(TEST_USER_ID, "history.pdf");
+        ChatStartResult removed = givenCompletedExchange(TEST_USER_ID, paper, null, "지운 세션");
+        chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), removed.sessionId());
+
+        mockMvc.perform(delete("/api/papers/{paperId}/chat/sessions/{sessionId}",
+                        paper.getId(), removed.sessionId())
+                        .with(userJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_NOT_FOUND"));
     }
 }
