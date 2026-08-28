@@ -39,6 +39,7 @@ public class PaperDocumentLinkService {
         Document document = documentRepository.findWithLockByChecksumSha256(checksumSha256)
                 .orElseThrow(() -> new IllegalStateException(
                         "생성 직후 조회에 실패한 document: paperId=" + paperId));
+        // 0 row = 같은 Paper의 동시 complete가 먼저 연결 — 결과가 같으므로 그대로 진행
         paperRepository.linkDocument(paperId, document.getId(), now);
         if (document.getStatus() == DocumentStatus.COMPLETED) {
             usageService.confirm(UsageType.PAPER_REGISTRATION, paperId, null);
