@@ -3,6 +3,7 @@ package com.ymc.plan.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -131,5 +132,64 @@ class UsageServiceTest extends IntegrationTest {
 
         assertThat(succeeded).isEqualTo(1);
         assertThat(usageRecordRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("confirm은 RESERVED만 CONFIRMED로 바꾸고 비용을 저장한다")
+    void confirmSettlesWithCost() {
+        UUID sourceId = UUID.randomUUID();
+        tx.executeWithoutResult(s -> usageService.reserve(
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+
+        tx.executeWithoutResult(s -> usageService.confirm(
+                UsageType.AI_QUERY, sourceId, new BigDecimal("0.00123000")));
+
+        var record = usageRecordRepository
+                .findByUsageTypeAndSourceId(UsageType.AI_QUERY, sourceId).orElseThrow();
+        assertThat(record.getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
+        assertThat(record.getEstimatedCostUsd()).isEqualByComparingTo("0.00123000");
+    }
+
+    @Test
+    @DisplayName("release는 RESERVED를 RELEASED로 — 집계에서 빠져 재예약 여유가 생긴다")
+    void releaseFreesCapacity() {
+        UUID sourceId = UUID.randomUUID();
+        reserveInTx(sourceId);
+        reserveInTx(UUID.randomUUID());
+        reserveInTx(UUID.randomUUID());
+
+        tx.executeWithoutResult(s -> usageService.release(
+                UsageType.PAPER_REGISTRATION, sourceId));
+
+        reserveInTx(UUID.randomUUID()); // 한도 3 — 해제로 자리가 났으니 성공해야 한다
+        assertThat(usageRecordRepository.count()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("해제된 sourceId의 재예약은 거부된다")
+    void reserveAfterReleaseRejected() {
+        UUID sourceId = UUID.randomUUID();
+        reserveInTx(sourceId);
+        tx.executeWithoutResult(s -> usageService.release(
+                UsageType.PAPER_REGISTRATION, sourceId));
+
+        assertThatThrownBy(() -> reserveInTx(sourceId))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("중복 confirm은 no-op, 원장 없는 confirm도 예외 없이 지나간다")
+    void settleIsIdempotentAndTolerant() {
+        UUID sourceId = UUID.randomUUID();
+        tx.executeWithoutResult(s -> usageService.reserve(
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+        tx.executeWithoutResult(s -> usageService.confirm(UsageType.AI_QUERY, sourceId, null));
+        tx.executeWithoutResult(s -> usageService.confirm(UsageType.AI_QUERY, sourceId, null));
+        tx.executeWithoutResult(s -> usageService.confirm(
+                UsageType.AI_QUERY, UUID.randomUUID(), null)); // 원장 부재 — warn 로그만
+
+        assertThat(usageRecordRepository
+                .findByUsageTypeAndSourceId(UsageType.AI_QUERY, sourceId).orElseThrow()
+                .getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
     }
 }

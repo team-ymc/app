@@ -1,10 +1,13 @@
 package com.ymc.plan.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UsageService {
 
+    private static final Logger log = LoggerFactory.getLogger(UsageService.class);
     private static final List<UsageRecordStatus> ACTIVE =
             List.of(UsageRecordStatus.RESERVED, UsageRecordStatus.CONFIRMED);
 
@@ -77,6 +81,44 @@ public class UsageService {
         // 동시 같은 sourceId는 유니크 제약이 최후 방어선이다 — flush로 위반을 호출 지점에서
         // 동기적으로 드러내 호출부 트랜잭션의 기존 방어가 받게 한다
         recordRepository.saveAndFlush(UsageRecord.reserve(bucket.getId(), usageType, sourceId, now));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void confirm(UsageType usageType, UUID sourceId, BigDecimal estimatedCostUsd) {
+        settle(usageType, sourceId, UsageRecordStatus.CONFIRMED, estimatedCostUsd);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void release(UsageType usageType, UUID sourceId) {
+        settle(usageType, sourceId, UsageRecordStatus.RELEASED, null);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void confirmAll(UsageType usageType, List<UUID> sourceIds) {
+        if (!sourceIds.isEmpty()) {
+            recordRepository.settleAll(usageType, sourceIds,
+                    UsageRecordStatus.CONFIRMED, Instant.now());
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void releaseAll(UsageType usageType, List<UUID> sourceIds) {
+        if (!sourceIds.isEmpty()) {
+            recordRepository.settleAll(usageType, sourceIds,
+                    UsageRecordStatus.RELEASED, Instant.now());
+        }
+    }
+
+    private void settle(UsageType usageType, UUID sourceId, UsageRecordStatus to,
+            BigDecimal cost) {
+        if (recordRepository.settleOne(usageType, sourceId, to, cost, Instant.now()) == 1) {
+            return;
+        }
+        if (recordRepository.findByUsageTypeAndSourceId(usageType, sourceId).isPresent()) {
+            log.debug("이미 정산된 실행의 중복 신호 무시: {}/{}", usageType, sourceId);
+        } else {
+            log.warn("예약 없는 정산 신호: {}/{}/{}", usageType, sourceId, to);
+        }
     }
 
     private ApiException limitExceeded(UsageType usageType) {
