@@ -1,6 +1,7 @@
 package com.ymc.chat.service;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -188,7 +189,7 @@ public class ChatStreamService {
         }
 
         @Override
-        public void onRunCompleted() {
+        public void onRunCompleted(BigDecimal estimatedCostUsd) {
             if (!finished.compareAndSet(false, true)) {
                 return; // 워치독·상한·transport 중 하나가 이미 종결함
             }
@@ -204,7 +205,8 @@ public class ChatStreamService {
             }
             boolean committed;
             try {
-                committed = transitions.complete(ids.assistantMessageId(), finalContent);
+                committed = transitions.complete(
+                        ids.assistantMessageId(), finalContent, ids.clientMessageId(), estimatedCostUsd);
             } catch (RuntimeException e) {
                 log.error("최종 답변 저장 실패. messageId={}", ids.assistantMessageId(), e);
                 failLocked("MESSAGE_PERSISTENCE_FAILED", "답변을 저장하지 못했습니다.", true);
@@ -252,7 +254,7 @@ public class ChatStreamService {
         private void failLocked(String code, String message, boolean retryable) {
             cancelTimers();
             try {
-                transitions.fail(ids.assistantMessageId());
+                transitions.fail(ids.assistantMessageId(), ids.clientMessageId());
             } catch (RuntimeException e) {
                 log.error("FAILED 전이조차 실패 — terminal 없이 종료. messageId={}",
                         ids.assistantMessageId(), e);

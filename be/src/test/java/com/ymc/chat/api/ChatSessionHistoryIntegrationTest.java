@@ -45,7 +45,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
             String question) {
         ChatStartResult started = chatCommandService.start(
                 ownerId, paper.getId(), sessionIdOrNull, UUID.randomUUID(), question);
-        chatMessageTransitions.complete(started.assistantMessageId(), "답변");
+        chatMessageTransitions.complete(
+                started.assistantMessageId(), "답변", started.clientMessageId(), null);
         return started;
     }
 

@@ -1,5 +1,6 @@
 package com.ymc.chat.infra.ai;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,7 +39,7 @@ public class FakeAiAgentStreamAdapter implements AiAgentStreamPort {
                 listener.onDelta(delta);
             }
             listener.onMessageCompleted(full.toString());
-            listener.onRunCompleted();
+            listener.onRunCompleted(new BigDecimal("0.001"));
         });
         return () -> {
             // fake는 즉시 완료되므로 취소할 것이 없다

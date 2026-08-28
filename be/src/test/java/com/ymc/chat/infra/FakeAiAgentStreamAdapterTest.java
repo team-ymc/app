@@ -3,6 +3,7 @@ package com.ymc.chat.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -23,7 +24,7 @@ class FakeAiAgentStreamAdapterTest {
         public void onRunStarted() { events.add("started"); }
         public void onDelta(String delta) { events.add("delta:" + delta); }
         public void onMessageCompleted(String message) { events.add("completed:" + message); }
-        public void onRunCompleted() { events.add("run-completed"); }
+        public void onRunCompleted(BigDecimal estimatedCostUsd) { events.add("run-completed"); }
         public void onRunFailed(String error) { events.add("run-failed:" + error); }
         public void onTransportError(Exception cause) { events.add("transport-error"); }
     };

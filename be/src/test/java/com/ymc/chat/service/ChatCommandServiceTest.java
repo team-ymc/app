@@ -64,7 +64,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
         // 첫 assistant를 종결시켜 CHAT_RUN_IN_PROGRESS를 피한다
         // (@Modifying 쿼리는 트랜잭션이 필요하므로 리포지토리 직접 호출이 아니라 transitions 빈을 쓴다)
-        chatMessageTransitions.complete(first.assistantMessageId(), "답");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답", first.clientMessageId(), null);
 
         ChatStartResult second = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "후속 질문");
@@ -223,7 +223,7 @@ class ChatCommandServiceTest extends IntegrationTest {
 
         ChatStartResult first = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
-        chatMessageTransitions.complete(first.assistantMessageId(), "답1");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답1", first.clientMessageId(), null);
 
         chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
@@ -258,7 +258,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
         Instant firstActivity = chatSessionRepository.findById(first.sessionId())
                 .orElseThrow().getLastMessageAt();
-        chatMessageTransitions.complete(first.assistantMessageId(), "답");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답", first.clientMessageId(), null);
 
         chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
