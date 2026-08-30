@@ -5,7 +5,7 @@ export type BadgeTone = 'neutral' | 'success' | 'danger' | 'pro' | 'neutralOnDar
 
 interface ToneStyle { background: string; color: string; border: string }
 
-// FT-011 플랜 배지 — Pro는 Navy Ink, 다크(월넛) 바 위에서는 *OnDark 톤을 쓴다.
+// 플랜 배지 톤 — Pro는 Navy Ink, 다크(월넛) 바 위에서는 *OnDark 톤을 쓴다.
 const TONES: Record<BadgeTone, ToneStyle> = {
   success: { background: 'var(--color-primary-subtle)', color: 'var(--success-sage)', border: '1px solid var(--success-sage)' },
   danger: { background: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' },
