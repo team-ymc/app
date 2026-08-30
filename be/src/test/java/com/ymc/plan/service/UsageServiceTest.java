@@ -151,6 +151,40 @@ class UsageServiceTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("비용은 numeric(14,8)에 맞춰 소수 8자리로 반올림한다")
+    void confirmRoundsCostToStorageScale() {
+        UUID sourceId = UUID.randomUUID();
+        tx.executeWithoutResult(s -> usageService.reserve(
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+
+        tx.executeWithoutResult(s -> usageService.confirm(
+                UsageType.AI_QUERY, sourceId, new BigDecimal("0.123456789")));
+
+        var record = usageRecordRepository
+                .findByUsageTypeAndSourceId(UsageType.AI_QUERY, sourceId).orElseThrow();
+        assertThat(record.getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
+        assertThat(record.getEstimatedCostUsd()).isEqualByComparingTo("0.12345679");
+    }
+
+    @Test
+    @DisplayName("음수·저장 범위 초과 비용은 버리되 사용량은 CONFIRMED한다")
+    void confirmDiscardsInvalidCost() {
+        for (String invalid : List.of("-0.00000001", "1000000")) {
+            UUID sourceId = UUID.randomUUID();
+            tx.executeWithoutResult(s -> usageService.reserve(
+                    TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+
+            tx.executeWithoutResult(s -> usageService.confirm(
+                    UsageType.AI_QUERY, sourceId, new BigDecimal(invalid)));
+
+            var record = usageRecordRepository
+                    .findByUsageTypeAndSourceId(UsageType.AI_QUERY, sourceId).orElseThrow();
+            assertThat(record.getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
+            assertThat(record.getEstimatedCostUsd()).isNull();
+        }
+    }
+
+    @Test
     @DisplayName("release는 RESERVED를 RELEASED로 — 집계에서 빠져 재예약 여유가 생긴다")
     void releaseFreesCapacity() {
         UUID sourceId = UUID.randomUUID();

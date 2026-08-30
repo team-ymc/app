@@ -2,6 +2,7 @@ package com.ymc.chat.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import com.ymc.chat.service.ChatCommandService;
 import com.ymc.chat.service.ChatMessageTransitions;
 import com.ymc.chat.service.ChatStartResult;
+import com.ymc.chat.domain.ChatMessageStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
@@ -59,6 +61,27 @@ class ChatUsageIntegrationTest extends IntegrationTest {
                 .findByUsageTypeAndSourceId(UsageType.AI_QUERY, clientMessageId).orElseThrow();
         assertThat(confirmed.getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
         assertThat(confirmed.getEstimatedCostUsd()).isEqualByComparingTo("0.001");
+    }
+
+    @Test
+    @DisplayName("범위 초과 비용은 버리고 답변 COMPLETED와 사용량 CONFIRMED를 유지한다")
+    void oversizedCostDoesNotFailCompletedAnswer() {
+        Paper paper = givenCompletedPaper("oversized-cost.pdf");
+        UUID clientMessageId = UUID.randomUUID();
+        ChatStartResult started = chatCommandService.start(
+                TEST_USER_ID, paper.getId(), null, clientMessageId, "질문");
+
+        boolean completed = chatMessageTransitions.complete(
+                started.assistantMessageId(), "답변", clientMessageId, new BigDecimal("1000000"));
+
+        assertThat(completed).isTrue();
+        var message = chatMessageRepository.findById(started.assistantMessageId()).orElseThrow();
+        assertThat(message.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
+        assertThat(message.getContent()).isEqualTo("답변");
+        UsageRecord confirmed = usageRecordRepository
+                .findByUsageTypeAndSourceId(UsageType.AI_QUERY, clientMessageId).orElseThrow();
+        assertThat(confirmed.getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
+        assertThat(confirmed.getEstimatedCostUsd()).isNull();
     }
 
     @Test

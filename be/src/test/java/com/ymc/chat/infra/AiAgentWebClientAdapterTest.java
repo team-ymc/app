@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,12 +37,16 @@ class AiAgentWebClientAdapterTest {
     static Scheduler scheduler;
 
     final List<String> events = new CopyOnWriteArrayList<>();
+    final AtomicReference<BigDecimal> completedCost = new AtomicReference<>();
 
     final AiStreamListener recorder = new AiStreamListener() {
         public void onRunStarted() { events.add("started"); }
         public void onDelta(String delta) { events.add("delta:" + delta); }
         public void onMessageCompleted(String message) { events.add("completed:" + message); }
-        public void onRunCompleted(BigDecimal estimatedCostUsd) { events.add("run-completed"); }
+        public void onRunCompleted(BigDecimal estimatedCostUsd) {
+            completedCost.set(estimatedCostUsd);
+            events.add("run-completed");
+        }
         public void onRunFailed(String error) { events.add("run-failed:" + error); }
         public void onTransportError(Exception cause) {
             events.add("transport-error:" + cause.getClass().getSimpleName());
@@ -78,13 +83,16 @@ class AiAgentWebClientAdapterTest {
                 FakeAiSseServer.delta("t-1", "안녕"),
                 FakeAiSseServer.delta("t-1", "하세요"),
                 FakeAiSseServer.messageCompleted("t-1", "안녕하세요"),
-                FakeAiSseServer.runCompleted("t-1")));
+                FakeAiSseServer.Frame.of("run.completed",
+                        "{\"type\":\"run.completed\",\"thread_id\":\"t-1\","
+                                + "\"estimated_cost_usd\":0.00123000}")));
 
         adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-1", "p-1", "질문", null), recorder);
 
         await().atMost(WAIT).until(() -> events.contains("run-completed"));
         assertThat(events).containsExactly(
                 "started", "delta:안녕", "delta:하세요", "completed:안녕하세요", "run-completed");
+        assertThat(completedCost.get()).isEqualByComparingTo("0.00123000");
         assertThat(aiServer.lastRequestBody()).contains("\"thread_id\":\"t-1\"");
         assertThat(aiServer.lastRequestBody()).contains("\"paper_id\":\"p-1\"");
         assertThat(aiServer.lastRequestBody()).contains("\"message\":\"질문\"");

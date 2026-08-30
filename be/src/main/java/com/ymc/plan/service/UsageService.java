@@ -1,6 +1,7 @@
 package com.ymc.plan.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,10 @@ import lombok.RequiredArgsConstructor;
 public class UsageService {
 
     private static final Logger log = LoggerFactory.getLogger(UsageService.class);
+    /** usage_record.estimated_cost_usd numeric(14,8)의 저장 상한. */
+    private static final BigDecimal MAX_ESTIMATED_COST_USD =
+            new BigDecimal("999999.99999999");
+    private static final int ESTIMATED_COST_SCALE = 8;
     private static final List<UsageRecordStatus> ACTIVE =
             List.of(UsageRecordStatus.RESERVED, UsageRecordStatus.CONFIRMED);
 
@@ -85,7 +90,8 @@ public class UsageService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void confirm(UsageType usageType, UUID sourceId, BigDecimal estimatedCostUsd) {
-        settle(usageType, sourceId, UsageRecordStatus.CONFIRMED, estimatedCostUsd);
+        settle(usageType, sourceId, UsageRecordStatus.CONFIRMED,
+                normalizeEstimatedCost(usageType, sourceId, estimatedCostUsd));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -127,6 +133,34 @@ public class UsageService {
         } else {
             log.warn("예약 없는 정산 신호: {}/{}/{}", usageType, sourceId, to);
         }
+    }
+
+    /** 관측용 비용이 사용자 실행의 성공을 뒤집지 않도록 저장 가능한 값만 남긴다. */
+    private BigDecimal normalizeEstimatedCost(
+            UsageType usageType, UUID sourceId, BigDecimal estimatedCostUsd) {
+        if (estimatedCostUsd == null) {
+            return null;
+        }
+        if (usageType != UsageType.AI_QUERY) {
+            logDiscardedCost("UNSUPPORTED_USAGE_TYPE", usageType, sourceId, estimatedCostUsd);
+            return null;
+        }
+        if (estimatedCostUsd.signum() < 0) {
+            logDiscardedCost("NEGATIVE", usageType, sourceId, estimatedCostUsd);
+            return null;
+        }
+        if (estimatedCostUsd.compareTo(MAX_ESTIMATED_COST_USD) > 0) {
+            logDiscardedCost("OUT_OF_RANGE", usageType, sourceId, estimatedCostUsd);
+            return null;
+        }
+        return estimatedCostUsd.setScale(ESTIMATED_COST_SCALE, RoundingMode.HALF_UP);
+    }
+
+    private void logDiscardedCost(
+            String reason, UsageType usageType, UUID sourceId, BigDecimal cost) {
+        // 외부에서 온 숫자 전체를 로그에 싣지 않는다 — 형태만으로 원인 파악이 충분하다.
+        log.warn("추정 비용 폐기: reason={}, usageType={}, sourceId={}, precision={}, scale={}",
+                reason, usageType, sourceId, cost.precision(), cost.scale());
     }
 
     private ApiException limitExceeded(UsageType usageType) {
