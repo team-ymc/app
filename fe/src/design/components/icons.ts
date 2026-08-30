@@ -11,6 +11,7 @@ import {
   PaperPlaneTilt,
   Moon,
   Sun,
+  SealCheck,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -26,6 +27,7 @@ export const ICONS: Record<string, Icon> = {
   'paper-plane-tilt': PaperPlaneTilt,
   moon: Moon,
   sun: Sun,
+  'seal-check': SealCheck,
 };
 
 export function iconComponent(kebab: string): Icon | undefined {
