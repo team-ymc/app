@@ -30,7 +30,8 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
 
     /**
-     * 검증 완료된 Paper를 Document에 연결. document_id가 null일 때만 1 row다.
+     * 검증 완료된 Paper를 Document에 연결. 미연결·미만료일 때만 1 row다.
+     * 만료 CAS와 같은 Paper 행에서 경쟁하므로 둘 중 먼저 커밋한 전이만 성공한다.
      * updated_at을 함께 갱신한다 — 연결 순간이 이 Paper의 표시 상태가 바뀐 시각이고,
      * bulk UPDATE는 JPA auditing을 우회하기 때문이다.
      */
@@ -41,6 +42,7 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                    p.updatedAt = :now
              where p.id = :paperId
                and p.documentId is null
+               and p.expiredAt is null
             """)
     int linkDocument(@Param("paperId") UUID paperId, @Param("documentId") UUID documentId,
             @Param("now") Instant now);
