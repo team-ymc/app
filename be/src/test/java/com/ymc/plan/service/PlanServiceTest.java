@@ -28,7 +28,7 @@ class PlanServiceTest extends IntegrationTest {
     @Test
     @DisplayName("유효 기간 안이면 Pro, 만료 시각부터 Free — [started, ended) 경계")
     void proWithinPeriodBoundary() {
-        Instant started = Instant.now().minus(1, ChronoUnit.DAYS);
+        Instant started = Instant.now().truncatedTo(ChronoUnit.MICROS).minus(1, ChronoUnit.DAYS);
         Instant ended = started.plus(30, ChronoUnit.DAYS);
         planEntitlementRepository.save(PlanEntitlement.grant(
                 TEST_USER_ID, PlanCode.PRO, started, ended, started));
@@ -43,7 +43,7 @@ class PlanServiceTest extends IntegrationTest {
     @Test
     @DisplayName("겹치는 권한이 여럿이면 가장 늦은 만료 시각")
     void latestExpiryWins() {
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         Instant endedShort = now.plus(7, ChronoUnit.DAYS);
         Instant endedLong = now.plus(30, ChronoUnit.DAYS);
         planEntitlementRepository.save(PlanEntitlement.grant(

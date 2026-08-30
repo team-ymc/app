@@ -38,10 +38,12 @@ public class PaperDocumentLinkService {
         Instant now = Instant.now();
         boolean created = documentRepository.insertIfAbsent(
                 UUID.randomUUID(), checksumSha256, fileKey, paperId, now) == 1;
-        // 잠금 조회 — 종결 전이와 직렬화해 "연결 직후 종결"의 정산 누락을 막는다
-        Document document = documentRepository.findWithLockByChecksumSha256(checksumSha256)
+        // 잠금 조회 — 같은 Paper의 requestPaperId 경쟁을 먼저 흡수하고, 다른 Paper가 만든
+        // 같은 checksum Document로 폴백한다. 종결 전이와도 같은 행에서 직렬화된다.
+        Document document = documentRepository.findWithLockByRequestPaperId(paperId)
+                .or(() -> documentRepository.findWithLockByChecksumSha256(checksumSha256))
                 .orElseThrow(() -> new IllegalStateException(
-                        "생성 직후 조회에 실패한 document: paperId=" + paperId));
+                        "insert 충돌 후 조회에 실패한 document: paperId=" + paperId));
         int linked = paperRepository.linkDocument(paperId, document.getId(), now);
         if (linked == 0) {
             verifyIdempotentLinkOrThrowExpired(paperId, document.getId());

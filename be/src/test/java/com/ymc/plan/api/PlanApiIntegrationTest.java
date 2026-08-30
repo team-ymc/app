@@ -59,7 +59,8 @@ class PlanApiIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("유효한 Pro는 플랜·만료 시각·Pro 한도를 반환한다")
     void proPlanWithExpiry() throws Exception {
-        Instant now = Instant.now();
+        // PostgreSQL timestamp(6) 왕복 후에도 동일하도록 DB 정밀도에 맞춘다.
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         Instant ended = now.plus(30, ChronoUnit.DAYS);
         planEntitlementRepository.save(PlanEntitlement.grant(
                 TEST_USER_ID, PlanCode.PRO, now.minusSeconds(60), ended, now));

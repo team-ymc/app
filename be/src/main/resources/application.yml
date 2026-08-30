@@ -61,7 +61,7 @@ paper:
     # 단일 PDF 상한. 계약의 CreatePaperRequest.size 최대값, FE의 MAX_PDF_UPLOAD_BYTES와 같은 값을 둔다
     max-file-size: ${MAX_UPLOAD_FILE_SIZE:50MB}
 
-# FT-011 플랜·사용량 — 값은 베타 초기 정책. 배포 정책값(env)으로 덮는다
+# FT-011 플랜·사용량 — 베타 초기 정책. 변경 시 관련 제품 정책과 함께 검토한다
 plan:
   policy:
     free:

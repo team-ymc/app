@@ -28,18 +28,24 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("select d from Document d where d.checksumSha256 = :checksumSha256")
     Optional<Document> findWithLockByChecksumSha256(@Param("checksumSha256") String checksumSha256);
 
+    /** 같은 Paper의 동시 complete에서 requestPaperId 유니크 경쟁의 승자를 잠금 조회한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.requestPaperId = :requestPaperId")
+    Optional<Document> findWithLockByRequestPaperId(@Param("requestPaperId") UUID requestPaperId);
+
     /**
-     * checksum 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이 트랜잭션을
-     * abort시켜 같은 Tx에서 기존-Document 경로로 전환할 수 없으므로 ON CONFLICT를 쓴다.
+     * checksum·requestPaperId 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이
+     * 트랜잭션을 abort시켜 같은 Tx에서 기존-Document 경로로 전환할 수 없으므로
+     * 모든 unique 충돌을 {@code ON CONFLICT DO NOTHING}으로 흡수한다.
      *
-     * @return 1이면 이 호출이 생성함, 0이면 같은 checksum이 이미 있음
+     * @return 1이면 이 호출이 생성함, 0이면 checksum 또는 requestPaperId가 이미 있음
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             insert into document
                 (id, checksum_sha256, file_key, status, error_code, request_paper_id, created_at, updated_at)
             values (:id, :checksum, :fileKey, 'UPLOADED', null, :requestPaperId, :now, :now)
-            on conflict (checksum_sha256) do nothing
+            on conflict do nothing
             """, nativeQuery = true)
     int insertIfAbsent(
             @Param("id") UUID id,
