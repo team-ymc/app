@@ -1,9 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UploadDialog from './UploadDialog';
 import { sha256Base64 } from './fileChecksum';
 import { createPaper, uploadToS3 } from '../../api/papers';
+import { ApiError } from '../../api/types';
+
+afterEach(cleanup);
 
 vi.mock('./fileChecksum', () => ({ sha256Base64: vi.fn() }));
 vi.mock('../../api/papers', () => ({
@@ -32,6 +35,14 @@ function selectPdfAndUpload(container: HTMLElement) {
     target: { files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] },
   });
   fireEvent.click(screen.getByRole('button', { name: '업로드' }));
+}
+
+function renderDialogWith(qc: QueryClient) {
+  return render(
+    <QueryClientProvider client={qc}>
+      <UploadDialog open onClose={() => {}} onUploaded={() => {}} />
+    </QueryClientProvider>,
+  );
 }
 
 describe('UploadDialog — checksum', () => {
@@ -63,5 +74,35 @@ describe('UploadDialog — checksum', () => {
 
     await waitFor(() =>
       expect(screen.getByText('파일 검증에 실패했습니다. 파일이 업로드 중 변경되었을 수 있습니다')).toBeTruthy());
+  });
+});
+
+describe('UploadDialog — 사용량 한도', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('429 PAPER_USAGE_LIMIT_EXCEEDED면 plan 쿼리를 invalidate하고 에러를 노출한다', async () => {
+    vi.mocked(sha256Base64).mockResolvedValue(HASH);
+    vi.mocked(createPaper).mockRejectedValue(new ApiError('한도 초과', 'PAPER_USAGE_LIMIT_EXCEEDED', 429));
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+    const { container } = renderDialogWith(qc);
+
+    selectPdfAndUpload(container);
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['plan'] }));
+    await waitFor(() => expect(screen.getByText(/PAPER_USAGE_LIMIT_EXCEEDED/)).toBeTruthy());
+  });
+
+  it('한도와 무관한 실패는 plan을 invalidate하지 않는다', async () => {
+    vi.mocked(sha256Base64).mockResolvedValue(HASH);
+    vi.mocked(createPaper).mockRejectedValue(new ApiError('중복 파일명', 'DUPLICATE_FILENAME', 409));
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+    const { container } = renderDialogWith(qc);
+
+    selectPdfAndUpload(container);
+
+    await waitFor(() => expect(screen.getByText(/DUPLICATE_FILENAME/)).toBeTruthy());
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['plan'] });
   });
 });

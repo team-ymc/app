@@ -116,6 +116,10 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
       onClose();
       onUploaded();
     } catch (e) {
+      // 한도 초과면 plan을 재조회 — 서재가 안내 박스·버튼 비활성으로 전환된다.
+      if (e instanceof ApiError && e.code === 'PAPER_USAGE_LIMIT_EXCEEDED') {
+        queryClient.invalidateQueries({ queryKey: ['plan'] });
+      }
       setError(e); // 숨기지 않는다 — 다이얼로그 안에 그대로 노출
       setPhase('file-selected'); // 재시도 가능하도록 복귀
     }

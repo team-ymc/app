@@ -3,6 +3,7 @@
 // sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사 (플랜 공통 변환표).
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Books,
   MagnifyingGlass,
@@ -12,6 +13,7 @@ import {
   User,
   CheckCircle,
   CaretLeft,
+  WarningCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../design/components/Button';
@@ -21,7 +23,7 @@ import { UsageMeter } from '../design/components/UsageMeter';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { usePapersQuery } from './bookshelf/usePapersQuery';
 import { usePlanQuery } from '../plan/usePlanQuery';
-import { periodLabel, meterCaption } from '../plan/planLabels';
+import { periodLabel, meterCaption, isExhausted, uploadLimitNotice } from '../plan/planLabels';
 import { filterPapers, paginate } from './bookshelf/paperFilters';
 import { accessDisplay } from './bookshelf/paperDateLabel';
 import UploadDialog from './bookshelf/UploadDialog';
@@ -50,9 +52,12 @@ export default function BookshelfPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { data, isPending, isError, error } = usePapersQuery();
   const planQuery = usePlanQuery();
   const plan = planQuery.data;
+  const uploadLocked = plan ? isExhausted(plan.usage.paperRegistration) : false;
+  const lockNotice = plan ? uploadLimitNotice(plan) : null;
 
   const [keyword, setKeyword] = useState('');
   const [isGridView, setIsGridView] = useState(false);
@@ -193,9 +198,36 @@ export default function BookshelfPage() {
               <Books size={19} color="var(--color-primary)" style={{ flexShrink: 0 }} />
               내 서재
             </h1>
-            <Button variant="secondary" icon="plus" onClick={() => setUploadOpen(true)} style={{ flexShrink: 0 }}>
-              <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>업로드</span>
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {uploadLocked && lockNotice && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    height: '36px',
+                    padding: '0 12px',
+                    boxSizing: 'border-box',
+                    background: 'var(--color-bg-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-control)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '13px',
+                    color: 'var(--color-text-body)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <WarningCircle size={15} color="var(--color-danger)" />
+                  <span>
+                    <span style={{ fontWeight: 600 }}>{lockNotice.headline}</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{lockNotice.reset}</span>
+                  </span>
+                </div>
+              )}
+              <Button variant="secondary" icon="plus" onClick={() => setUploadOpen(true)} disabled={uploadLocked} style={{ flexShrink: 0 }}>
+                <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>업로드</span>
+              </Button>
+            </div>
           </div>
 
           {/* R3 Controls */}
@@ -477,7 +509,10 @@ export default function BookshelfPage() {
         <UploadDialog
           open
           onClose={() => setUploadOpen(false)}
-          onUploaded={() => showToast('등록되었습니다 — 분석이 시작됩니다')}
+          onUploaded={() => {
+            queryClient.invalidateQueries({ queryKey: ['plan'] });
+            showToast('등록되었습니다 — 분석이 시작됩니다');
+          }}
         />
       )}
 
