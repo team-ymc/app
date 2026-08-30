@@ -11,12 +11,17 @@ import {
   FileText,
   User,
   CheckCircle,
+  CaretLeft,
 } from '@phosphor-icons/react';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../design/components/Button';
 import { IconButton } from '../design/components/IconButton';
+import { Badge } from '../design/components/Badge';
+import { UsageMeter } from '../design/components/UsageMeter';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { usePapersQuery } from './bookshelf/usePapersQuery';
+import { usePlanQuery } from '../plan/usePlanQuery';
+import { periodLabel, meterCaption } from '../plan/planLabels';
 import { filterPapers, paginate } from './bookshelf/paperFilters';
 import { accessDisplay } from './bookshelf/paperDateLabel';
 import UploadDialog from './bookshelf/UploadDialog';
@@ -46,6 +51,8 @@ export default function BookshelfPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data, isPending, isError, error } = usePapersQuery();
+  const planQuery = usePlanQuery();
+  const plan = planQuery.data;
 
   const [keyword, setKeyword] = useState('');
   const [isGridView, setIsGridView] = useState(false);
@@ -53,6 +60,7 @@ export default function BookshelfPage() {
   const [uploadOpen, setUploadOpen] = useState(false); // Task 11: UploadDialog가 이 state를 소비한다
   const [toast, setToast] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileBtnRef = useRef<HTMLButtonElement>(null);
@@ -323,7 +331,7 @@ export default function BookshelfPage() {
             position: 'fixed',
             top: '58px',
             right: '20px',
-            width: '180px',
+            width: '200px',
             background: 'var(--color-bg-paper)',
             border: '1px solid var(--color-border)',
             borderRadius: '8px',
@@ -350,11 +358,76 @@ export default function BookshelfPage() {
           </div>
           <div style={{ height: '1px', background: 'var(--color-border)', margin: '2px 6px' }} />
           <DropdownButton>프로필</DropdownButton>
+          <button
+            onClick={() => setUsageOpen((v) => !v)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '9px 10px',
+              border: 'none',
+              borderRadius: '6px',
+              background: usageOpen ? 'var(--color-primary-subtle)' : 'transparent',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '13px',
+              color: 'var(--color-text-body)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <CaretLeft size={13} color="var(--color-text-muted)" />
+            <span>사용량</span>
+          </button>
           <DropdownButton>설정</DropdownButton>
           <div style={{ height: '1px', background: 'var(--color-border)', margin: '2px 6px' }} />
           <DropdownButton danger onClick={handleSignOut}>
             로그아웃
           </DropdownButton>
+          {usageOpen && plan && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 'calc(100% + 8px)',
+                width: '260px',
+                background: 'var(--color-bg-paper)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                boxShadow: 'var(--shadow-menu)',
+                padding: '16px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                zIndex: 55,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px' }}>
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', fontWeight: 600, color: 'var(--color-text-heading)', whiteSpace: 'nowrap' }}>
+                  이번 달 사용량
+                </span>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                  {periodLabel(plan, new Date())}
+                </span>
+              </div>
+              <UsageMeter
+                label="AI 질의"
+                used={plan.usage.aiQuery.used ?? 0}
+                limit={plan.usage.aiQuery.limit}
+                unlimited={plan.usage.aiQuery.mode === 'UNLIMITED'}
+                resetLabel={meterCaption('질문', plan.usage.aiQuery)}
+              />
+              <UsageMeter
+                label="문서 등록"
+                used={plan.usage.paperRegistration.used ?? 0}
+                limit={plan.usage.paperRegistration.limit}
+                unlimited={plan.usage.paperRegistration.mode === 'UNLIMITED'}
+                resetLabel={meterCaption('등록', plan.usage.paperRegistration)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -381,8 +454,22 @@ export default function BookshelfPage() {
           <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>Paper Teacher</span>
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ProfileButton ref={profileBtnRef} onClick={() => setProfileMenuOpen((o) => !o)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {plan && (
+            <Badge
+              tone={plan.plan === 'PRO' ? 'proOnDark' : 'neutralOnDark'}
+              icon={plan.plan === 'PRO' ? 'seal-check' : undefined}
+            >
+              {plan.plan === 'PRO' ? 'Pro' : 'Free'}
+            </Badge>
+          )}
+          <ProfileButton
+            ref={profileBtnRef}
+            onClick={() => {
+              setProfileMenuOpen((o) => !o);
+              setUsageOpen(false);
+            }}
+          />
         </div>
       </div>
 
