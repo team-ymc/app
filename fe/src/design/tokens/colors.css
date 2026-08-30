@@ -3,7 +3,7 @@
 --walnut:#261B17;--walnut-raised:#35251F;
 --parchment:#F4EBDD;--paper:#FFFDF7;--surface-warm:#F9F3E8;
 --ink-charcoal:#272421;--ink-body:#38332E;--ink-muted:#6F685F;
---border-warm:#D8CCBB;--brass:#A48248;
+--border-warm:#D8CCBB;--brass:#A48248;--brass-on-dark:#E8C98F;
 --success-sage:#71806A;--danger-red:#8A3C35;
 --on-primary:#FFFDF7;--on-dark:#FFFDF7;
 --night-canvas:#111923;--night-paper:#192432;--night-ink:#F0E8DC;--night-muted:#AFA89E;--night-border:#344559;
@@ -13,7 +13,7 @@
 --color-border:var(--border-warm);
 --color-primary:var(--navy-ink);--color-primary-hover:var(--navy-ink-hover);
 --color-primary-subtle:var(--navy-subtle);--color-primary-selection:var(--navy-selection);
---color-accent-brass:var(--brass);--color-success:var(--success-sage);--color-danger:var(--danger-red);
+--color-accent-brass:var(--brass);--color-accent-brass-on-dark:var(--brass-on-dark);--color-success:var(--success-sage);--color-danger:var(--danger-red);
 --color-on-primary:var(--on-primary);--color-on-dark:var(--on-dark)
 }
 [data-theme="night"]{

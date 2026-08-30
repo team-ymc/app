@@ -21,6 +21,8 @@ import { TocRail } from './study/TocRail';
 import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
 import { useScrollSpy } from './study/useScrollSpy';
 import type { SelectionAnchors } from './study/selectionAnchors';
+import { usePlanQuery } from '../plan/usePlanQuery';
+import { isExhausted, exhaustedPlaceholder } from '../plan/planLabels';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const SPLIT_MIN = 30;
@@ -67,6 +69,8 @@ function StudyPageContent({ paperId }: { paperId: string }) {
     queryKey: ['paper-content', paperId],
     queryFn: () => getPaperContent(paperId),
   });
+  const planQuery = usePlanQuery();
+  const aiUsage = planQuery.data?.usage.aiQuery;
 
   const [tocOpen, setTocOpen] = useState(false);
   const [nightMode, setNightMode] = useState<boolean>(() => {
@@ -327,6 +331,8 @@ function StudyPageContent({ paperId }: { paperId: string }) {
               onContextConsumed={() => setPendingContext(null)}
               collapsed={chatCollapsed}
               onToggleCollapse={() => setChatCollapsed((v) => !v)}
+              queryLocked={aiUsage ? isExhausted(aiUsage) : false}
+              lockPlaceholder={exhaustedPlaceholder(aiUsage?.resetAt ?? null)}
             />
           </div>
         </div>

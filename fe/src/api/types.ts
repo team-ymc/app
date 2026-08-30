@@ -67,3 +67,20 @@ export interface PaperContentResponse {
   blocks: PaperContentBlockDto[];
   assets: Record<string, PaperContentAssetDto>;
 }
+
+// GET /api/me/plan. UNLIMITED면 limit·used·remaining·resetAt 모두 null.
+export type UsageMode = 'MONTHLY' | 'UNLIMITED';
+
+export interface UsageLimit {
+  mode: UsageMode;
+  limit: number | null;
+  used: number | null;      // 확정 + 진행 중 예약
+  remaining: number | null;
+  resetAt: string | null;   // 다음 KST 월간 버킷 시작
+}
+
+export interface PlanUsageResponse {
+  plan: 'FREE' | 'PRO';
+  planExpiresAt: string | null; // PRO만, FREE면 null
+  usage: { aiQuery: UsageLimit; paperRegistration: UsageLimit };
+}
