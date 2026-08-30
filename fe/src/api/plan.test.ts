@@ -21,7 +21,8 @@ describe('api/plan', () => {
   it('getMyPlan: GET /api/me/plan 응답을 그대로 반환한다', async () => {
     mockFetch({ body: PLAN_BODY });
     const res = await getMyPlan();
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/me/plan', expect.objectContaining({}));
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(globalThis.fetch).mock.calls[0][0]).toBe('/api/me/plan');
     expect(res.plan).toBe('FREE');
     expect(res.usage.aiQuery.remaining).toBe(63);
   });

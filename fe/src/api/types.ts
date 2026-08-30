@@ -68,7 +68,7 @@ export interface PaperContentResponse {
   assets: Record<string, PaperContentAssetDto>;
 }
 
-// GET /api/me/plan (FT-011 Story 3). UNLIMITED면 limit·used·remaining·resetAt 모두 null.
+// GET /api/me/plan. UNLIMITED면 limit·used·remaining·resetAt 모두 null.
 export type UsageMode = 'MONTHLY' | 'UNLIMITED';
 
 export interface UsageLimit {

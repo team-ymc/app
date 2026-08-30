@@ -24,7 +24,7 @@ export function exhaustedPlaceholder(resetAt: string | null): string {
 // UsageMeter 하단 캡션. UNLIMITED는 컴포넌트 기본 캡션('이번 달 제한 없음')에 맡긴다.
 export function meterCaption(unitLabel: string, u: UsageLimit): string | null {
   if (u.mode !== 'MONTHLY' || u.resetAt == null) return null;
-  if (u.remaining === 0) return `모두 사용 · ${kstMonthDay(u.resetAt)} ${HM.format(new Date(u.resetAt))} 초기화`;
+  if (isExhausted(u)) return `모두 사용 · ${kstMonthDay(u.resetAt)} ${HM.format(new Date(u.resetAt))} 초기화`;
   return `남은 ${unitLabel} ${u.remaining}회 · ${kstMonthDay(u.resetAt)} 초기화`;
 }
 

@@ -1,4 +1,4 @@
-// 플랜·사용량 조회 (FT-011 Story 3). papers.ts와 같은 결 — authFetch + apiError.
+// 플랜·사용량 조회. papers.ts와 같은 결 — authFetch + apiError.
 import { authFetch } from './auth';
 import { apiError } from './papers';
 import type { PlanUsageResponse } from './types';
