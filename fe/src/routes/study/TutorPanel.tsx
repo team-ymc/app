@@ -37,6 +37,9 @@ export interface TutorPanelProps {
   onContextConsumed: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  /** AI 질의 한도 소진 — StudyPage가 plan 조회로 판정해 내려준다. */
+  queryLocked?: boolean;
+  lockPlaceholder?: string;
 }
 
 const rootStyle: CSSProperties = {
@@ -227,7 +230,16 @@ function dotStyle(delay: number): CSSProperties {
   };
 }
 
-export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed, collapsed, onToggleCollapse }: TutorPanelProps) {
+export function TutorPanel({
+  paperId,
+  blocks,
+  pendingContext,
+  onContextConsumed,
+  collapsed,
+  onToggleCollapse,
+  queryLocked = false,
+  lockPlaceholder,
+}: TutorPanelProps) {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const [input, setInput] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
@@ -291,7 +303,14 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
       signal: controller.signal,
       onEvent: (e) => {
         // 전송 완료 시 세션 목록을 무효화 — 새 세션이 다음에 드롭다운을 열 때 반영되게 한다.
-        if (e.type === 'completed') queryClient.invalidateQueries({ queryKey: ['chat-sessions', paperId] });
+        if (e.type === 'completed') {
+          queryClient.invalidateQueries({ queryKey: ['chat-sessions', paperId] });
+          queryClient.invalidateQueries({ queryKey: ['plan'] }); // 사용량 확정 반영
+        }
+        // 한도 초과 — plan 재조회가 입력창을 잠근다
+        if (e.type === 'failed' && e.code === 'CHAT_USAGE_LIMIT_EXCEEDED') {
+          queryClient.invalidateQueries({ queryKey: ['plan'] });
+        }
         dispatch(e);
       },
     });
@@ -359,6 +378,7 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
   }
 
   function handleSend() {
+    if (queryLocked) return;
     const question = input.trim();
     if (!question || state.streaming) return;
     setInput('');
@@ -411,7 +431,8 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
     !!lastMessage &&
     lastMessage.role === 'assistant' &&
     lastMessage.status === 'FAILED' &&
-    lastMessage.error?.retryable !== false;
+    lastMessage.error?.retryable !== false &&
+    lastMessage.error?.code !== 'CHAT_USAGE_LIMIT_EXCEEDED'; // 재시도해도 429 — 초기화 시각까지 불가
 
   const composer = (
     <div style={{ position: 'relative' }}>
@@ -455,6 +476,7 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
           background: 'var(--color-bg-paper)',
           padding: '5px 5px 5px 14px',
           transition: 'border-color 150ms ease',
+          cursor: queryLocked ? 'not-allowed' : undefined,
         }}
       >
         <textarea
@@ -464,7 +486,8 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
           onKeyDown={handleKeyDown}
           onFocus={() => setComposerFocused(true)}
           onBlur={() => setComposerFocused(false)}
-          placeholder="AI에게 질문해보세요"
+          disabled={queryLocked}
+          placeholder={queryLocked ? (lockPlaceholder ?? '금월 사용량 소진') : 'AI에게 질문해보세요'}
           rows={1}
           style={{
             flex: 1,
@@ -477,10 +500,11 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
             fontFamily: 'var(--font-sans)',
             fontSize: 15,
             lineHeight: 1.5,
-            color: 'var(--color-text-body)',
+            color: queryLocked ? 'var(--color-text-muted)' : 'var(--color-text-body)',
             minHeight: 22,
             maxHeight: 150,
             boxSizing: 'border-box',
+            cursor: queryLocked ? 'not-allowed' : undefined,
           }}
         />
         <IconButton
@@ -488,7 +512,7 @@ export function TutorPanel({ paperId, blocks, pendingContext, onContextConsumed,
           label="질문 보내기"
           size={34}
           onClick={handleSend}
-          disabled={state.streaming}
+          disabled={state.streaming || queryLocked}
           style={{ flexShrink: 0, marginBottom: 2 }}
         />
       </div>
