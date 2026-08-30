@@ -40,7 +40,7 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
         Paper paper = paperRepository.save(Paper.register(ownerId, filename, Instant.now()));
         Document document = givenLinkedDocument(paper);
         documentTransitions.markProcessing(document.getId());
-        documentTransitions.markParsed(document.getId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(document.getId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -49,7 +49,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
             String question) {
         ChatStartResult started = chatCommandService.start(
                 ownerId, paper.getId(), sessionIdOrNull, UUID.randomUUID(), question);
-        chatMessageTransitions.complete(started.assistantMessageId(), "답변");
+        chatMessageTransitions.complete(
+                started.assistantMessageId(), "답변", started.clientMessageId(), null);
         return started;
     }
 
@@ -269,7 +270,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
         chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
 
-        boolean owner = chatMessageTransitions.complete(started.assistantMessageId(), "늦은 답변");
+        boolean owner = chatMessageTransitions.complete(
+                started.assistantMessageId(), "늦은 답변", started.clientMessageId(), null);
 
         assertThat(owner).isTrue();
     }
@@ -281,7 +283,8 @@ class ChatSessionHistoryIntegrationTest extends IntegrationTest {
         UUID clientMessageId = UUID.randomUUID();
         ChatStartResult started = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), null, clientMessageId, "질문");
-        chatMessageTransitions.complete(started.assistantMessageId(), "답변");
+        chatMessageTransitions.complete(
+                started.assistantMessageId(), "답변", started.clientMessageId(), null);
         chatCommandService.deleteSession(TEST_USER_ID, paper.getId(), started.sessionId());
 
         assertThatThrownBy(() -> chatCommandService.start(

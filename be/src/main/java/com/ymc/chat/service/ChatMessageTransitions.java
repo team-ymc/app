@@ -1,5 +1,6 @@
 package com.ymc.chat.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -7,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.chat.domain.ChatMessageRepository;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,16 +22,26 @@ import lombok.RequiredArgsConstructor;
 public class ChatMessageTransitions {
 
     private final ChatMessageRepository chatMessageRepository;
+    private final UsageService usageService;
 
-    /** @return 이 호출이 COMPLETED 전이의 주인이면 true */
+    /** @return 이 호출이 COMPLETED 전이의 주인이면 true. 주인일 때만 사용량을 확정한다. */
     @Transactional
-    public boolean complete(UUID messageId, String content) {
-        return chatMessageRepository.markCompleted(messageId, content, Instant.now()) == 1;
+    public boolean complete(UUID messageId, String content, UUID clientMessageId,
+            BigDecimal estimatedCostUsd) {
+        boolean owner = chatMessageRepository.markCompleted(messageId, content, Instant.now()) == 1;
+        if (owner) {
+            usageService.confirm(UsageType.AI_QUERY, clientMessageId, estimatedCostUsd);
+        }
+        return owner;
     }
 
-    /** @return 이 호출이 FAILED 전이의 주인이면 true */
+    /** @return 이 호출이 FAILED 전이의 주인이면 true. 주인일 때만 예약을 해제한다. */
     @Transactional
-    public boolean fail(UUID messageId) {
-        return chatMessageRepository.markFailed(messageId, Instant.now()) == 1;
+    public boolean fail(UUID messageId, UUID clientMessageId) {
+        boolean owner = chatMessageRepository.markFailed(messageId, Instant.now()) == 1;
+        if (owner) {
+            usageService.release(UsageType.AI_QUERY, clientMessageId);
+        }
+        return owner;
     }
 }

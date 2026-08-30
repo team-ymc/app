@@ -27,6 +27,15 @@ class DocumentPersistenceIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void 같은_requestPaperId도_한_번만_insert되고_두번째는_0row다() {
+        UUID requestPaperId = UUID.randomUUID();
+        assertThat(insert(randomChecksum(), requestPaperId)).isNotNull();
+        assertThat(insert(randomChecksum(), requestPaperId)).isNull();
+        assertThat(documentRepository.findByRequestPaperId(requestPaperId)).isPresent();
+        assertThat(documentRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void 선점_CAS는_UPLOADED에서만_1row다() {
         String checksum = randomChecksum();
         UUID id = insert(checksum, UUID.randomUUID());

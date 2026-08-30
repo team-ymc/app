@@ -34,7 +34,7 @@ class ChatCommandServiceTest extends IntegrationTest {
     /** 파싱 완료(COMPLETED) 논문 — 채팅 가능 상태. */
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("chat-target.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -64,7 +64,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
         // 첫 assistant를 종결시켜 CHAT_RUN_IN_PROGRESS를 피한다
         // (@Modifying 쿼리는 트랜잭션이 필요하므로 리포지토리 직접 호출이 아니라 transitions 빈을 쓴다)
-        chatMessageTransitions.complete(first.assistantMessageId(), "답");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답", first.clientMessageId(), null);
 
         ChatStartResult second = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "후속 질문");
@@ -190,7 +190,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 com.ymc.paper.domain.Paper.register(otherOwner, "others-dup.pdf", Instant.now()));
         Document othersDocument = givenLinkedDocument(othersPaper);
         documentTransitions.markProcessing(othersDocument.getId());
-        documentTransitions.markParsed(othersDocument.getId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(othersDocument.getId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 otherOwner, othersPaper.getId(), null, clientMessageId, "같은 질문"))
@@ -208,7 +208,7 @@ class ChatCommandServiceTest extends IntegrationTest {
         chatCommandService.start(TEST_USER_ID, paper.getId(), null, clientMessageId, "같은 질문");
 
         Paper secondPaper = givenProcessingPaper("second-paper.pdf");
-        documentTransitions.markParsed(secondPaper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(secondPaper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         assertThatThrownBy(() -> chatCommandService.start(
                 TEST_USER_ID, secondPaper.getId(), null, clientMessageId, "같은 질문"))
@@ -223,7 +223,7 @@ class ChatCommandServiceTest extends IntegrationTest {
 
         ChatStartResult first = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
-        chatMessageTransitions.complete(first.assistantMessageId(), "답1");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답1", first.clientMessageId(), null);
 
         chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");
@@ -258,7 +258,7 @@ class ChatCommandServiceTest extends IntegrationTest {
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "첫 질문");
         Instant firstActivity = chatSessionRepository.findById(first.sessionId())
                 .orElseThrow().getLastMessageAt();
-        chatMessageTransitions.complete(first.assistantMessageId(), "답");
+        chatMessageTransitions.complete(first.assistantMessageId(), "답", first.clientMessageId(), null);
 
         chatCommandService.start(
                 TEST_USER_ID, paper.getId(), first.sessionId(), UUID.randomUUID(), "둘째 질문");

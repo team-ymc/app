@@ -34,7 +34,7 @@ class PaperDownloadIntegrationTest extends IntegrationTest {
     @DisplayName("완료된 논문: 200과 다운로드 URL")
     void returnsDownloadUrlForCompletedPaper() throws Exception {
         Paper paper = givenProcessingPaper("done.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(get("/api/papers/{id}/download", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())

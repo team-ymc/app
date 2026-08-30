@@ -28,6 +28,9 @@ import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
+import com.ymc.plan.domain.PlanEntitlementRepository;
+import com.ymc.plan.domain.UsageBucketRepository;
+import com.ymc.plan.domain.UsageRecordRepository;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
@@ -123,6 +126,15 @@ public abstract class IntegrationTest {
     @Autowired
     protected AwsProperties awsProperties;
 
+    @Autowired
+    protected PlanEntitlementRepository planEntitlementRepository;
+
+    @Autowired
+    protected UsageBucketRepository usageBucketRepository;
+
+    @Autowired
+    protected UsageRecordRepository usageRecordRepository;
+
     /*
      * 스파이를 (쓰지 않는 테스트까지 포함해) 베이스에 모아 둔 이유: 빈 override는 스프링 컨텍스트
      * 캐시 키의 일부다. 테스트 클래스마다 다른 조합을 선언하면 컨텍스트가 갈라지고 컨테이너도 그만큼
@@ -153,6 +165,9 @@ public abstract class IntegrationTest {
      */
     @BeforeEach
     void resetState() {
+        usageRecordRepository.deleteAll();
+        usageBucketRepository.deleteAll();
+        planEntitlementRepository.deleteAll();
         chatMessageRepository.deleteAll();
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();

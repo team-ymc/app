@@ -48,6 +48,11 @@ public class PaperUploadCompletionService {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
 
+        if (paper.getExpiredAt() != null) {
+            // 만료가 먼저 커밋됐으면 예약은 이미 반환됐다 — 업로드를 이어가지 않는다
+            throw new ApiException(ErrorCode.UPLOAD_EXPIRED, "업로드가 만료된 논문입니다. 다시 등록해 주세요.");
+        }
+
         // 멱등 재호출. 발행 규칙을 먼저 거치는 이유: 발행 실패로 UPLOADED에 정체된 Document를
         // 재호출이 구제할 수 있는 유일한 창구이기 때문이다.
         if (paper.getDocumentId() != null) {

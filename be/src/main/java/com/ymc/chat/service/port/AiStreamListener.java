@@ -1,5 +1,7 @@
 package com.ymc.chat.service.port;
 
+import java.math.BigDecimal;
+
 /**
  * AI 스트림 이벤트 수신 콜백. 구현체(어댑터)는 한 run의 콜백을 순서대로, 한 번에 하나씩
  * 호출해야 한다 — 리스너 쪽에서 동기화를 추가하지 않는다.
@@ -16,7 +18,8 @@ public interface AiStreamListener {
     /** AI가 만든 최종 답변 전문. 이 시점은 아직 성공 확정이 아니다 (run.completed 대기). */
     void onMessageCompleted(String message);
 
-    void onRunCompleted();
+    /** run 성공 종결. estimatedCostUsd는 추정 비용(USD) — 없으면 null. */
+    void onRunCompleted(BigDecimal estimatedCostUsd);
 
     /** AI가 run.failed를 보냄. raw error는 FE에 노출하지 않는다. */
     void onRunFailed(String error);

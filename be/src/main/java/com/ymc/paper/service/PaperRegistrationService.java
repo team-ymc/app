@@ -17,6 +17,8 @@ import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.PresignedUpload;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,6 +38,7 @@ public class PaperRegistrationService {
     private final PaperRepository paperRepository;
     private final FileStorage fileStorage;
     private final PaperUploadPolicy uploadPolicy;
+    private final UsageService usageService;
 
     /**
      * 파일명이 중복이 아니면 레코드를 만들고 업로드 URL을 발급한다.
@@ -66,12 +69,14 @@ public class PaperRegistrationService {
             throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
         }
 
-        // 3. 사전 조회
+        // 3. 사전 조회 — 만료 잔재는 새 등록이 대체하므로 먼저 지운다
+        paperRepository.deleteExpiredByOwnerAndFilename(ownerId, filename);
         if (paperRepository.existsByOwnerIdAndFilename(ownerId, filename)) {
             throw duplicateFilename(filename);
         }
 
         Paper paper = Paper.register(ownerId, filename, Instant.now());
+        usageService.reserve(ownerId, UsageType.PAPER_REGISTRATION, paper.getId());
 
         // flush를 앞당겨 유니크 제약 위반 방지하여 적절한 에러코드 반환.
         try {

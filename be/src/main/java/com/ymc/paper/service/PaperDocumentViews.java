@@ -60,6 +60,9 @@ public class PaperDocumentViews {
 
     /** Document 상태는 API PaperStatus와 이름 1:1이다. 연결 전 = 업로드 대기. */
     static PaperStatus derivedStatus(Paper paper, Document document) {
+        if (paper.getExpiredAt() != null) {
+            return PaperStatus.EXPIRED;
+        }
         if (document == null) {
             return PaperStatus.UPLOAD_PENDING;
         }

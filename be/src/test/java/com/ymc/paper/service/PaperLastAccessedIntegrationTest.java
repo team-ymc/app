@@ -78,7 +78,7 @@ class PaperLastAccessedIntegrationTest extends IntegrationTest {
     void contentQueryTouchesLastAccessed() {
         Paper paper = givenProcessingPaper("content-touch.pdf");
         ingestService.ingest(paper.getDocumentId(), givenPackageOnS3(paper.getId()));
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         assertThat(reload(paper.getId()).getLastAccessedAt()).isNull();
 
         contentQueryService.getContent(paper.getId(), TEST_USER_ID);
@@ -90,7 +90,7 @@ class PaperLastAccessedIntegrationTest extends IntegrationTest {
     @DisplayName("채팅 시작이 lastAccessedAt을 갱신한다")
     void chatStartTouchesLastAccessed() {
         Paper paper = givenProcessingPaper("chat-touch.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         assertThat(reload(paper.getId()).getLastAccessedAt()).isNull();
 
         chatCommandService.start(TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");

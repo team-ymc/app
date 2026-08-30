@@ -20,7 +20,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
     /** COMPLETED + 적재까지 끝난 논문. */
     private Paper givenIngestedPaper() {
         Paper paper = givenProcessingPaper("content.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         documentContentIngestService.ingest(paper.getDocumentId(), givenPackageOnS3(paper.getId()));
         return reload(paper.getId());
     }
@@ -75,7 +75,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
     @Test
     void 완료됐지만_미적재면_409_PAPER_NOT_READY() throws Exception {
         Paper paper = givenProcessingPaper("not-ingested.pdf");
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
                 .andExpect(status().isConflict())

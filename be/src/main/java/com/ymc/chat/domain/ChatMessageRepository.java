@@ -48,4 +48,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
 
     /** 히스토리 조회 (계약 listChatSessionMessages). 정렬 키는 seq — ix_chat_message_session_seq. */
     List<ChatMessage> findAllBySessionIdOrderBySeqAsc(UUID sessionId);
+
+    /** 정리 스케줄러의 정체 GENERATING 스캔. */
+    List<ChatMessage> findAllByRoleAndStatusAndCreatedAtBefore(
+            ChatMessageRole role, ChatMessageStatus status, Instant cutoff);
 }

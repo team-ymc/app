@@ -53,7 +53,7 @@ class ParseResultContentIngestIntegrationTest extends IntegrationTest {
         // 시나리오: 전이는 커밋됐는데 적재가 실패해 메시지가 재전달된 경우
         Paper paper = givenProcessingPaper("redelivery.pdf");
         String manifestKey = givenPackageOnS3(paper.getId());
-        documentTransitions.markParsed(reload(paper.getId()).getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(reload(paper.getId()).getDocumentId(), DocumentStatus.COMPLETED, null);
 
         publishParseResult("""
                 {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}

@@ -43,7 +43,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     void returnsTerminalStatus(PaperStatus terminal) throws Exception {
         Paper paper = givenProcessingPaper("terminal-" + terminal + ".pdf");
         String errorCode = terminal == PaperStatus.FAILED ? "PDF_UNREADABLE" : null;
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.valueOf(terminal.name()), errorCode);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.valueOf(terminal.name()), errorCode);
 
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
@@ -56,7 +56,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("transition.pdf");
         Instant beforeTransition = reload(paper.getId()).getUpdatedAt();
 
-        documentTransitions.markParsed(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
 
         JsonNode body = objectMapper.readTree(
                 mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))

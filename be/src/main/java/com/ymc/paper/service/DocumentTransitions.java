@@ -1,6 +1,7 @@
 package com.ymc.paper.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -8,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.DocumentStatus;
+import com.ymc.paper.domain.PaperRepository;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 public class DocumentTransitions {
 
     private final DocumentRepository documentRepository;
+    private final PaperRepository paperRepository;
+    private final UsageService usageService;
 
     /** 파싱 시작 권한 선점을 즉시 커밋한다. true면 이 호출만 발행 권한을 갖는다. */
     @Transactional
@@ -34,9 +40,28 @@ public class DocumentTransitions {
         return documentRepository.revertToUploaded(documentId, Instant.now()) == 1;
     }
 
-    /** 결과 수신 전이. false면 이미 terminal(중복 수신 등). */
+    /**
+     * 결과 수신 전이 + 연결된 모든 Paper의 사용량 정산을 한 트랜잭션으로. 전이 주인일 때만
+     * 정산한다 — 쪼개면 전이만 커밋되고 정산이 유실될 수 있다.
+     *
+     * @throws IllegalArgumentException COMPLETED·FAILED가 아닌 상태를 전달한 경우
+     */
     @Transactional
-    public boolean markParsed(UUID documentId, DocumentStatus terminal, String errorCode) {
-        return documentRepository.markParsed(documentId, terminal, errorCode, Instant.now()) == 1;
+    public boolean markParsedAndSettle(UUID documentId, DocumentStatus terminal, String errorCode) {
+        if (terminal == null || !terminal.isTerminal()) {
+            throw new IllegalArgumentException("Document 종결 상태만 허용됩니다: " + terminal);
+        }
+        boolean owner = documentRepository.markParsed(documentId, terminal, errorCode,
+                Instant.now()) == 1;
+        if (!owner) {
+            return false;
+        }
+        List<UUID> paperIds = paperRepository.findIdsByDocumentId(documentId);
+        if (terminal == DocumentStatus.COMPLETED) {
+            usageService.confirmAll(UsageType.PAPER_REGISTRATION, paperIds);
+        } else {
+            usageService.releaseAll(UsageType.PAPER_REGISTRATION, paperIds);
+        }
+        return true;
     }
 }

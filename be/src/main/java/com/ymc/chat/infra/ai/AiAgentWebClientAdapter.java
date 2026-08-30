@@ -1,5 +1,6 @@
 package com.ymc.chat.infra.ai;
 
+import java.math.BigDecimal;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -108,7 +109,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 case "message.completed" -> listener.onMessageCompleted(textField(event.data(), "message"));
                 case "run.completed" -> {
                     terminalSeen.set(true);
-                    listener.onRunCompleted();
+                    listener.onRunCompleted(optionalCost(event.data()));
                 }
                 case "run.failed" -> {
                     terminalSeen.set(true);
@@ -120,6 +121,17 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
             // reactive 체인으로 던진다 — Reactor가 구독을 취소(=연결 종료=AI 생성 취소)하고
             // error 경로를 타서 onTransportError가 정확히 한 번 호출된다
             throw new IllegalStateException("AI event data 파싱 실패: " + name, e);
+        }
+    }
+
+    /** run.completed의 선택 필드. 없거나 숫자가 아니면 null — 성공 처리를 막지 않는다. */
+    private BigDecimal optionalCost(String data) {
+        try {
+            JsonNode node = objectMapper.readTree(data).get("estimated_cost_usd");
+            return node != null && node.isNumber() ? node.decimalValue() : null;
+        } catch (JsonProcessingException e) {
+            log.warn("estimated_cost_usd 파싱 실패 — 비용 없이 진행", e);
+            return null;
         }
     }
 

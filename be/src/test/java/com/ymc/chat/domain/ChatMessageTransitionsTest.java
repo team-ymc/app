@@ -19,21 +19,22 @@ class ChatMessageTransitionsTest extends IntegrationTest {
     @Autowired
     ChatMessageTransitions transitions;
 
-    private ChatMessage givenGeneratingAssistant() {
+    private ChatMessage givenGeneratingAssistant(UUID clientMessageId) {
         ChatSession session = chatSessionRepository.save(
                 ChatSession.open(TEST_USER_ID, UUID.randomUUID(), "질문", Instant.now()));
         return chatMessageRepository.save(
-                ChatMessage.assistantGenerating(session, UUID.randomUUID(), 1, Instant.now()));
+                ChatMessage.assistantGenerating(session, clientMessageId, 1, Instant.now()));
     }
 
     @Test
     @DisplayName("GENERATING → COMPLETED 전이는 한 번만 성공하고 content를 저장한다")
     void completeOnlyOnce() {
-        ChatMessage assistant = givenGeneratingAssistant();
+        UUID clientMessageId = UUID.randomUUID();
+        ChatMessage assistant = givenGeneratingAssistant(clientMessageId);
 
-        assertThat(transitions.complete(assistant.getId(), "최종 답변")).isTrue();
-        assertThat(transitions.complete(assistant.getId(), "다른 답변")).isFalse();
-        assertThat(transitions.fail(assistant.getId())).isFalse();
+        assertThat(transitions.complete(assistant.getId(), "최종 답변", clientMessageId, null)).isTrue();
+        assertThat(transitions.complete(assistant.getId(), "다른 답변", clientMessageId, null)).isFalse();
+        assertThat(transitions.fail(assistant.getId(), clientMessageId)).isFalse();
 
         ChatMessage saved = chatMessageRepository.findById(assistant.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
@@ -44,10 +45,11 @@ class ChatMessageTransitionsTest extends IntegrationTest {
     @Test
     @DisplayName("GENERATING → FAILED 전이 후에는 COMPLETED가 불가능하고 content는 남지 않는다")
     void failBlocksComplete() {
-        ChatMessage assistant = givenGeneratingAssistant();
+        UUID clientMessageId = UUID.randomUUID();
+        ChatMessage assistant = givenGeneratingAssistant(clientMessageId);
 
-        assertThat(transitions.fail(assistant.getId())).isTrue();
-        assertThat(transitions.complete(assistant.getId(), "늦은 답변")).isFalse();
+        assertThat(transitions.fail(assistant.getId(), clientMessageId)).isTrue();
+        assertThat(transitions.complete(assistant.getId(), "늦은 답변", clientMessageId, null)).isFalse();
 
         ChatMessage saved = chatMessageRepository.findById(assistant.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(ChatMessageStatus.FAILED);

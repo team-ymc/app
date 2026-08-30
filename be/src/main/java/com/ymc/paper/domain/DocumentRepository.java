@@ -1,13 +1,18 @@
 package com.ymc.paper.domain;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * 상태 전이는 전부 조건부 UPDATE(CAS) — 변경 row 수가 1일 때만 후속 동작. Paper CAS와 같은 관용구다.
@@ -18,18 +23,29 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     Optional<Document> findByRequestPaperId(UUID requestPaperId);
 
+    /** 연결·종결 직렬화용 잠금 조회 — 종결 UPDATE와 이 잠금이 같은 행에서 만난다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.checksumSha256 = :checksumSha256")
+    Optional<Document> findWithLockByChecksumSha256(@Param("checksumSha256") String checksumSha256);
+
+    /** 같은 Paper의 동시 complete에서 requestPaperId 유니크 경쟁의 승자를 잠금 조회한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.requestPaperId = :requestPaperId")
+    Optional<Document> findWithLockByRequestPaperId(@Param("requestPaperId") UUID requestPaperId);
+
     /**
-     * checksum 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이 트랜잭션을
-     * abort시켜 같은 Tx에서 기존-Document 경로로 전환할 수 없으므로 ON CONFLICT를 쓴다.
+     * checksum·requestPaperId 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이
+     * 트랜잭션을 abort시켜 같은 Tx에서 기존-Document 경로로 전환할 수 없으므로
+     * 모든 unique 충돌을 {@code ON CONFLICT DO NOTHING}으로 흡수한다.
      *
-     * @return 1이면 이 호출이 생성함, 0이면 같은 checksum이 이미 있음
+     * @return 1이면 이 호출이 생성함, 0이면 checksum 또는 requestPaperId가 이미 있음
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             insert into document
                 (id, checksum_sha256, file_key, status, error_code, request_paper_id, created_at, updated_at)
             values (:id, :checksum, :fileKey, 'UPLOADED', null, :requestPaperId, :now, :now)
-            on conflict (checksum_sha256) do nothing
+            on conflict do nothing
             """, nativeQuery = true)
     int insertIfAbsent(
             @Param("id") UUID id,
@@ -76,4 +92,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("terminal") DocumentStatus terminal,
             @Param("errorCode") String errorCode,
             @Param("now") Instant now);
+
+    /** 정리 스케줄러의 정체 UPLOADED·PROCESSING 스캔. */
+    @Query("select d.id from Document d where d.status in :statuses and d.updatedAt < :cutoff")
+    List<UUID> findStaleIds(@Param("statuses") Collection<DocumentStatus> statuses,
+            @Param("cutoff") Instant cutoff);
+
+    /** 테스트 전용 — 전이 시각을 과거로 되돌려 스캔 기준 통과를 재현한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("update Document d set d.updatedAt = :at where d.id = :id")
+    void backdateUpdatedAt(@Param("id") UUID id, @Param("at") Instant at);
 }

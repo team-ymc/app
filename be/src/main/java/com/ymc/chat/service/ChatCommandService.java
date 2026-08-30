@@ -22,6 +22,8 @@ import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.service.PaperAccessRecorder;
 import com.ymc.paper.service.PaperChatAccessValidator;
+import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.service.UsageService;
 
 /**
  * 채팅 시작 트랜잭션 — 검증과 저장까지만. 스트리밍은 이 메서드가 commit된 뒤
@@ -37,6 +39,7 @@ public class ChatCommandService {
     private final PaperAccessRecorder paperAccessRecorder;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final UsageService usageService;
     private final TransactionTemplate requiresNewTx;
 
     public ChatCommandService(
@@ -44,11 +47,13 @@ public class ChatCommandService {
             PaperAccessRecorder paperAccessRecorder,
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
+            UsageService usageService,
             PlatformTransactionManager transactionManager) {
         this.paperChatAccessValidator = paperChatAccessValidator;
         this.paperAccessRecorder = paperAccessRecorder;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
+        this.usageService = usageService;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -57,6 +62,7 @@ public class ChatCommandService {
      * @throws ApiException PAPER_NOT_FOUND / FORBIDDEN / PAPER_NOT_READY — 논문 검증 실패
      * @throws ApiException CHAT_SESSION_NOT_FOUND — 세션 없음·소유/논문 불일치
      * @throws ApiException CHAT_RUN_IN_PROGRESS — 세션에 GENERATING assistant 존재
+     * @throws ApiException CHAT_USAGE_LIMIT_EXCEEDED — 이번 달 AI 질의 한도 초과
      * @throws ApiException CLIENT_MESSAGE_ID_CONFLICT — 같은 id, 다른 content
      * @throws DuplicateChatMessageException — 같은 id, 같은 content (멱등 재전송)
      */
@@ -69,6 +75,12 @@ public class ChatCommandService {
 
         ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
 
+        if (sessionIdOrNull != null) {
+            // 세션 잠금을 기다리는 동안 선행 요청이 같은 clientMessageId를 저장했을 수 있다.
+            // 실행 중 여부보다 구체적인 멱등 계약(DUPLICATE/CONFLICT)을 먼저 판정한다.
+            rejectDuplicate(ownerId, paperId, clientMessageId, content);
+        }
+
         if (chatMessageRepository.existsBySessionIdAndStatus(
                 session.getId(), ChatMessageStatus.GENERATING)) {
             throw new ApiException(ErrorCode.CHAT_RUN_IN_PROGRESS, "이미 답변을 생성하고 있습니다.");
@@ -80,6 +92,9 @@ public class ChatCommandService {
         paperAccessRecorder.recordAccess(paperId, now);
         ChatMessage assistant;
         try {
+            // reserve도 같은 유니크 제약(usage_type+source_id) 경쟁에 걸릴 수 있어 메시지 저장과
+            // 같은 재시도 경로를 타도록 여기 둔다 — 별도 catch를 두지 않는다.
+            usageService.reserve(ownerId, UsageType.AI_QUERY, clientMessageId);
             chatMessageRepository.save(
                     ChatMessage.userMessage(session, clientMessageId, content, userSeq, now));
             assistant = chatMessageRepository.saveAndFlush(

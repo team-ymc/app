@@ -30,7 +30,8 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
 
     /**
-     * 검증 완료된 Paper를 Document에 연결. document_id가 null일 때만 1 row다.
+     * 검증 완료된 Paper를 Document에 연결. 미연결·미만료일 때만 1 row다.
+     * 만료 CAS와 같은 Paper 행에서 경쟁하므로 둘 중 먼저 커밋한 전이만 성공한다.
      * updated_at을 함께 갱신한다 — 연결 순간이 이 Paper의 표시 상태가 바뀐 시각이고,
      * bulk UPDATE는 JPA auditing을 우회하기 때문이다.
      */
@@ -41,7 +42,39 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                    p.updatedAt = :now
              where p.id = :paperId
                and p.documentId is null
+               and p.expiredAt is null
             """)
     int linkDocument(@Param("paperId") UUID paperId, @Param("documentId") UUID documentId,
             @Param("now") Instant now);
+
+    /** 만료 CAS — 업로드 미완(document 미연결)이고 아직 만료 전일 때만 1 row. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.expiredAt = :now, p.updatedAt = :now
+             where p.id = :paperId
+               and p.documentId is null
+               and p.expiredAt is null
+            """)
+    int markExpired(@Param("paperId") UUID paperId, @Param("now") Instant now);
+
+    /** 만료 잔재 제거 — 같은 파일명 재등록이 만료 row를 대체할 수 있게 한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            delete from Paper p
+             where p.ownerId = :ownerId and p.filename = :filename
+               and p.expiredAt is not null
+            """)
+    int deleteExpiredByOwnerAndFilename(@Param("ownerId") UUID ownerId,
+            @Param("filename") String filename);
+
+    @Query("select p.id from Paper p where p.documentId = :documentId")
+    List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
+
+    /** 정리 스케줄러의 정체 UPLOAD_PENDING 스캔 — document 미연결, 아직 만료 전. */
+    @Query("""
+            select p.id from Paper p
+             where p.documentId is null and p.expiredAt is null and p.createdAt < :cutoff
+            """)
+    List<UUID> findStaleUploadPendingIds(@Param("cutoff") Instant cutoff);
 }
