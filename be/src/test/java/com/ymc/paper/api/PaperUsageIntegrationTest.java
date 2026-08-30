@@ -1,6 +1,7 @@
 package com.ymc.paper.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -146,6 +147,25 @@ class PaperUsageIntegrationTest extends IntegrationTest {
 
         assertThat(second).isFalse();
         assertThat(recordStatusOf(paper.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("비종결 상태는 Document와 사용량을 변경하기 전에 거부한다")
+    void nonTerminalStatusIsRejectedBeforeMutation() {
+        Paper paper = givenReservedPendingPaper("invalid-terminal.pdf");
+        Document document = givenLinkedDocument(paper);
+
+        for (DocumentStatus invalid : new DocumentStatus[] {
+                DocumentStatus.UPLOADED, DocumentStatus.PROCESSING, null}) {
+            assertThatThrownBy(() -> documentTransitions.markParsedAndSettle(
+                    document.getId(), invalid, null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("종결 상태");
+        }
+
+        assertThat(documentRepository.findById(document.getId()).orElseThrow().getStatus())
+                .isEqualTo(DocumentStatus.UPLOADED);
+        assertThat(recordStatusOf(paper.getId())).isEqualTo(UsageRecordStatus.RESERVED);
     }
 
     /**

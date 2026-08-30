@@ -43,9 +43,14 @@ public class DocumentTransitions {
     /**
      * 결과 수신 전이 + 연결된 모든 Paper의 사용량 정산을 한 트랜잭션으로. 전이 주인일 때만
      * 정산한다 — 쪼개면 전이만 커밋되고 정산이 유실될 수 있다.
+     *
+     * @throws IllegalArgumentException COMPLETED·FAILED가 아닌 상태를 전달한 경우
      */
     @Transactional
     public boolean markParsedAndSettle(UUID documentId, DocumentStatus terminal, String errorCode) {
+        if (terminal == null || !terminal.isTerminal()) {
+            throw new IllegalArgumentException("Document 종결 상태만 허용됩니다: " + terminal);
+        }
         boolean owner = documentRepository.markParsed(documentId, terminal, errorCode,
                 Instant.now()) == 1;
         if (!owner) {
