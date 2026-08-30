@@ -75,6 +75,12 @@ public class ChatCommandService {
 
         ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
 
+        if (sessionIdOrNull != null) {
+            // 세션 잠금을 기다리는 동안 선행 요청이 같은 clientMessageId를 저장했을 수 있다.
+            // 실행 중 여부보다 구체적인 멱등 계약(DUPLICATE/CONFLICT)을 먼저 판정한다.
+            rejectDuplicate(ownerId, paperId, clientMessageId, content);
+        }
+
         if (chatMessageRepository.existsBySessionIdAndStatus(
                 session.getId(), ChatMessageStatus.GENERATING)) {
             throw new ApiException(ErrorCode.CHAT_RUN_IN_PROGRESS, "이미 답변을 생성하고 있습니다.");
