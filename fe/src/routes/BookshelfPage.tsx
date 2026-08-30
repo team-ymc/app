@@ -384,6 +384,7 @@ export default function BookshelfPage() {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              textAlign: 'right',
             }}
           >
             {user?.displayName ?? user?.email ?? ''}
@@ -562,7 +563,7 @@ function DropdownButton({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        textAlign: 'left',
+        textAlign: 'right',
         padding: '9px 10px',
         border: 'none',
         background: hover ? 'var(--color-primary-subtle)' : 'transparent',
