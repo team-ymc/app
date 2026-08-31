@@ -1,6 +1,7 @@
 package com.ymc.chat.infra.ai;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -29,7 +30,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Scheduler;
 
 /**
- * BE↔AI 계약(inline-pdf-agent-run-stream.yml)의 WebClient 구현 (설계 §4).
+ * BE↔AI 계약(universal-pdf-agent-run-stream.yml)의 WebClient 구현 (설계 §4).
  *
  * <p>reactive 체인은 이 클래스 밖으로 나가지 않는다 — 리스너 콜백은 전부
  * {@code chatRelayScheduler}(virtual thread)에서 순서대로 호출되므로 relay는 블로킹해도 된다.
@@ -42,7 +43,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
 
     private static final Logger log = LoggerFactory.getLogger(AiAgentWebClientAdapter.class);
 
-    static final String STREAM_PATH = "/api/v1/agents/inline-pdf-agent/runs/stream";
+    static final String STREAM_PATH = "/api/v1/agents/universal-pdf-agent/runs/stream";
 
     private final WebClient aiWebClient;
     private final Scheduler chatRelayScheduler;
@@ -54,13 +55,14 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
             @JsonProperty("thread_id") String threadId,
             @JsonProperty("paper_id") String paperId,
             String message,
-            @JsonInclude(JsonInclude.Include.NON_NULL) SelectionBody selection) {
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<SelectionBody> selections) {
     }
 
     record SelectionBody(AnchorBody start, AnchorBody end) {
-        static SelectionBody from(ChatSelectionDto dto) {
+        /** 단일 selection을 1개짜리 배열로 감싼다 — 없으면 null로 필드 생략 (빈 배열은 계약 위반). */
+        static List<SelectionBody> listFrom(ChatSelectionDto dto) {
             return dto == null ? null
-                    : new SelectionBody(AnchorBody.from(dto.start()), AnchorBody.from(dto.end()));
+                    : List.of(new SelectionBody(AnchorBody.from(dto.start()), AnchorBody.from(dto.end())));
         }
     }
 
@@ -79,7 +81,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 .uri(STREAM_PATH)
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(new StreamRequestBody(request.threadId(), request.paperId(), request.message(),
-                        SelectionBody.from(request.selection())))
+                        SelectionBody.listFrom(request.selection())))
                 .retrieve()
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {
                 });

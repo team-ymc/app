@@ -153,7 +153,7 @@ class AiAgentWebClientAdapterTest {
     }
 
     @Test
-    @DisplayName("selection은 snake_case로 직렬화되고, 없으면 필드 자체가 생략된다")
+    @DisplayName("selection은 1개짜리 selections 배열로 snake_case 직렬화된다")
     void selectionSerialization() {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t-6"),
@@ -167,11 +167,11 @@ class AiAgentWebClientAdapterTest {
 
         await().atMost(WAIT).until(() -> events.contains("run-completed"));
         assertThat(aiServer.lastRequestBody())
-                .contains("\"selection\":{\"start\":{\"block_id\":\"p0-b0\",\"offset\":3},\"end\":{\"block_id\":\"p0-b2\"}}");
+                .contains("\"selections\":[{\"start\":{\"block_id\":\"p0-b0\",\"offset\":3},\"end\":{\"block_id\":\"p0-b2\"}}]");
     }
 
     @Test
-    @DisplayName("selection이 null이면 body에 selection 키가 없다")
+    @DisplayName("selection이 null이면 body에 selections 키가 없다")
     void nullSelectionOmitted() {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t-7"),
