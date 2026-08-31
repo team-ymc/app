@@ -17,24 +17,25 @@
   letter-spacing: var(--subheading-tracking);
 }
 .pt-markdown p { margin: 0; }
-/* Task 12: Paper Study Page 목업 R4 block.isEquation 래퍼(배경/보더/패딩) 그대로.
-   수식 번호("(1)")는 목업 더미 데이터일 뿐 실제 파싱 결과에 없어 이식하지 않는다 (report 기록). */
+/* 이미지·수식·표·캡션 공통 프레임 — 목업 v2 pt-content-frame 값 그대로. */
 .pt-markdown .katex-display {
   overflow-x: auto;
+  text-align: center;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-structural);
+  border-radius: 4px;
   padding: 22px 24px;
   margin: 0;
 }
 
-.pt-figure { margin: var(--space-lg) 0; }
+.pt-figure { margin: var(--space-lg) 0; text-align: center; }
 .pt-figure img {
   display: block; max-width: 100%;
+  margin: 0 auto;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-structural);
-  padding: var(--space-sm);
+  border-radius: 4px;
+  padding: 8px 10px;
   box-sizing: border-box;
 }
 .pt-figure img.pt-figure-broken { min-height: 80px; }
@@ -43,20 +44,58 @@
   font-size: 13px; color: var(--color-text-muted);
 }
 
-/* Task 12: Paper Study Page 목업 R4 block.isTable cell.style 값 그대로 (border-bottom만, header는 배경 없이 굵게). */
-.pt-table-scroll { overflow-x: auto; margin: var(--space-md) 0; }
-.pt-markdown table { border-collapse: collapse; width: 100%; }
+/* figure title(figure_title label) — 원문보다 작은 sans·옅은 회색·가운데 정렬,
+   이미지와 결합하지 않는 독립 블록을 프레임으로 감싼다. */
+.pt-caption-block .pt-markdown {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  text-align: center;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+/* heading level 2 섹션 구분선 — border라 텍스트 드래그 선택에 포함되지 않는다. */
+.pt-section-start {
+  display: block;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+}
+
+/* 표 — 목업 v2 pt-paper-table: 프레임 안 paper 배경, 셀 가운데 정렬,
+   위아래 2px 진한(heading 색) 라인, 셀 안 수식은 SanitizedHtmlTable이 KaTeX로 변환. */
+.pt-table-scroll {
+  overflow-x: auto;
+  margin: var(--space-md) 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+.pt-markdown table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
 .pt-markdown th, .pt-markdown td {
-  text-align: left;
-  padding: 10px 12px;
+  text-align: center;
+  vertical-align: middle;
+  padding: 10px 14px;
+  background: var(--color-bg-paper);
   border-bottom: 1px solid var(--color-border);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--color-text-body);
 }
 .pt-markdown th {
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 1px solid var(--color-text-heading);
   font-weight: 600;
-  font-size: 13px;
   color: var(--color-text-heading);
 }
+.pt-markdown tr:first-child th { border-top: 2px solid var(--color-text-heading); }
+.pt-markdown tr:last-child td { border-bottom: 2px solid var(--color-text-heading); }

@@ -41,6 +41,20 @@ describe('adaptPaperContent', () => {
     expect(out.assetExpiresAt).toBe('2026-08-05T00:00:00Z');
   });
 
+  it('figure_title은 caption 블록으로 분류하고 원문·shift를 보존한다', () => {
+    const out = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'c0', globalOrder: 0, label: 'figure_title', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'Figure 2: Multi-Head Attention.' } },
+      ],
+    }));
+    expect(out.blocks[0]).toMatchObject({
+      type: 'caption',
+      markdown: 'Figure 2: Multi-Head Attention.',
+      sourceText: 'Figure 2: Multi-Head Attention.',
+      sourceOffsetShift: 0,
+    });
+  });
+
   it('레지스트리에 없는 assetKey·미지 format은 깨지지 않게 강등하고 경고한다', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const out = adaptPaperContent(res({

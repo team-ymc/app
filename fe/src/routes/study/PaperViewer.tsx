@@ -9,6 +9,13 @@ import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import { SanitizedHtmlTable } from '../../markdown/SanitizedHtmlTable';
 import type { PaperBlock } from '../../markdown/paperContent';
 
+// heading level 2 구분선은 border(비텍스트)라 드래그 선택에 포함되지 않는다.
+function sectionClass(b: PaperBlock): string | undefined {
+  if (b.type === 'caption') return 'pt-caption-block';
+  if (b.type === 'heading' && b.headingLevel === 2) return 'pt-section-start';
+  return undefined;
+}
+
 export interface PaperViewerProps {
   blocks: PaperBlock[];
   containerRef: Ref<HTMLDivElement>;
@@ -33,7 +40,13 @@ export function PaperViewer({ blocks, containerRef, onImageError }: PaperViewerP
         <PaperSheet style={{ width: '100%', maxWidth: '1000px', padding: '28px 36px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {blocks.map((b) => (
-              <section key={b.id} data-block-id={b.id} id={b.id} style={{ scrollMarginTop: '24px' }}>
+              <section
+                key={b.id}
+                data-block-id={b.id}
+                id={b.id}
+                className={sectionClass(b)}
+                style={{ scrollMarginTop: '24px' }}
+              >
                 {b.type === 'table' && b.tableHtml != null ? (
                   <SanitizedHtmlTable html={b.tableHtml} />
                 ) : (

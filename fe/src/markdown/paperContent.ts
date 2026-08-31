@@ -4,7 +4,7 @@
 import { fetchPaperContent } from '../api/papers';
 import type { PaperContentBlockDto, PaperContentResponse } from '../api/types';
 
-export type BlockType = 'heading' | 'subheading' | 'para' | 'figure' | 'equation' | 'table' | 'other';
+export type BlockType = 'heading' | 'subheading' | 'para' | 'caption' | 'figure' | 'equation' | 'table' | 'other';
 
 export interface PaperBlock {
   id: string;
@@ -63,6 +63,9 @@ function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBl
           headingText: c.text,
           headingLevel: level,
         }, c.text, hashes.length + 1);
+      }
+      if (b.label === 'figure_title') {
+        return withSource({ id: b.blockId, type: 'caption', markdown: c.text }, c.text, 0);
       }
       return withSource({ id: b.blockId, type: 'para', markdown: c.text }, c.text, 0);
     }
