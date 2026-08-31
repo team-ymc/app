@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.sun.net.httpserver.HttpServer;
 
 /**
- * BE↔AI SSE 계약(inline-pdf-agent-run-stream.yml)을 흉내내는 테스트 전용 서버.
+ * BE↔AI SSE 계약(universal-pdf-agent-run-stream.yml)을 흉내내는 테스트 전용 서버.
  * 프레임 단위 지연, terminal 없는 EOF, 장시간 침묵(행)을 스크립트로 재현한다.
  */
 public final class FakeAiSseServer implements AutoCloseable {
