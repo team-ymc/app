@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, User } from '@phosphor-icons/react';
+import { ArrowLeft } from '@phosphor-icons/react';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { IconButton } from '../design/components/IconButton';
 import { getStatus } from '../api/papers';
@@ -19,6 +19,7 @@ import { PaperViewer } from './study/PaperViewer';
 import { SelectionLayer } from './study/SelectionLayer';
 import { TocRail } from './study/TocRail';
 import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
+import { AccountMenu } from '../account/AccountMenu';
 import { useScrollSpy } from './study/useScrollSpy';
 import type { SelectionAnchors } from './study/selectionAnchors';
 import { usePlanQuery } from '../plan/usePlanQuery';
@@ -184,7 +185,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
       {/* R1 Global top bar */}
       <div
         style={{
-          height: '52px',
+          height: '64px',
           flexShrink: 0,
           background: 'var(--color-bg-walnut)',
           color: 'var(--color-on-dark)',
@@ -195,7 +196,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: '0 20px 0 16px', gap: '16px' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
             <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '16px', letterSpacing: '-0.005em', whiteSpace: 'nowrap' }}>
+            <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', letterSpacing: '-0.005em', whiteSpace: 'nowrap' }}>
               Paper Teacher
             </span>
           </Link>
@@ -245,7 +246,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '14px',
             padding: '0 20px',
             borderLeft: '1px solid rgba(255,253,247,0.14)',
           }}
@@ -257,24 +258,8 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             onClick={() => setNightMode((v) => !v)}
             style={{ color: 'var(--color-on-dark)' }}
           />
-          <button
-            aria-label="프로필"
-            title="프로필"
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '9999px',
-              border: '1px solid rgba(255,253,247,0.25)',
-              background: 'var(--color-bg-walnut-raised)',
-              color: 'var(--color-on-dark)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            <User size={15} />
-          </button>
+          <div style={{ width: '1px', height: '18px', background: 'rgba(255,253,247,0.18)', flexShrink: 0 }} />
+          <AccountMenu />
         </div>
       </div>
 
