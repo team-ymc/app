@@ -16,5 +16,5 @@ public record ChatMessageStreamRequest(
         UUID sessionId,
         @NotNull UUID clientMessageId,
         @NotBlank String content,
-        @Valid @Size(min = 1, max = 5) @UniqueElements List<ChatSelectionDto> selections) {
+        @Size(min = 1, max = 5) @UniqueElements List<@NotNull @Valid ChatSelectionDto> selections) {
 }

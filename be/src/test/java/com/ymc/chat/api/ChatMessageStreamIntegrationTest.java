@@ -325,6 +325,39 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("selections에 null 원소가 있으면 400이고 세션·메시지를 만들지 않는다")
+    void nullSelectionElementRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        var selections = objectMapper.createArrayNode();
+        selections.add(objectMapper.valueToTree(selectionJson("p0-b0", "p0-b2")));
+        selections.addNull();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithSelections(selections)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+        assertThat(chatMessageRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("원소 내부가 계약 위반이면(blockId 공백) 400이다")
+    void invalidSelectionElementRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithSelections(java.util.List.of(selectionJson("", "p0-b2")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+        assertThat(chatMessageRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("완전히 동일한 selection 중복은 400이다 (계약 uniqueItems)")
     void duplicateSelectionsRejected() throws Exception {
         Paper paper = givenCompletedPaper();
