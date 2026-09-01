@@ -19,8 +19,11 @@ function renderPanel(locked: boolean) {
       <TutorPanel
         paperId="p1"
         blocks={[]}
-        pendingContext={null}
-        onContextConsumed={() => {}}
+        attachments={[]}
+        attachEvent={null}
+        onRemoveAttachment={() => {}}
+        onAttachmentsConsumed={() => {}}
+        attachNotice={null}
         collapsed={false}
         onToggleCollapse={() => {}}
         queryLocked={locked}

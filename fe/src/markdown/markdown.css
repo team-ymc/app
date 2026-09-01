@@ -58,6 +58,28 @@
   padding: 8px 10px;
 }
 
+/* 이미지·표·수식 atomic 블록 — user-select:all이라 내부 텍스트는 부분 선택되지 않고,
+   앞뒤 본문에 걸친 드래그는 블록을 통째로 포함한 채 이어진다 (none은 걸쳐 드래그를 끊는다).
+   호버·질문하기 대상(data-context-target)에는 목업 v2 pt-context-target 링을 켠다. */
+.pt-atomic-block { user-select: all; cursor: pointer; }
+/* 걸쳐 드래그로 블록이 범위에 통째로 포함돼도 내부 글자에 하이라이트를 칠하지 않는다 —
+   이미지처럼 조용히 포함되게. 범위·anchors 의미는 그대로다. */
+.pt-atomic-block ::selection { background: transparent; }
+.pt-atomic-block .pt-figure img,
+.pt-atomic-block .katex-display,
+.pt-atomic-block .pt-table-scroll {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.pt-atomic-block:hover .pt-figure img,
+.pt-atomic-block:hover .katex-display,
+.pt-atomic-block:hover .pt-table-scroll,
+.pt-atomic-block[data-context-target="true"] .pt-figure img,
+.pt-atomic-block[data-context-target="true"] .katex-display,
+.pt-atomic-block[data-context-target="true"] .pt-table-scroll {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
 /* heading level 2 섹션 구분선 — border라 텍스트 드래그 선택에 포함되지 않는다. */
 .pt-section-start {
   display: block;

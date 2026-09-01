@@ -248,7 +248,7 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
   );
 }
 
-function ToolbarButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+export function ToolbarButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   const [hover, setHover] = useState(false);
   const style: CSSProperties = {
     display: 'flex',
@@ -274,7 +274,7 @@ function ToolbarButton({ icon, label, onClick }: { icon: React.ReactNode; label:
   );
 }
 
-function AskRow({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+export function AskRow({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   const [hover, setHover] = useState(false);
   const style: CSSProperties = {
     display: 'flex',

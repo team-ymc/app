@@ -17,8 +17,10 @@ import { ApiError } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
 import { PaperViewer } from './study/PaperViewer';
 import { SelectionLayer } from './study/SelectionLayer';
+import { ContentAskLayer } from './study/ContentAskLayer';
 import { TocRail } from './study/TocRail';
-import { TutorPanel, type TutorPanelPendingContext } from './study/TutorPanel';
+import { TutorPanel, type TutorPanelAttachEvent } from './study/TutorPanel';
+import { attachSelection, MAX_ATTACHMENTS, type SelectionAttachment } from '../chat/selectionAttachments';
 import { AccountMenu } from '../account/AccountMenu';
 import { useScrollSpy } from './study/useScrollSpy';
 import type { SelectionAnchors } from './study/selectionAnchors';
@@ -84,11 +86,15 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  // SelectionLayer의 "AI에게 질문" → Ask popup 선택으로 채워진다 (FT-006 Story 4).
-  const [pendingContext, setPendingContext] = useState<TutorPanelPendingContext | null>(null);
+  // SelectionLayer·ContentAskLayer의 "AI에게 질문" → 컴포저 인용 첨부 목록으로 누적된다 (FT-006 Story 5).
+  const [attachments, setAttachments] = useState<SelectionAttachment[]>([]);
+  const [attachEvent, setAttachEvent] = useState<TutorPanelAttachEvent | null>(null);
+  const [attachNotice, setAttachNotice] = useState<string | null>(null);
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const splitRegionRef = useRef<HTMLDivElement>(null);
+  const attachSeqRef = useRef(0);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const blocks = useMemo(() => contentQuery.data?.blocks ?? [], [contentQuery.data]);
   const toc = contentQuery.data?.toc ?? [];
@@ -119,11 +125,33 @@ function StudyPageContent({ paperId }: { paperId: string }) {
     document.getElementById(blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // SelectionLayer의 Ask popup에서 "현재 채팅"/"새 채팅"을 고르면 호출된다 — pendingContext를 세팅하고
-  // 챗 패널이 접혀 있으면 펼친다(TutorPanel이 pendingContext 변화에 반응해 입력창에 포커스한다).
+  function showAttachNotice(message: string) {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setAttachNotice(message);
+    noticeTimerRef.current = setTimeout(() => setAttachNotice(null), 2500);
+  }
+
+  // SelectionLayer·ContentAskLayer의 Ask popup에서 "현재 채팅"/"새 채팅"을 고르면 호출된다 —
+  // 첨부를 누적하고(완전 중복 무시·상한·크기 검증) 챗 패널이 접혀 있으면 펼친다.
+  // anchors를 못 만든 선택은 첨부 없이 패널만 연다 (기존 단수 시절과 동일한 폴백).
   function handleAsk(text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) {
-    setPendingContext({ text, mode, anchors });
+    if (anchors) {
+      const result = attachSelection(attachments, blocks, { text, anchors });
+      if (!result.ok) {
+        showAttachNotice(result.reason === 'limit'
+          ? `인용은 최대 ${MAX_ATTACHMENTS}개까지 첨부할 수 있어요`
+          : '선택 영역이 너무 커요. 더 짧게 선택해 주세요.');
+        return;
+      }
+      setAttachments(result.attachments);
+    }
+    attachSeqRef.current += 1;
+    setAttachEvent({ seq: attachSeqRef.current, mode });
     setChatCollapsed(false);
+  }
+
+  function handleRemoveAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
   function handleSplitterPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -281,6 +309,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
           >
             <PaperViewer blocks={blocks} containerRef={viewerRef} onImageError={handleImageError} />
             <SelectionLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
+            <ContentAskLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
           </div>
 
           {/* Resizable splitter */}
@@ -312,8 +341,11 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             <TutorPanel
               paperId={paperId}
               blocks={blocks}
-              pendingContext={pendingContext}
-              onContextConsumed={() => setPendingContext(null)}
+              attachments={attachments}
+              attachEvent={attachEvent}
+              onRemoveAttachment={handleRemoveAttachment}
+              onAttachmentsConsumed={() => setAttachments([])}
+              attachNotice={attachNotice}
               collapsed={chatCollapsed}
               onToggleCollapse={() => setChatCollapsed((v) => !v)}
               queryLocked={aiUsage ? isExhausted(aiUsage) : false}

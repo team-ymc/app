@@ -153,26 +153,31 @@ class AiAgentWebClientAdapterTest {
     }
 
     @Test
-    @DisplayName("selection은 1개짜리 selections 배열로 snake_case 직렬화된다")
-    void selectionSerialization() {
+    @DisplayName("selections는 요청 배열 순서 그대로 snake_case 직렬화된다")
+    void selectionsSerialization() {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t-6"),
                 FakeAiSseServer.messageCompleted("t-6", "답"),
                 FakeAiSseServer.runCompleted("t-6")));
 
-        ChatSelectionDto selection = new ChatSelectionDto(
-                new ChatSelectionDto.Anchor("p0-b0", 3),
-                new ChatSelectionDto.Anchor("p0-b2", null));
-        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-6", "p-6", "질문", selection), recorder);
+        List<ChatSelectionDto> selections = List.of(
+                new ChatSelectionDto(
+                        new ChatSelectionDto.Anchor("p0-b0", 3),
+                        new ChatSelectionDto.Anchor("p0-b2", null)),
+                new ChatSelectionDto(
+                        new ChatSelectionDto.Anchor("p5-b1", null),
+                        new ChatSelectionDto.Anchor("p5-b4", null)));
+        adapter(Duration.ofSeconds(5)).stream(new AiRunRequest("t-6", "p-6", "질문", selections), recorder);
 
         await().atMost(WAIT).until(() -> events.contains("run-completed"));
         assertThat(aiServer.lastRequestBody())
-                .contains("\"selections\":[{\"start\":{\"block_id\":\"p0-b0\",\"offset\":3},\"end\":{\"block_id\":\"p0-b2\"}}]");
+                .contains("\"selections\":[{\"start\":{\"block_id\":\"p0-b0\",\"offset\":3},\"end\":{\"block_id\":\"p0-b2\"}},"
+                        + "{\"start\":{\"block_id\":\"p5-b1\"},\"end\":{\"block_id\":\"p5-b4\"}}]");
     }
 
     @Test
-    @DisplayName("selection이 null이면 body에 selections 키가 없다")
-    void nullSelectionOmitted() {
+    @DisplayName("selections가 null이면 body에 selections 키가 없다")
+    void nullSelectionsOmitted() {
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t-7"),
                 FakeAiSseServer.runCompleted("t-7")));

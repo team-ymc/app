@@ -286,8 +286,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("selection이 wire까지 snake_case로 전달된다")
-    void selectionRelayedOverWire() throws Exception {
+    @DisplayName("selections가 wire까지 snake_case로 전달된다")
+    void selectionsRelayedOverWire() throws Exception {
         Paper paper = givenCompletedPaper();
         aiServer.enqueue(Script.of(
                 FakeAiSseServer.runStarted("t"),
@@ -301,9 +301,9 @@ class AiRelayIntegrationTest extends IntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "clientMessageId", UUID.randomUUID().toString(),
                                 "content", "질문",
-                                "selection", Map.of(
+                                "selections", java.util.List.of(Map.of(
                                         "start", Map.of("blockId", "p0-b0", "offset", 0),
-                                        "end", Map.of("blockId", "p0-b1"))))))
+                                        "end", Map.of("blockId", "p0-b1")))))))
                 .andExpect(request().asyncStarted())
                 .andReturn();
 

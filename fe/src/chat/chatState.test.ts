@@ -16,14 +16,17 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     expect(s.messages[0]).toMatchObject({ role: 'user', content: '질문' });
     expect(s.messages[1]).toMatchObject({ role: 'assistant', status: 'GENERATING', content: '' });
     expect(s.streaming).toBe(true);
-    expect(s.pending).toEqual({ clientMessageId: 'c-1', content: '질문', selection: null });
+    expect(s.pending).toEqual({ clientMessageId: 'c-1', content: '질문', selections: [] });
   });
 
-  it('send는 user 메시지와 pending에 selection을 담는다', () => {
-    const sel = { start: { blockId: 'b1' }, end: { blockId: 'b1' } };
-    const s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문', selection: sel });
-    expect(s.messages[0].selection).toEqual(sel);
-    expect(s.pending).toEqual({ clientMessageId: 'c1', content: '질문', selection: sel });
+  it('send는 user 메시지와 pending에 selections 배열을 담는다', () => {
+    const sels = [
+      { start: { blockId: 'b1' }, end: { blockId: 'b1' } },
+      { start: { blockId: 'b2', offset: 0 }, end: { blockId: 'b3', offset: 4 } },
+    ];
+    const s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문', selections: sels });
+    expect(s.messages[0].selections).toEqual(sels);
+    expect(s.pending).toEqual({ clientMessageId: 'c1', content: '질문', selections: sels });
   });
 
   it('started → delta → completed: append 후 전체 content로 replace한다', () => {
@@ -52,7 +55,7 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     const s = reduceAll([send, started,
       { type: 'failed', confirmed: false, code: 'STREAM_INTERRUPTED', message: '연결 끊김', retryable: true }]);
     expect(s.messages[1].status).toBe('FAILED');
-    expect(s.pending).toEqual({ clientMessageId: 'c-1', content: '질문', selection: null }); // 유지!
+    expect(s.pending).toEqual({ clientMessageId: 'c-1', content: '질문', selections: [] }); // 유지!
   });
 
   it('409 DUPLICATE(GENERATING): 안내로 교체하고 sessionId를 회수한다', () => {
@@ -77,7 +80,7 @@ describe('chatState — 스트림 이벤트를 화면 상태로', () => {
     let s = chatReducer(initialChatState, { type: 'send', clientMessageId: 'c1', content: '질문' });
     s = chatReducer(s, { type: 'failed', confirmed: true, code: 'AI_RUN_FAILED', retryable: true });
     s = chatReducer(s, { type: 'send', clientMessageId: 'c2', content: '질문', resend: true });
-    expect(s.pending).toEqual({ clientMessageId: 'c2', content: '질문', selection: null });
+    expect(s.pending).toEqual({ clientMessageId: 'c2', content: '질문', selections: [] });
     expect(s.messages).toHaveLength(2); // 말풍선 재사용, 추가 없음
   });
 
@@ -106,8 +109,8 @@ describe('historyLoaded', () => {
     expect(s.streaming).toBe(false);
     expect(s.pending).toBeNull();
     expect(s.messages).toEqual([
-      { key: 'm-1', role: 'user', content: '질문', status: 'COMPLETED', error: null, selection: null },
-      { key: 'm-2', role: 'assistant', content: '**답변**', status: 'COMPLETED', error: null, selection: null },
+      { key: 'm-1', role: 'user', content: '질문', status: 'COMPLETED', error: null, selections: [] },
+      { key: 'm-2', role: 'assistant', content: '**답변**', status: 'COMPLETED', error: null, selections: [] },
     ]);
   });
 
@@ -116,7 +119,7 @@ describe('historyLoaded', () => {
       type: 'historyLoaded', sessionId: 's-1',
       items: [item({ messageId: 'm-3', role: 'ASSISTANT', content: null, status: 'GENERATING', seq: 2 })],
     });
-    expect(s.messages[0]).toEqual({ key: 'm-3', role: 'assistant', content: '', status: 'GENERATING', error: null, selection: null });
+    expect(s.messages[0]).toEqual({ key: 'm-3', role: 'assistant', content: '', status: 'GENERATING', error: null, selections: [] });
   });
 
   test('FAILED assistant는 retryable=false 에러로 매핑된다 — 과거 실패에 재시도 미노출', () => {

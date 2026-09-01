@@ -5,12 +5,13 @@
 // wiring은 구 fe/src/chat/ChatPanel.jsx(삭제 예정, 참조용)의 useReducer(chatReducer)/streamChatMessage/
 // AbortController 언마운트 처리·재시도 로직을 그대로 따르되, TS화된 ../../chat/chatState·chatStream(Task 4)을 쓴다.
 import { useEffect, useRef, useState, useReducer } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Quotes, X } from '@phosphor-icons/react';
+import { Function as FunctionIcon, Image as ImageIcon, Quotes, Table as TableIcon, X } from '@phosphor-icons/react';
 import { chatReducer, initialChatState } from '../../chat/chatState';
 import { streamChatMessage } from '../../chat/chatStream';
 import { resolveSelectionPreview } from '../../chat/selectionPreview';
+import { attachmentKindOf, type AttachmentKind, type SelectionAttachment } from '../../chat/selectionAttachments';
 import { listChatSessions, listChatSessionMessages, deleteChatSession } from '../../api/chatSessions';
 import type { ChatSessionSummary } from '../../api/chatSessions';
 import { ApiError } from '../../api/types';
@@ -22,24 +23,47 @@ import { StudentMessage } from '../../design/components/StudentMessage';
 import { IconButton } from '../../design/components/IconButton';
 import type { SelectionAnchors } from './selectionAnchors';
 
-// controller 승인 확장(brief): pendingContext.mode==='new'면 전송 전에 dispatch({type:'reset'})해서
-// ask popup의 "새 채팅" 선택을 지원한다. mode 생략 시 기존 세션에 이어 붙인다("현재 채팅").
-export interface TutorPanelPendingContext {
-  text: string;
-  mode?: 'current' | 'new';
-  anchors: SelectionAnchors | null;
+// 첨부 목록은 StudyPage가 소유한다(attachSelection 로직). attachEvent는 "방금 첨부됨" 신호 —
+// mode==='new'면 새 채팅으로 reset하고(seq당 한 번), 어느 모드든 입력창에 포커스한다.
+export interface TutorPanelAttachEvent {
+  seq: number;
+  mode: 'current' | 'new';
 }
 
 export interface TutorPanelProps {
   paperId: string;
   blocks: PaperBlock[];
-  pendingContext: TutorPanelPendingContext | null;
-  onContextConsumed: () => void;
+  attachments: SelectionAttachment[];
+  attachEvent: TutorPanelAttachEvent | null;
+  onRemoveAttachment: (index: number) => void;
+  /** 전송으로 첨부가 소비됨 — StudyPage가 목록을 비운다. */
+  onAttachmentsConsumed: () => void;
+  /** 상한·크기 초과 안내 — 컴포저 위에 표시한다. */
+  attachNotice: string | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   /** AI 질의 한도 소진 — StudyPage가 plan 조회로 판정해 내려준다. */
   queryLocked?: boolean;
   lockPlaceholder?: string;
+}
+
+const CHIP_COLLAPSE_COUNT = 2;
+
+const KIND_CONFIG: Record<AttachmentKind, { label: string; color: string }> = {
+  selection: { label: '인용', color: 'var(--color-text-muted)' },
+  image: { label: '이미지', color: 'var(--color-success)' },
+  table: { label: '표', color: 'var(--color-primary)' },
+  formula: { label: '수식', color: 'var(--color-accent-brass)' },
+};
+
+function kindIcon(kind: AttachmentKind, size: number): ReactNode {
+  const color = KIND_CONFIG[kind].color;
+  switch (kind) {
+    case 'image': return <ImageIcon size={size} color={color} />;
+    case 'table': return <TableIcon size={size} color={color} />;
+    case 'formula': return <FunctionIcon size={size} color={color} />;
+    default: return <Quotes size={size} color={color} />;
+  }
 }
 
 const rootStyle: CSSProperties = {
@@ -233,8 +257,11 @@ function dotStyle(delay: number): CSSProperties {
 export function TutorPanel({
   paperId,
   blocks,
-  pendingContext,
-  onContextConsumed,
+  attachments,
+  attachEvent,
+  onRemoveAttachment,
+  onAttachmentsConsumed,
+  attachNotice,
   collapsed,
   onToggleCollapse,
   queryLocked = false,
@@ -243,7 +270,8 @@ export function TutorPanel({
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const [input, setInput] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
-  const [contextTooltipOpen, setContextTooltipOpen] = useState(false);
+  const [tooltipIndex, setTooltipIndex] = useState(-1);
+  const [chipsExpanded, setChipsExpanded] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -261,7 +289,7 @@ export function TutorPanel({
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lastResetContextRef = useRef<TutorPanelPendingContext | null>(null);
+  const lastResetSeqRef = useRef(0);
   // 히스토리 로드 레이스 가드 — reset·전송 시작이 세대를 올려서, 그 이후 도착하는 stale
   // listChatSessionMessages 응답(성공/실패 모두)이 새 상태를 덮어쓰지 못하게 한다.
   const historyLoadSeq = useRef(0);
@@ -272,26 +300,32 @@ export function TutorPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [state.messages]);
 
-  // ask popup "새 채팅"(mode:'new') 지원 — 같은 pendingContext 객체에 대해 한 번만 reset한다.
+  // ask popup "새 채팅"(mode:'new') 지원 — 같은 attachEvent.seq에 대해 한 번만 reset한다.
   // 참조 구현(mockup newConversation의 clearInterval)처럼 진행 중 스트림부터 끊고 reset한다 —
   // 그러지 않으면 이전 스트림의 delta/completed가 초기화된 state에 뒤늦게 dispatch될 수 있다.
-  // SelectionLayer의 "AI에게 질문"이 pendingContext를 세팅하면 입력창에 포커스한다(FT-006 Story 4).
-  // StudyPage가 같은 이벤트 핸들러에서 collapsed도 함께 해제하므로, 이 effect가 실행되는 시점에는
-  // 이미 펼쳐진 상태로 커밋되어 textareaRef가 존재한다.
+  // 첨부가 일어나면 입력창에 포커스한다(FT-006 Story 4). StudyPage가 같은 이벤트 핸들러에서
+  // collapsed도 함께 해제하므로, 이 effect가 실행되는 시점에는 이미 펼쳐져 textareaRef가 존재한다.
   useEffect(() => {
-    setContextTooltipOpen(false);
-    if (pendingContext && pendingContext.mode === 'new' && lastResetContextRef.current !== pendingContext) {
+    setTooltipIndex(-1);
+    if (!attachEvent) return;
+    if (attachEvent.mode === 'new' && lastResetSeqRef.current !== attachEvent.seq) {
       historyLoadSeq.current += 1; // 진행 중인 히스토리 로드를 무효화 — reset 후 stale 응답이 덮어쓰지 못하게
       abortRef.current?.abort();
       dispatch({ type: 'reset' });
     }
-    lastResetContextRef.current = pendingContext;
-    if (pendingContext) textareaRef.current?.focus();
-  }, [pendingContext]);
+    lastResetSeqRef.current = attachEvent.seq;
+    textareaRef.current?.focus();
+  }, [attachEvent]);
 
-  function run(clientMessageId: string, content: string, resend: boolean, selection: SelectionAnchors | null) {
+  // 첨부가 2개 이하로 줄면 접힘 상태로 복귀한다 — 배지가 사라진 채 펼침 상태로 남지 않게.
+  useEffect(() => {
+    if (attachments.length <= CHIP_COLLAPSE_COUNT) setChipsExpanded(false);
+    setTooltipIndex((i) => (i >= attachments.length ? -1 : i));
+  }, [attachments]);
+
+  function run(clientMessageId: string, content: string, resend: boolean, selections: SelectionAnchors[]) {
     historyLoadSeq.current += 1; // 전송(첫 전송·재시도 모두) 시작 — 진행 중인 히스토리 로드를 무효화
-    dispatch({ type: 'send', clientMessageId, content, selection, resend });
+    dispatch({ type: 'send', clientMessageId, content, selections, resend });
     const controller = new AbortController();
     abortRef.current = controller;
     streamChatMessage({
@@ -299,7 +333,7 @@ export function TutorPanel({
       sessionId: state.sessionId,
       clientMessageId,
       content,
-      selection,
+      selections,
       signal: controller.signal,
       onEvent: (e) => {
         // 전송 완료 시 세션 목록을 무효화 — 새 세션이 다음에 드롭다운을 열 때 반영되게 한다.
@@ -383,8 +417,8 @@ export function TutorPanel({
     if (!question || state.streaming) return;
     setInput('');
     resetComposerHeight();
-    run(crypto.randomUUID(), question, false, pendingContext?.anchors ?? null);
-    if (pendingContext) onContextConsumed();
+    run(crypto.randomUUID(), question, false, attachments.map((a) => a.anchors));
+    onAttachmentsConsumed();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -407,11 +441,11 @@ export function TutorPanel({
   function handleRetry() {
     if (state.streaming) return;
     if (state.pending) {
-      run(state.pending.clientMessageId, state.pending.content, true, state.pending.selection);
+      run(state.pending.clientMessageId, state.pending.content, true, state.pending.selections);
       return;
     }
     const lastUser = [...state.messages].reverse().find((m) => m.role === 'user');
-    if (lastUser) run(crypto.randomUUID(), lastUser.content, true, lastUser.selection);
+    if (lastUser) run(crypto.randomUUID(), lastUser.content, true, lastUser.selections);
   }
 
   if (collapsed) {
@@ -434,36 +468,77 @@ export function TutorPanel({
     lastMessage.error?.retryable !== false &&
     lastMessage.error?.code !== 'CHAT_USAGE_LIMIT_EXCEEDED'; // 재시도해도 429 — 초기화 시각까지 불가
 
+  const visibleChips = chipsExpanded || attachments.length <= CHIP_COLLAPSE_COUNT
+    ? attachments
+    : attachments.slice(0, CHIP_COLLAPSE_COUNT);
+  const hiddenChipCount = attachments.length - visibleChips.length;
+
   const composer = (
     <div style={{ position: 'relative' }}>
-      {pendingContext ? (
-        <div style={{ marginBottom: 8, position: 'relative', display: 'inline-block' }}>
-          <div onClick={() => setContextTooltipOpen((v) => !v)} style={contextChipStyle}>
-            <Quotes size={12} color="var(--color-text-muted)" />
-            <span>인용</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onContextConsumed();
-              }}
-              aria-label="인용 제거"
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 0, display: 'flex', alignItems: 'center', marginLeft: 2 }}
-            >
-              <X size={12} />
-            </button>
-          </div>
-          {contextTooltipOpen ? (
-            <div style={contextTooltipStyle}>
-              <button
-                onClick={() => setContextTooltipOpen(false)}
-                aria-label="닫기"
-                style={{ position: 'absolute', top: 10, right: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 2, display: 'flex', alignItems: 'center' }}
-              >
-                <X size={12} />
-              </button>
-              <div style={{ paddingRight: 20, paddingTop: 2, maxHeight: 160, overflowY: 'auto' }}>{pendingContext.text}</div>
+      {attachments.length > 0 ? (
+        <div style={{ marginBottom: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+          {visibleChips.map((a, i) => (
+            <div key={`${a.anchors.start.blockId}-${a.anchors.start.offset ?? ''}-${a.anchors.end.blockId}-${a.anchors.end.offset ?? ''}`} style={{ position: 'relative', display: 'inline-block' }}>
+              <div onClick={() => setTooltipIndex((v) => (v === i ? -1 : i))} style={contextChipStyle}>
+                {kindIcon(a.kind, 12)}
+                <span>{KIND_CONFIG[a.kind].label}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveAttachment(i);
+                  }}
+                  aria-label={`${KIND_CONFIG[a.kind].label} 제거`}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 0, display: 'flex', alignItems: 'center', marginLeft: 2 }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {tooltipIndex === i ? (
+                <div style={contextTooltipStyle}>
+                  <button
+                    onClick={() => setTooltipIndex(-1)}
+                    aria-label="닫기"
+                    style={{ position: 'absolute', top: 10, right: 10, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 2, display: 'flex', alignItems: 'center' }}
+                  >
+                    <X size={12} />
+                  </button>
+                  <div style={{ paddingRight: 20, paddingTop: 2, maxHeight: 160, overflowY: 'auto' }}>
+                    {a.text || KIND_CONFIG[a.kind].label}
+                  </div>
+                </div>
+              ) : null}
             </div>
+          ))}
+          {attachments.length > CHIP_COLLAPSE_COUNT ? (
+            <button
+              onClick={() => {
+                setTooltipIndex(-1);
+                setChipsExpanded((v) => !v);
+              }}
+              aria-label={chipsExpanded ? '첨부 접기' : `숨은 인용 ${hiddenChipCount}개 펼치기`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                boxSizing: 'border-box',
+                padding: '5px 10px',
+                background: 'transparent',
+                border: '1px dashed var(--color-border)',
+                borderRadius: 'var(--radius-pill)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              {chipsExpanded ? '접기' : `+${hiddenChipCount}`}
+            </button>
           ) : null}
+        </div>
+      ) : null}
+      {attachNotice ? (
+        <div style={{ marginBottom: 8, fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, color: 'var(--color-accent-brass)' }}>
+          {attachNotice}
         </div>
       ) : null}
       <div
@@ -583,21 +658,25 @@ export function TutorPanel({
         <TutorNotebook style={{ borderLeft: 'none' }} composer={composer}>
           {state.messages.map((m) => {
             if (m.role === 'user') {
-              const preview = m.selection ? resolveSelectionPreview(blocks, m.selection) : null;
               return (
                 <div key={m.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  {m.selection ? (
-                    <button
-                      onClick={() => document.getElementById(m.selection!.start.blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                      title="선택한 본문으로 이동"
-                      style={{ ...contextChipStyle, maxWidth: 260, border: '1px solid var(--color-border)' }}
-                    >
-                      <Quotes size={12} color="var(--color-text-muted)" />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {preview ?? '선택한 구절'}
-                      </span>
-                    </button>
-                  ) : null}
+                  {m.selections.map((sel) => {
+                    const kind = attachmentKindOf(blocks, sel);
+                    const preview = resolveSelectionPreview(blocks, sel);
+                    return (
+                      <button
+                        key={`${m.key}-${sel.start.blockId}-${sel.start.offset ?? ''}-${sel.end.blockId}-${sel.end.offset ?? ''}`}
+                        onClick={() => document.getElementById(sel.start.blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        title="선택한 본문으로 이동"
+                        style={{ ...contextChipStyle, maxWidth: 260, border: '1px solid var(--color-border)' }}
+                      >
+                        {kindIcon(kind, 12)}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {preview ?? (kind === 'selection' ? '선택한 구절' : KIND_CONFIG[kind].label)}
+                        </span>
+                      </button>
+                    );
+                  })}
                   <StudentMessage
                     style={{
                       background: 'var(--color-bg-surface)',
