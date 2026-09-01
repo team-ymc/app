@@ -35,7 +35,7 @@ services:
           - ymc-be
 
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/livez"]
       interval: 10s
       timeout: 5s
       retries: 10

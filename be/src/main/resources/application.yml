@@ -3,6 +3,13 @@ server:
   # CloudFront·ALB 뒤에서 X-Forwarded-Proto/Host로 원래 scheme·host를 복원
   forward-headers-strategy: framework
 
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true
+
 spring:
   application:
     name: ymc-api
@@ -85,6 +92,29 @@ aws:
   sqs:
     parse-request-queue: ${PARSE_REQUEST_QUEUE_NAME:parse-requests}
     parse-result-queue: ${PARSE_RESULT_QUEUE_NAME:parse-results}
+
+---
+# ================= observability (배포 환경에서 Collector 사용 시) =================
+spring:
+  config:
+    activate:
+      on-profile: observability
+
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    prometheus:
+      access: read-only
 
 ---
 # ================= local (LocalStack + PostgreSQL) =================

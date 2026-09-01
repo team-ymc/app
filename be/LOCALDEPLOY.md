@@ -54,7 +54,8 @@ docker compose logs -f be  # be 로그 팔로우 (Ctrl+C로 종료)
 health check:
 
 ```bash
-curl http://localhost:8080/actuator/health   # {"status":"UP"}
+curl http://localhost:8080/livez    # 컨테이너 재시작 판단
+curl http://localhost:8080/readyz   # 트래픽 수신 가능 여부
 ```
 
 ## Stop
