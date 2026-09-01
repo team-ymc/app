@@ -59,10 +59,12 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
     }
 
     record SelectionBody(AnchorBody start, AnchorBody end) {
-        /** 단일 selection을 1개짜리 배열로 감싼다 — 없으면 null로 필드 생략 (빈 배열은 계약 위반). */
-        static List<SelectionBody> listFrom(ChatSelectionDto dto) {
-            return dto == null ? null
-                    : List.of(new SelectionBody(AnchorBody.from(dto.start()), AnchorBody.from(dto.end())));
+        /** 배열 순서 그대로 매핑한다 — null이면 필드 생략 (빈 배열은 계약 위반이라 DTO 검증이 막는다). */
+        static List<SelectionBody> listFrom(List<ChatSelectionDto> dtos) {
+            return dtos == null ? null
+                    : dtos.stream()
+                            .map(dto -> new SelectionBody(AnchorBody.from(dto.start()), AnchorBody.from(dto.end())))
+                            .toList();
         }
     }
 
@@ -81,7 +83,7 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 .uri(STREAM_PATH)
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(new StreamRequestBody(request.threadId(), request.paperId(), request.message(),
-                        SelectionBody.listFrom(request.selection())))
+                        SelectionBody.listFrom(request.selections())))
                 .retrieve()
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {
                 });

@@ -56,7 +56,7 @@ public class ChatController {
                 ownerId, paperId, request.sessionId(), request.clientMessageId(), request.content());
 
         SseEmitter emitter = new SseEmitter(chatStreamProperties.emitterTimeout().toMillis());
-        chatStreamService.begin(emitter, started, request.content(), request.selection());
+        chatStreamService.begin(emitter, started, request.content(), request.selections());
 
         return ResponseEntity.ok()
                 .header("Cache-Control", "no-cache, no-transform") // 중간 계층 버퍼링·캐싱 방지 (계약)

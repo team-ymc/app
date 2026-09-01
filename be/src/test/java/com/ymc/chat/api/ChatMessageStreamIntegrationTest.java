@@ -272,6 +272,73 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
         assertThat(chatSessionRepository.count()).isEqualTo(1);
     }
 
+    private String bodyWithSelections(Object selections) throws Exception {
+        return objectMapper.writeValueAsString(Map.of(
+                "clientMessageId", UUID.randomUUID().toString(),
+                "content", "질문",
+                "selections", selections));
+    }
+
+    private static Map<String, Object> selectionJson(String startBlock, String endBlock) {
+        return Map.of(
+                "start", Map.of("blockId", startBlock),
+                "end", Map.of("blockId", endBlock));
+    }
+
+    @Test
+    @DisplayName("selections 2개는 정상 수용된다")
+    void multipleSelectionsAccepted() throws Exception {
+        Paper paper = givenCompletedPaper();
+        MvcResult result = startStream(paper, bodyWithSelections(java.util.List.of(
+                selectionJson("p0-b0", "p0-b2"), selectionJson("p5-b1", "p5-b4"))));
+        mockMvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("selections 빈 배열은 400이다 (계약 minItems 1)")
+    void emptySelectionsRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithSelections(java.util.List.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("selections 6개는 400이다 (계약 maxItems 5)")
+    void tooManySelectionsRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithSelections(java.util.stream.IntStream.rangeClosed(1, 6)
+                                .mapToObj(i -> selectionJson("p" + i + "-b0", "p" + i + "-b1"))
+                                .toList())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("완전히 동일한 selection 중복은 400이다 (계약 uniqueItems)")
+    void duplicateSelectionsRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithSelections(java.util.List.of(
+                                selectionJson("p0-b0", "p0-b2"), selectionJson("p0-b0", "p0-b2")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+    }
+
     @Test
     @DisplayName("계약에 없는 필드(sessoinId 오타)는 새 세션을 만들지 않고 400이다")
     void unknownFieldRejected() throws Exception {
