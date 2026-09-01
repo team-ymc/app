@@ -10,9 +10,12 @@ import { SanitizedHtmlTable } from '../../markdown/SanitizedHtmlTable';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 // heading level 2 구분선은 border(비텍스트)라 드래그 선택에 포함되지 않는다.
+// 이미지·표·수식은 내부 텍스트를 부분 선택할 수 없는 atomic 블록이다 (FT-006 Story 6) —
+// 첨부는 ContentAskLayer의 질문하기로 블록 단위로만 한다.
 function sectionClass(b: PaperBlock): string | undefined {
   if (b.type === 'caption') return 'pt-caption-block';
   if (b.type === 'heading' && b.headingLevel === 2) return 'pt-section-start';
+  if (b.type === 'figure' || b.type === 'table' || b.type === 'equation') return 'pt-atomic-block';
   return undefined;
 }
 

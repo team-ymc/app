@@ -58,25 +58,41 @@ describe('chatStream — 스트림 소비와 종결 판정', () => {
     expect(body).toEqual({ clientMessageId: 'c-1', content: '질문' }); // sessionId null이면 키 제외
   });
 
-  it('selection이 있으면 요청 body에 포함한다', async () => {
+  it('selections가 있으면 요청 body에 배열 순서 그대로 포함한다', async () => {
     mockStreamFetch([frame('message.completed', { type: 'message.completed', content: 'x', status: 'COMPLETED' })]);
-    await collect({ selection: { start: { blockId: 'b1' }, end: { blockId: 'b2' } } });
+    await collect({
+      selections: [
+        { start: { blockId: 'b1' }, end: { blockId: 'b2' } },
+        { start: { blockId: 'b5' }, end: { blockId: 'b5' } },
+      ],
+    });
     const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.selection).toEqual({ start: { blockId: 'b1' }, end: { blockId: 'b2' } });
+    expect(body.selections).toEqual([
+      { start: { blockId: 'b1' }, end: { blockId: 'b2' } },
+      { start: { blockId: 'b5' }, end: { blockId: 'b5' } },
+    ]);
+  });
+
+  it('selections가 빈 배열이면 body에서 키를 생략한다 (계약 minItems 1)', async () => {
+    mockStreamFetch([frame('message.completed', { type: 'message.completed', content: 'x', status: 'COMPLETED' })]);
+    await collect({ selections: [] });
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect('selections' in body).toBe(false);
   });
 
   it('offset이 붙은 selection을 그대로 요청 body에 싣는다', async () => {
     mockStreamFetch([frame('message.completed', { type: 'message.completed', content: 'x', status: 'COMPLETED' })]);
     await collect({
-      selection: { start: { blockId: 'p0002-b0000', offset: 12 }, end: { blockId: 'p0002-b0003', offset: 42 } },
+      selections: [{ start: { blockId: 'p0002-b0000', offset: 12 }, end: { blockId: 'p0002-b0003', offset: 42 } }],
     });
     const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.selection).toEqual({
+    expect(body.selections).toEqual([{
       start: { blockId: 'p0002-b0000', offset: 12 },
       end: { blockId: 'p0002-b0003', offset: 42 },
-    });
+    }]);
   });
 
   it('error event: 확인된 실패로 콜백한다', async () => {

@@ -18,7 +18,7 @@ export interface StreamOpts {
   sessionId: string | null;
   clientMessageId: string;
   content: string;
-  selection?: SelectionAnchors | null;
+  selections?: SelectionAnchors[] | null;
   signal?: AbortSignal;
   onEvent: (e: ChatStreamEvent) => void;
 }
@@ -32,10 +32,10 @@ function isAbortError(e: unknown): boolean {
  * 종결 판정 (계약): message.completed=성공 / error=확인된 실패 /
  * terminal 없는 EOF·네트워크 예외=결과 미상 실패(성공 아님) / heartbeat=무시.
  */
-export async function streamChatMessage({ paperId, sessionId, clientMessageId, content, selection, signal, onEvent }: StreamOpts): Promise<void> {
-  const body: { clientMessageId: string; content: string; sessionId?: string; selection?: SelectionAnchors } = { clientMessageId, content };
+export async function streamChatMessage({ paperId, sessionId, clientMessageId, content, selections, signal, onEvent }: StreamOpts): Promise<void> {
+  const body: { clientMessageId: string; content: string; sessionId?: string; selections?: SelectionAnchors[] } = { clientMessageId, content };
   if (sessionId) body.sessionId = sessionId;
-  if (selection) body.selection = selection;
+  if (selections && selections.length > 0) body.selections = selections; // 빈 배열은 계약 위반(minItems 1) — 생략
 
   let res: Response;
   try {

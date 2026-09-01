@@ -13,18 +13,18 @@ export interface ChatMessage {
   content: string;
   status: ChatMessageStatus;
   error: { code: string; message?: string; retryable: boolean } | null;
-  selection: SelectionAnchors | null;
+  selections: SelectionAnchors[];
 }
 
 export interface ChatState {
   sessionId: string | null;
   messages: ChatMessage[];
   streaming: boolean;
-  pending: { clientMessageId: string; content: string; selection: SelectionAnchors | null } | null;
+  pending: { clientMessageId: string; content: string; selections: SelectionAnchors[] } | null;
 }
 
 export type ChatAction =
-  | { type: 'send'; clientMessageId: string; content: string; selection?: SelectionAnchors | null; resend?: boolean }
+  | { type: 'send'; clientMessageId: string; content: string; selections?: SelectionAnchors[]; resend?: boolean }
   | { type: 'started'; sessionId: string }
   | { type: 'delta'; delta: string }
   | { type: 'completed'; content: string }
@@ -56,7 +56,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         return {
           ...state,
           streaming: true,
-          pending: { clientMessageId: action.clientMessageId, content: action.content, selection: action.selection ?? null },
+          pending: { clientMessageId: action.clientMessageId, content: action.content, selections: action.selections ?? [] },
           messages: state.messages.map((m, i) =>
             i === state.messages.length - 1 && m.role === 'assistant'
               ? { ...m, content: '', status: 'GENERATING', error: null }
@@ -66,11 +66,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         streaming: true,
-        pending: { clientMessageId: action.clientMessageId, content: action.content, selection: action.selection ?? null },
+        pending: { clientMessageId: action.clientMessageId, content: action.content, selections: action.selections ?? [] },
         messages: [
           ...state.messages,
-          { key: nextKey('u'), role: 'user', content: action.content, status: 'COMPLETED', error: null, selection: action.selection ?? null },
-          { key: nextKey('a'), role: 'assistant', content: '', status: 'GENERATING', error: null, selection: null },
+          { key: nextKey('u'), role: 'user', content: action.content, status: 'COMPLETED', error: null, selections: action.selections ?? [] },
+          { key: nextKey('a'), role: 'assistant', content: '', status: 'GENERATING', error: null, selections: [] },
         ],
       };
     }
@@ -128,7 +128,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           error: it.status === 'FAILED'
             ? { code: 'HISTORY_FAILED', message: '응답 생성에 실패했습니다.', retryable: false }
             : null,
-          selection: null, // 이력 응답에는 selection이 없다
+          selections: [], // 이력 응답에는 selection이 없다
         })),
       };
     case 'reset':
