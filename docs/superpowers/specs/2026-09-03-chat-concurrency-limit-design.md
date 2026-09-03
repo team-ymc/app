@@ -97,20 +97,20 @@ DDL은 로컬 스키마 재생성으로 반영하고, dev DB에는 배포 절차
 BE 통합 테스트(신규 파일). 채팅 시작을 부르는 픽스처는 `users` 행을 함께 만든다. 기존 `ChatCommandService` 통합 테스트도 사용자 행 없이 시작하면 잠금을 못 잡으므로 픽스처를 같이 고친다.
 
 상한 판정:
-1. 세션 3개가 각각 `GENERATING`이면 4번째 세션의 시작이 429이고, 세션·메시지·`usage_record`·논문 접근 기록이 추가로 생기지 않는다.
+1. 세션 3개가 각각 `GENERATING`이면 4번째 시작(새 세션·기존 세션 모두)이 429이고, 세션·메시지·`usage_record`가 추가로 생기지 않으며 논문 접근 시각과 세션 활동 시각이 바뀌지 않는다.
 2. 그중 하나를 `COMPLETED`로 전이하면 시작이 통과한다.
 3. 논리 삭제된 세션의 `GENERATING`도 활성으로 센다.
 4. 세는 조건: 다른 사용자의 `GENERATING`, `COMPLETED`·`FAILED` assistant, `USER` role 행은 세지 않는다.
 5. 같은 세션 재요청은 사용자 전체 검사 전에 `CHAT_RUN_IN_PROGRESS`(409)로 끝난다.
 
-경합:
+경합 (테스트 스레드가 `users` 행을 먼저 잠근 채 두 요청을 출발시키고, 둘 다 잠금 대기에 들어간 것을 확인한 뒤 풀어준다. 출발 시점만 맞추면 잠금이 없어도 순차 실행으로 통과할 수 있기 때문이다):
 6. 활성 2개에서 서로 다른 새 세션 시작 2건을 동시에 보내면 정확히 하나만 성공한다. 기존 세션 2건 조합도 같다.
 7. 같은 `clientMessageId`의 새 세션 시작 2건이 동시에 들어오면 진 쪽은 429가 아니라 `DUPLICATE_MESSAGE`를 받는다.
-8. `reserve` 뒤 assistant 저장 전에 실패를 주입하면 롤백으로 월간 사용량과 동시성 슬롯이 모두 풀린다.
+8. `start`를 감싼 트랜잭션이 예외로 롤백되면 월간 사용량 예약과 동시성 슬롯이 모두 풀린다. `start` 안에 부분 커밋이 없어 저장 도중 실패도 같은 결과이므로 리포지토리에 실패를 주입하지 않는다.
 
 기타:
 9. 사용자 행이 없으면 `IllegalStateException`.
-10. `PlanPropertiesTest`: `chat.max-active-sessions` null·0·음수 거부, 정상 바인딩.
+10. `PlanPropertiesTest`: `chat.max-active-sessions` null·0·음수 거부. YAML 바인딩은 통합 테스트의 컨텍스트 기동이 검증한다(기존 정책값과 같은 방식).
 11. HTTP 수준: 상태 429, `code`, `message` 단언.
 
 FE:
