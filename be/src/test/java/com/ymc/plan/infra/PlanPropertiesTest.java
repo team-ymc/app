@@ -84,7 +84,7 @@ class PlanPropertiesTest {
     @Test
     @DisplayName("플랜 정책 전체가 없으면 거부한다")
     void nullPolicyRejected() {
-        assertThatThrownBy(() -> new PlanProperties(null, cleanup()))
+        assertThatThrownBy(() -> new PlanProperties(null, cleanup(), chat()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("플랜 정책");
     }
@@ -95,7 +95,7 @@ class PlanPropertiesTest {
         var policy = Map.of(
                 PlanCode.FREE, policiesByUsageType(100, 3));
 
-        assertThatThrownBy(() -> new PlanProperties(policy, cleanup()))
+        assertThatThrownBy(() -> new PlanProperties(policy, cleanup(), chat()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("PRO");
     }
@@ -109,7 +109,7 @@ class PlanPropertiesTest {
                         new PlanProperties.Policy(PolicyMode.MONTHLY, 100)),
                 PlanCode.PRO, policiesByUsageType(1000, 100));
 
-        assertThatThrownBy(() -> new PlanProperties(policy, cleanup()))
+        assertThatThrownBy(() -> new PlanProperties(policy, cleanup(), chat()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("FREE/PAPER_REGISTRATION");
     }
@@ -117,9 +117,37 @@ class PlanPropertiesTest {
     @Test
     @DisplayName("cleanup 설정 전체가 없으면 거부한다")
     void nullCleanupRejected() {
-        assertThatThrownBy(() -> new PlanProperties(policies(), null))
+        assertThatThrownBy(() -> new PlanProperties(policies(), null, chat()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cleanup");
+    }
+
+    @Test
+    @DisplayName("application.yml 기본값 — chat.max-active-sessions는 3")
+    void chatMaxActiveSessions() {
+        assertThat(props().chat().maxActiveSessions()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("chat 설정 전체가 없으면 거부한다")
+    void nullChatRejected() {
+        assertThatThrownBy(() -> new PlanProperties(policies(), cleanup(), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("chat");
+    }
+
+    @Test
+    @DisplayName("max-active-sessions는 1 이상이어야 한다")
+    void nonPositiveMaxActiveSessionsRejected() {
+        assertThatThrownBy(() -> new PlanProperties.Chat(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("max-active-sessions");
+        assertThatThrownBy(() -> new PlanProperties.Chat(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("max-active-sessions");
+        assertThatThrownBy(() -> new PlanProperties.Chat(-1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("max-active-sessions");
     }
 
     @Test
@@ -144,7 +172,11 @@ class PlanPropertiesTest {
     }
 
     private PlanProperties props() {
-        return new PlanProperties(policies(), cleanup());
+        return new PlanProperties(policies(), cleanup(), chat());
+    }
+
+    private PlanProperties.Chat chat() {
+        return new PlanProperties.Chat(3);
     }
 
     private Map<PlanCode, Map<UsageType, PlanProperties.Policy>> policies() {

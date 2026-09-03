@@ -77,6 +77,8 @@ plan:
     pro:
       ai-query: { mode: MONTHLY, limit: 1000 }
       paper-registration: { mode: MONTHLY, limit: 100 }
+  chat:
+    max-active-sessions: 3           # 사용자당 동시 GENERATING 세션 상한 (플랜 공통)
   cleanup:
     interval: 10m                    # 정리 실행 주기
     chat-generating-deadline: 30m    # GENERATING 스캔 — run deadline(10m)+emitter(11m)보다 크게
