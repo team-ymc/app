@@ -36,11 +36,11 @@
 - `users` 행은 OAuth 최초 로그인 저장 외에 갱신되는 곳이 없어 경합이 없다.
 - **사용자 행이 없으면 `IllegalStateException`으로 실패시킨다(500).** 인증된 요청의 `ownerId`는 항상 `users`에 있으므로 부재는 인증과 데이터가 어긋난 비정상이다. 상한 검사를 건너뛰는 fail-open은 이 기능의 목적과 반대라 택하지 않는다. `paper.owner_id`·`chat_session.owner_id`에 `users` FK를 두는 것은 이번 범위 밖이다.
 - **잠금 획득 직후, 세기 전에 `rejectDuplicate`를 다시 판정한다.** 새 세션 요청은 세션 잠금이 없어(요청마다 새 UUID) 같은 `clientMessageId`의 두 요청이 모두 첫 판정을 통과한 뒤 사용자 잠금에서만 직렬화된다. 재판정 없이 세면 앞선 요청이 마지막 슬롯을 채웠을 때 재전송이 `DUPLICATE_MESSAGE` 대신 429를 받는다. 잠금을 잡은 시점의 조회는 앞선 커밋을 반드시 보므로 재판정이 정확하다.
-- **잠금 체인은 `chat_session → users → usage_bucket` 순으로 고정한다.** `usageService.reserve`가 이어서 월간 버킷 행을 잠그기 때문에 실제 체인은 세 단계다. 세 행 중 둘 이상을 한 트랜잭션에서 잠그는 다른 코드는 현재 없다(문서 등록은 버킷만, 사용량 정산은 원장 행만). 역순으로 잠그는 트랜잭션을 만들면 교착이 나므로 이 규칙을 `ChatCommandService` 주석에 남긴다.
+- **잠금 체인은 `chat_session → users → paper → usage_bucket` 순으로 고정한다.** `usageService.reserve`가 이어서 월간 버킷 행을 잠그고, 그 사이 `paperAccessRecorder.recordAccess`가 같은 트랜잭션에서 `paper` 행을 UPDATE하므로 실제 체인은 네 단계다. 네 행 중 둘 이상을 한 트랜잭션에서 잠그는 다른 코드는 현재 없다(문서 등록은 버킷만, 사용량 정산은 원장 행만). 역순으로 잠그는 트랜잭션을 만들면 교착이 나므로 이 규칙을 `ChatCommandService` 주석에 남긴다.
 - 새 세션 경로는 세션 잠금 없이 사용자 잠금부터 잡는다. 새 세션 UUID에는 경쟁 상대가 없어 순서 규칙과 충돌하지 않는다.
 - 잠금 대기 timeout은 두지 않는다. 이 트랜잭션은 DB 작업만 하고 커밋하며(AI 호출은 커밋 뒤) 세션·버킷 잠금과 같은 방식이다. DB가 던지는 잠금 예외(교착 감지 등)는 기존 방침대로 500으로 둔다.
 
-재검토 조건: `users` 행을 요청마다 갱신하는 기능(마지막 활동 시각 등)이 생기거나 순서 규칙을 지키기 어려운 코드가 생기면 사용자별 잠금 전용 행으로 옮긴다. 잠그는 리포지토리 호출 한 줄과 테이블 하나가 바뀐다.
+재검토 조건: `users` 행을 요청마다 갱신하는 기능(마지막 활동 시각 등)이 생기거나 순서 규칙을 지키기 어려운 코드가 생기면 사용자별 잠금 전용 행으로 옮긴다. 잠그는 리포지토리 호출 한 줄과 테이블 하나가 바뀐다. 또한 이 잠금은 사용자의 채팅 시작을 사용량 예약까지 포함해 직렬화하므로, `start` 트랜잭션이 길어지는 변경(요청마다 `users` 갱신 등)은 사용자별 채팅 처리량을 직접 깎는다.
 
 ## 4. BE 변경
 
@@ -70,6 +70,7 @@ user·assistant 메시지 저장                 (기존)
 | `plan/infra/PlanProperties` | `Chat chat` 중첩 레코드, `maxActiveSessions`(null·0 이하 거부). 플랜별이 아니라 공통 |
 | `application.yml` | `plan.chat.max-active-sessions: 3` |
 | `be/docs/db/chat.sql` | `create index ix_chat_session_owner on chat_session (owner_id)` |
+| `chat/domain/ChatSession` | `@Table(indexes = @Index(name = "ix_chat_session_owner", columnList = "owner_id"))` — `ddl-auto: update` 환경(로컬·dev·테스트)에서 자동 생성. prod(`validate`)는 인덱스를 검사하지 않으므로 chat.sql이 prod 산출물 |
 
 정책값을 `PlanProperties`에 두는 이유는 FT-011의 정책이고 배포 설정으로 덮는 방식이 같기 때문이다. 플랜별로 달라지면 `policy` 맵 쪽으로 옮긴다.
 
