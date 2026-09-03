@@ -7,6 +7,7 @@ import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
@@ -21,7 +22,8 @@ import lombok.Getter;
  */
 @Getter
 @Entity
-@Table(name = "chat_session")
+@Table(name = "chat_session",
+        indexes = @Index(name = "ix_chat_session_owner", columnList = "owner_id"))
 public class ChatSession {
 
     @Id

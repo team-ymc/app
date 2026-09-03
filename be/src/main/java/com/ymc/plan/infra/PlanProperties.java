@@ -9,9 +9,9 @@ import com.ymc.plan.domain.PlanCode;
 import com.ymc.plan.domain.PolicyMode;
 import com.ymc.plan.domain.UsageType;
 
-/** 플랜·기능별 사용량 정책과 정리 주기. 값은 배포 설정으로 덮는다. */
+/** 플랜·기능별 사용량 정책, 정리 주기, 채팅 동시 실행 상한. 값은 배포 설정으로 덮는다. */
 @ConfigurationProperties(prefix = "plan")
-public record PlanProperties(Map<PlanCode, Map<UsageType, Policy>> policy, Cleanup cleanup) {
+public record PlanProperties(Map<PlanCode, Map<UsageType, Policy>> policy, Cleanup cleanup, Chat chat) {
 
     public PlanProperties {
         if (policy == null) {
@@ -19,6 +19,9 @@ public record PlanProperties(Map<PlanCode, Map<UsageType, Policy>> policy, Clean
         }
         if (cleanup == null) {
             throw new IllegalArgumentException("cleanup 설정이 필요합니다.");
+        }
+        if (chat == null) {
+            throw new IllegalArgumentException("chat 설정이 필요합니다.");
         }
 
         for (PlanCode plan : PlanCode.values()) {
@@ -60,6 +63,15 @@ public record PlanProperties(Map<PlanCode, Map<UsageType, Policy>> policy, Clean
         private static void requirePositive(String name, Duration value) {
             if (value == null || value.isZero() || value.isNegative()) {
                 throw new IllegalArgumentException("cleanup." + name + "은 양수여야 합니다.");
+            }
+        }
+    }
+
+    /** 사용자 전체 동시 GENERATING 세션 상한. 플랜과 무관한 공통값이다. */
+    public record Chat(Integer maxActiveSessions) {
+        public Chat {
+            if (maxActiveSessions == null || maxActiveSessions < 1) {
+                throw new IllegalArgumentException("chat.max-active-sessions는 1 이상이어야 합니다.");
             }
         }
     }

@@ -131,6 +131,17 @@ describe('chatStream — 스트림 소비와 종결 판정', () => {
     expect(actions.at(-1)).toMatchObject({ type: 'failed', confirmed: true, code: 'CHAT_RUN_IN_PROGRESS' });
   });
 
+  it('429 CHAT_CONCURRENCY_LIMIT_EXCEEDED: 재시도 가능한 확인된 실패로 콜백한다', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false, status: 429, body: null,
+      json: async () => ({ code: 'CHAT_CONCURRENCY_LIMIT_EXCEEDED', message: '동시에 진행 중인 답변이 3개입니다.' }),
+    }) as unknown as typeof fetch;
+    const actions = await collect();
+    expect(actions.at(-1)).toMatchObject({
+      type: 'failed', confirmed: true, code: 'CHAT_CONCURRENCY_LIMIT_EXCEEDED', retryable: true,
+    });
+  });
+
   it('네트워크 예외: 결과 미상 실패로 콜백한다', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('network error')) as unknown as typeof fetch;
     const actions = await collect();

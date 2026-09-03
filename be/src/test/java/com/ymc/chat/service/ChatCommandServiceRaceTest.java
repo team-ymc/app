@@ -27,7 +27,9 @@ import com.ymc.chat.domain.ChatSession;
 import com.ymc.chat.domain.ChatSessionRepository;
 import com.ymc.paper.service.PaperAccessRecorder;
 import com.ymc.paper.service.PaperChatAccessValidator;
+import com.ymc.plan.infra.PlanProperties;
 import com.ymc.plan.service.UsageService;
+import com.ymc.user.domain.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ChatCommandServiceRaceTest {
@@ -46,6 +48,12 @@ class ChatCommandServiceRaceTest {
 
     @Mock
     UsageService usageService;
+
+    @Mock
+    UserRepository userRepository;
+
+    @Mock
+    PlanProperties planProperties;
 
     @Mock
     PlatformTransactionManager transactionManager;

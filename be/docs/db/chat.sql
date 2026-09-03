@@ -25,6 +25,9 @@ create table chat_session (
     primary key (id)
 );
 
+-- 사용자 전체 활성 세션 수를 세는 쿼리가 소유자로 세션을 좁힌다 (users 행 잠금 아래에서 실행).
+create index ix_chat_session_owner on chat_session (owner_id);
+
 create table chat_message (
     id                uuid                        not null,
     session_id        uuid                        not null,

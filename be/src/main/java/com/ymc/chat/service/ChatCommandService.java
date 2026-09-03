@@ -23,14 +23,17 @@ import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.service.PaperAccessRecorder;
 import com.ymc.paper.service.PaperChatAccessValidator;
 import com.ymc.plan.domain.UsageType;
+import com.ymc.plan.infra.PlanProperties;
 import com.ymc.plan.service.UsageService;
+import com.ymc.user.domain.UserRepository;
 
 /**
  * 채팅 시작 트랜잭션 — 검증과 저장까지만. 스트리밍은 이 메서드가 commit된 뒤
  * {@link ChatStreamService}가 시작한다 (계약: commit 뒤 message.started).
  *
- * <p>세션당 동시 실행 1개는 기존 세션 행의 PESSIMISTIC_WRITE 잠금으로 보장한다.
- * 새 세션은 방금 만든 UUID라 경쟁 상대가 존재할 수 없다 (설계 §3).
+ * <p>세션당 동시 실행 1개는 기존 세션 행의 PESSIMISTIC_WRITE 잠금으로, 사용자 전체 활성 세션 상한은
+ * users 행 잠금 아래에서 GENERATING assistant를 세어 보장한다. 새 세션은 방금 만든 UUID라
+ * 세션 잠금 경쟁 상대가 없다.
  */
 @Service
 public class ChatCommandService {
@@ -40,6 +43,8 @@ public class ChatCommandService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final UsageService usageService;
+    private final UserRepository userRepository;
+    private final PlanProperties planProperties;
     private final TransactionTemplate requiresNewTx;
 
     public ChatCommandService(
@@ -48,12 +53,16 @@ public class ChatCommandService {
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             UsageService usageService,
+            UserRepository userRepository,
+            PlanProperties planProperties,
             PlatformTransactionManager transactionManager) {
         this.paperChatAccessValidator = paperChatAccessValidator;
         this.paperAccessRecorder = paperAccessRecorder;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.usageService = usageService;
+        this.userRepository = userRepository;
+        this.planProperties = planProperties;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -62,6 +71,7 @@ public class ChatCommandService {
      * @throws ApiException PAPER_NOT_FOUND / FORBIDDEN / PAPER_NOT_READY — 논문 검증 실패
      * @throws ApiException CHAT_SESSION_NOT_FOUND — 세션 없음·소유/논문 불일치
      * @throws ApiException CHAT_RUN_IN_PROGRESS — 세션에 GENERATING assistant 존재
+     * @throws ApiException CHAT_CONCURRENCY_LIMIT_EXCEEDED — 사용자 전체 활성 세션이 상한
      * @throws ApiException CHAT_USAGE_LIMIT_EXCEEDED — 이번 달 AI 질의 한도 초과
      * @throws ApiException CLIENT_MESSAGE_ID_CONFLICT — 같은 id, 다른 content
      * @throws DuplicateChatMessageException — 같은 id, 같은 content (멱등 재전송)
@@ -84,6 +94,22 @@ public class ChatCommandService {
         if (chatMessageRepository.existsBySessionIdAndStatus(
                 session.getId(), ChatMessageStatus.GENERATING)) {
             throw new ApiException(ErrorCode.CHAT_RUN_IN_PROGRESS, "이미 답변을 생성하고 있습니다.");
+        }
+
+        // 락 획득 순서: chat_session → users → paper → usage_bucket.
+        userRepository.findWithLockById(ownerId)
+                .orElseThrow(() -> new IllegalStateException("사용자 행 없음: " + ownerId));
+
+        // 사용자 잠금을 기다리는 동안 같은 clientMessageId가 커밋됐을 수 있다.
+        // 새 세션 경로는 세션 잠금이 없어 이 재판정이 유일한 멱등 방어선
+        rejectDuplicate(ownerId, paperId, clientMessageId, content);
+
+        int maxActive = planProperties.chat().maxActiveSessions();
+        long active = chatMessageRepository.countBySessionOwnerIdAndRoleAndStatus(
+                ownerId, ChatMessageRole.ASSISTANT, ChatMessageStatus.GENERATING);
+        if (active >= maxActive) {
+            throw new ApiException(ErrorCode.CHAT_CONCURRENCY_LIMIT_EXCEEDED,
+                    "동시에 진행 중인 답변이 " + maxActive + "개입니다. 하나가 끝나면 다시 시도하세요.");
         }
 
         Instant now = Instant.now();
