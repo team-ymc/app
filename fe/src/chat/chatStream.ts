@@ -62,7 +62,8 @@ export async function streamChatMessage({ paperId, sessionId, clientMessageId, c
       type: 'failed', confirmed: true,
       code: errorBody.code || `HTTP_${res.status}`,
       message: errorBody.message || '요청에 실패했습니다.',
-      retryable: false,
+      // 동시 실행 상한은 다른 세션 답변이 끝나면 같은 내용으로 다시 보낼 수 있다
+      retryable: errorBody.code === 'CHAT_CONCURRENCY_LIMIT_EXCEEDED',
     });
     return;
   }
