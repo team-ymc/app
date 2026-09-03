@@ -33,15 +33,17 @@ class OAuthUserServiceIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("같은 provider+providerId 재로그인 → 같은 사용자 (레코드 1개)")
     void 기존이면_같은_사용자를_돌려준다() {
+        long before = userRepository.count();
         User first = oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
         User second = oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
         assertThat(second.getId()).isEqualTo(first.getId());
-        assertThat(userRepository.count()).isEqualTo(1);
+        assertThat(userRepository.count()).isEqualTo(before + 1);
     }
 
     @Test
     @DisplayName("동시 첫 로그인 경쟁 — 패자도 승자의 사용자를 돌려받는다")
     void 동시_가입_경쟁에서도_한_명만_생성된다() throws Exception {
+        long before = userRepository.count();
         int threads = 2;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         try {
@@ -60,7 +62,7 @@ class OAuthUserServiceIntegrationTest extends IntegrationTest {
             User first = results.get(0).get();
             User second = results.get(1).get();
             assertThat(first.getId()).isEqualTo(second.getId());
-            assertThat(userRepository.count()).isEqualTo(1);
+            assertThat(userRepository.count()).isEqualTo(before + 1);
         } finally {
             pool.shutdown();
         }

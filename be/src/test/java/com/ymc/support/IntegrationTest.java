@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -135,6 +136,9 @@ public abstract class IntegrationTest {
     @Autowired
     protected UsageRecordRepository usageRecordRepository;
 
+    @Autowired
+    protected JdbcTemplate jdbcTemplate;
+
     /*
      * 스파이를 (쓰지 않는 테스트까지 포함해) 베이스에 모아 둔 이유: 빈 override는 스프링 컨텍스트
      * 캐시 키의 일부다. 테스트 클래스마다 다른 조합을 선언하면 컨텍스트가 갈라지고 컨테이너도 그만큼
@@ -172,6 +176,8 @@ public abstract class IntegrationTest {
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
+        givenUser(TEST_USER_ID);
+        givenUser(OTHER_USER_ID);
         documentContentBlockRepository.deleteAll();
         documentContentAssetRepository.deleteAll();
         documentContentRepository.deleteAll();
@@ -190,6 +196,14 @@ public abstract class IntegrationTest {
     protected RequestPostProcessor otherUserJwt() {
         return SecurityMockMvcRequestPostProcessors.jwt()
                 .jwt(j -> j.subject(OTHER_USER_ID.toString()));
+    }
+
+    /** 테스트 JWT subject에 대응하는 users 행. 채팅 시작이 사용자 행을 잠그므로 항상 둔다. */
+    protected void givenUser(UUID id) {
+        jdbcTemplate.update(
+                "insert into users (id, provider, provider_id, email, display_name, created_at) "
+                        + "values (?, 'GOOGLE', ?, ?, ?, now())",
+                id, "sub-" + id, id + "@test.local", "테스트 사용자");
     }
 
     /** UPLOAD_PENDING 레코드. S3에는 아직 아무것도 없다. */

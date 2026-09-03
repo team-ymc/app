@@ -15,6 +15,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
 
     boolean existsBySessionIdAndStatus(UUID sessionId, ChatMessageStatus status);
 
+    /** 소유자의 GENERATING assistant 수 = 활성 세션 수. 논리 삭제된 세션도 센다. */
+    @Query("""
+            select count(m) from ChatMessage m
+            where m.session.ownerId = :ownerId and m.role = :role and m.status = :status
+            """)
+    long countBySessionOwnerIdAndRoleAndStatus(
+            UUID ownerId, ChatMessageRole role, ChatMessageStatus status);
+
     /**
      * {@code GENERATING → COMPLETED} 조건부 전이 + 최종 content 1회 저장.
      *
