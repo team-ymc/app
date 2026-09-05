@@ -71,7 +71,8 @@ class StalePaperCleanupTest extends IntegrationTest {
     @DisplayName("삭제된 UPLOAD_PENDING도 정체 정리가 만료·해제한다")
     void expiresDeletedStalePending() {
         Paper stale = givenReservedPaperAt("deleted-stale.pdf", Instant.now().minus(2, ChronoUnit.HOURS));
-        tx.executeWithoutResult(s -> paperRepository.markDeleted(stale.getId(), Instant.now()));
+        Integer deleted = tx.execute(s -> paperRepository.markDeleted(stale.getId(), Instant.now()));
+        assertThat(deleted).isEqualTo(1);
 
         cleanup.run();
 

@@ -198,4 +198,6 @@ FE (`fe/src`)
 - 삭제 후 같은 파일을 다시 올리면 Document가 이미 있으므로 즉시 COMPLETED로 연결된다(재파싱 없음). 의도된 동작.
 - 삭제된 논문의 usage 기록은 남는다(사용량 미복구 규칙).
 - **삭제 ↔ complete 경쟁**: `complete`가 살아 있는 행을 읽은 직후 삭제가 커밋되면 `linkDocument` CAS가 `deleted_at`을 보지 않아 삭제된 행에 Document가 연결되고 사용량이 정산될 수 있다. 사용자에게는 보이지 않고(이미 404) 사용량은 어차피 미복구 규칙이라 수용한다. CAS에 조건을 더하지 않는다.
+- **채팅 세션 생성 ↔ 삭제 경쟁**: `start`가 활성 논문 검증을 통과한 직후 삭제가 커밋되면 삭제된 논문에 `deleted_at = null`인 세션 한 개가 남을 수 있다. 논문이 404라 세션은 어디서도 닿지 않으므로 수용한다(잠금 추가 안 함).
+- **접근 기록·이름 변경 flush ↔ 삭제 경쟁**: `Paper`에 `@DynamicUpdate`가 없어 dirty checking UPDATE가 모든 updatable 컬럼을 쓴다. 삭제가 그 사이에 커밋되면 `deleted_at`이 null로 되돌아갈 수 있다(수 ms 창). 후속 티켓에서 `@DynamicUpdate` 또는 `deleted_at is null` 조건 UPDATE로 다룬다.
 - FT-002 신규 Story의 태그(`MVP` 여부)와 Story 번호는 문서 작성 시 Registry·기존 관례를 확인해 정한다.

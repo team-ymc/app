@@ -230,7 +230,8 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         Paper paper = givenReservedPendingPaper("deleted.pdf");
         Document document = givenLinkedDocument(paper);
         documentTransitions.markProcessing(document.getId());
-        tx.executeWithoutResult(s -> paperRepository.markDeleted(paper.getId(), Instant.now()));
+        Integer deleted = tx.execute(s -> paperRepository.markDeleted(paper.getId(), Instant.now()));
+        assertThat(deleted).isEqualTo(1);
 
         tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
                 document.getId(), DocumentStatus.COMPLETED, null));

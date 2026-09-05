@@ -110,6 +110,20 @@ class PaperManagementIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("이름 변경: 앞뒤 공백을 뺀 길이가 255자면 허용한다")
+    void renameAllowsMaxLengthAfterTrim() throws Exception {
+        Paper paper = givenProcessingPaper("old.pdf");
+        String name = "b".repeat(255);
+
+        mockMvc.perform(patch("/api/papers/{id}", paper.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(renameJson("  " + name + "  "))
+                        .with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.filename").value(name));
+    }
+
+    @Test
     @DisplayName("이름 변경: 같은 이름의 다른 논문이 있어도 허용한다")
     void renameAllowsDuplicate() throws Exception {
         givenProcessingPaper("same.pdf");
