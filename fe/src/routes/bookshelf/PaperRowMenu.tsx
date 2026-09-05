@@ -69,10 +69,11 @@ export default function PaperRowMenu({ paper, onDownload, onRename, onDelete, si
       if (e.key === 'Escape') setOpen(false);
     }
     document.addEventListener('mousedown', onDocMouseDown, true);
-    document.addEventListener('keydown', onDocKeyDown);
+    // 래퍼가 행으로 번지는 keydown을 막으므로 capture로 먼저 받는다
+    document.addEventListener('keydown', onDocKeyDown, true);
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown, true);
-      document.removeEventListener('keydown', onDocKeyDown);
+      document.removeEventListener('keydown', onDocKeyDown, true);
     };
   }, [open]);
 

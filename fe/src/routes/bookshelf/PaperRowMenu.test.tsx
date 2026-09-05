@@ -57,7 +57,7 @@ describe('PaperRowMenu', () => {
     expect(screen.queryByRole('menu')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: '더 보기' }), { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
   });
 });
