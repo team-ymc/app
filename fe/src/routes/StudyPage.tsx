@@ -52,7 +52,8 @@ export default function StudyPage() {
     );
   }
   if (statusQuery.isError) {
-    return <Navigate to="/library" replace state={{ toast: '논문 상태를 불러오지 못했습니다' }} />;
+    const gone = statusQuery.error instanceof ApiError && statusQuery.error.httpStatus === 404;
+    return <Navigate to="/library" replace state={{ toast: gone ? '삭제되었거나 없는 논문입니다' : '논문 상태를 불러오지 못했습니다' }} />;
   }
 
   // COMPLETED가 아닌 논문은 학습 진입 불가 (FT-002 Story 3와 동일 규칙) — /library로 돌려보내고 토스트로 안내한다.

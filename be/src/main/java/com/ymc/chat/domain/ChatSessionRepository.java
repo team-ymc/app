@@ -1,12 +1,15 @@
 package com.ymc.chat.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
 
@@ -26,4 +29,14 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from ChatSession s where s.id = :id")
     Optional<ChatSession> findWithLockById(UUID id);
+
+    /** 논문 삭제에 딸려 소속 세션을 논리 삭제한다. 살아 있는 세션만 건드린다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ChatSession s
+               set s.deletedAt = :now
+             where s.paperId = :paperId
+               and s.deletedAt is null
+            """)
+    int markDeletedByPaperId(@Param("paperId") UUID paperId, @Param("now") Instant now);
 }

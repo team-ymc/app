@@ -103,7 +103,7 @@ public class PaperUploadCompletionService {
     }
 
     private Paper find(UUID paperId) {
-        return paperRepository.findById(paperId).orElseThrow(() -> {
+        return paperRepository.findActiveById(paperId).orElseThrow(() -> {
             log.debug("존재하지 않는 paperId로 complete 호출: {}", paperId);
             return new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId);
         });

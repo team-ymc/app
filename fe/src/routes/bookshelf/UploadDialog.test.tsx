@@ -95,14 +95,14 @@ describe('UploadDialog — 사용량 한도', () => {
 
   it('한도와 무관한 실패는 plan을 invalidate하지 않는다', async () => {
     vi.mocked(sha256Base64).mockResolvedValue(HASH);
-    vi.mocked(createPaper).mockRejectedValue(new ApiError('중복 파일명', 'DUPLICATE_FILENAME', 409));
+    vi.mocked(createPaper).mockRejectedValue(new ApiError('지원하지 않는 형식입니다', 'UNSUPPORTED_FILE_TYPE', 400));
     const qc = new QueryClient();
     const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
     const { container } = renderDialogWith(qc);
 
     selectPdfAndUpload(container);
 
-    await waitFor(() => expect(screen.getByText(/DUPLICATE_FILENAME/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/UNSUPPORTED_FILE_TYPE/)).toBeTruthy());
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['plan'] });
   });
 });

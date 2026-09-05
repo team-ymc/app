@@ -22,6 +22,6 @@ public class PaperAccessRecorder {
     /** 존재·소유 검증을 통과한 뒤에만 호출 */
     @Transactional
     public void recordAccess(UUID paperId, Instant at) {
-        paperRepository.findById(paperId).ifPresent(p -> p.markAccessed(at));
+        paperRepository.findActiveById(paperId).ifPresent(p -> p.markAccessed(at));
     }
 }

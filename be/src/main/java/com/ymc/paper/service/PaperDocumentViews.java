@@ -58,6 +58,10 @@ public class PaperDocumentViews {
                 .toList();
     }
 
+    public PaperListView listView(Paper paper) {
+        return listViews(List.of(paper)).get(0);
+    }
+
     /** Document 상태는 API PaperStatus와 이름 1:1이다. 연결 전 = 업로드 대기. */
     static PaperStatus derivedStatus(Paper paper, Document document) {
         if (paper.getExpiredAt() != null) {

@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +22,7 @@ import com.ymc.plan.service.UsageService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 논문 등록 — 중복 판정 → {@code UPLOAD_PENDING} 레코드 생성 → presigned PUT URL 발급.
+ * 논문 등록 — 형식·크기 검증 → {@code UPLOAD_PENDING} 레코드 생성 → presigned PUT URL 발급.
  * 레코드 생성이 업로드보다 먼저다 (ADR-001).
  */
 @Service
@@ -41,14 +40,10 @@ public class PaperRegistrationService {
     private final UsageService usageService;
 
     /**
-     * 파일명이 중복이 아니면 레코드를 만들고 업로드 URL을 발급한다.
-     *
-     * <p>중복 판정은 사전 조회 + DB 유니크 제약 이중 방어다 (design D4). 사전 조회를 나란히 통과한
-     * 동시 요청은 제약 위반으로 잡아 같은 409로 변환한다.
+     * 레코드를 만들고 업로드 URL을 발급한다.
      *
      * @throws ApiException {@code UNSUPPORTED_FILE_TYPE} — contentType이 PDF가 아님
      * @throws ApiException {@code FILE_TOO_LARGE} — 신고된 크기가 상한을 넘음. 레코드를 만들지 않는다
-     * @throws ApiException {@code DUPLICATE_FILENAME} — 같은 소유자에게 같은 파일명이 이미 있음
      */
     @Transactional
     public PaperRegistrationResult register(
@@ -69,21 +64,9 @@ public class PaperRegistrationService {
             throw new ApiException(ErrorCode.FILE_TOO_LARGE, uploadPolicy.tooLargeMessage());
         }
 
-        // 3. 사전 조회 — 만료 잔재는 새 등록이 대체하므로 먼저 지운다
-        paperRepository.deleteExpiredByOwnerAndFilename(ownerId, filename);
-        if (paperRepository.existsByOwnerIdAndFilename(ownerId, filename)) {
-            throw duplicateFilename(filename);
-        }
-
         Paper paper = Paper.register(ownerId, filename, Instant.now());
         usageService.reserve(ownerId, UsageType.PAPER_REGISTRATION, paper.getId());
-
-        // flush를 앞당겨 유니크 제약 위반 방지하여 적절한 에러코드 반환.
-        try {
-            paperRepository.saveAndFlush(paper);
-        } catch (DataIntegrityViolationException e) {
-            throw duplicateFilename(filename);
-        }
+        paperRepository.save(paper);
 
         // S3는 외부 I/O가 발생하지만,
         // presign은 S3 호출이 아니라 로컬 서명 계산이라 트랜잭션 안에서 해도 외부 I/O가 없다.
@@ -98,10 +81,5 @@ public class PaperRegistrationService {
                 upload.expiresAt(),
                 PaperStatus.UPLOAD_PENDING,
                 paper.getCreatedAt());
-    }
-
-    private static ApiException duplicateFilename(String filename) {
-        return new ApiException(
-                ErrorCode.DUPLICATE_FILENAME, "같은 파일명의 논문이 이미 있습니다: " + filename);
     }
 }

@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,9 +21,11 @@ import com.ymc.paper.api.dto.PaperCreated;
 import com.ymc.paper.api.dto.PaperDownloadResponse;
 import com.ymc.paper.api.dto.PaperListResponse;
 import com.ymc.paper.api.dto.PaperStatusResponse;
+import com.ymc.paper.api.dto.RenamePaperRequest;
 import com.ymc.paper.service.PaperContentQueryService;
 import com.ymc.paper.service.PaperDownloadService;
 import com.ymc.paper.service.PaperListService;
+import com.ymc.paper.service.PaperManagementService;
 import com.ymc.paper.service.PaperRegistrationService;
 import com.ymc.paper.service.PaperStatusService;
 import com.ymc.paper.service.PaperStatusView;
@@ -42,6 +46,7 @@ public class PaperController {
     private final PaperDownloadService downloadService;
     private final PaperListService listService;
     private final PaperContentQueryService contentQueryService;
+    private final PaperManagementService managementService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. 소유자는 인증 주체다 (YMC-215). */
     @PostMapping
@@ -88,6 +93,22 @@ public class PaperController {
     public PaperContentResponse content(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         return PaperContentResponse.from(contentQueryService.getContent(paperId, ownerId));
+    }
+
+    /** 논문 이름 변경. 바뀐 행을 목록 항목 형태로 돌려준다. */
+    @PatchMapping("/{paperId}")
+    public PaperListResponse.Item rename(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId,
+            @Valid @RequestBody RenamePaperRequest request) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return PaperListResponse.Item.from(managementService.rename(paperId, ownerId, request.filename()));
+    }
+
+    /** 논문 논리 삭제. */
+    @DeleteMapping("/{paperId}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        managementService.delete(paperId, ownerId);
+        return ResponseEntity.noContent().build();
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {

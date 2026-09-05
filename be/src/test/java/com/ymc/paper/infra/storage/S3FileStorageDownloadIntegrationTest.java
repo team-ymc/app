@@ -23,4 +23,15 @@ class S3FileStorageDownloadIntegrationTest extends IntegrationTest {
         assertThat(d.url()).contains("X-Amz-Signature");
         assertThat(d.expiresAt()).isNotNull();
     }
+
+    @Test
+    @DisplayName("presignDownload: 따옴표·제어 문자는 빠지고 한글은 남는다")
+    void stripsHeaderBreakingCharacters() {
+        PresignedDownload d = fileStorage.presignDownload(
+                "papers/550e8400-e29b-41d4-a716-446655440000/original.pdf",
+                "논문 \"v2\"\r\n final.pdf");
+
+        String decoded = java.net.URLDecoder.decode(d.url(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(decoded).contains("filename=\"논문 v2 final.pdf\"");
+    }
 }

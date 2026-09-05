@@ -72,6 +72,23 @@ export async function listPapers(): Promise<{ papers: Paper[] }> {
   return res.json(); // { papers: [{ paperId, filename, status, createdAt, updatedAt }] }
 }
 
+// 이름 변경 (계약 0.4.0). 바뀐 행을 돌려주므로 호출 측이 캐시의 해당 항목만 교체한다.
+export async function renamePaper(paperId: string, filename: string): Promise<Paper> {
+  const res = await authFetch(`/api/papers/${paperId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename }),
+  });
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
+// 논리 삭제 (계약 0.4.0). 204라 본문이 없다.
+export async function deletePaper(paperId: string): Promise<void> {
+  const res = await authFetch(`/api/papers/${paperId}`, { method: 'DELETE' });
+  if (!res.ok) throw await apiError(res);
+}
+
 // 파싱된 논문 본문 조회 (blocks는 globalOrder 오름차순으로 온다).
 export async function fetchPaperContent(paperId: string): Promise<PaperContentResponse> {
   const res = await authFetch(`/api/papers/${paperId}/content`);

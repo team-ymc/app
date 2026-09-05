@@ -2,6 +2,7 @@ package com.ymc.paper.domain;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,19 +16,28 @@ import org.springframework.data.repository.query.Param;
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
-    /**
-     * 파일명 중복 판정. 상태를 가리지 않는다 — 업로드에 실패한 {@code UPLOAD_PENDING} 레코드도
-     * 중복으로 걸린다 (계약 주의사항, MVP는 같은 파일명 재업로드 미지원).
-     */
-    boolean existsByOwnerIdAndFilename(UUID ownerId, String filename);
-
     /** 서재 목록. 최근 접근순 — 접근 이력이 없으면 등록 시각을 접근 시각처럼 취급한다 (계약 `GET /api/papers`). */
     @Query("""
             select p from Paper p
              where p.ownerId = :ownerId
+               and p.deletedAt is null
              order by coalesce(p.lastAccessedAt, p.createdAt) desc
             """)
     List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
+
+    /** 사용자 경로용 조회 — 논리 삭제된 행은 없는 것으로 본다. 내부 경로(Document 연결 검증·정산·정체 정리)는 삭제 행을 그대로 봐야 하므로 이 메서드를 쓰지 않는다. */
+    @Query("select p from Paper p where p.id = :id and p.deletedAt is null")
+    Optional<Paper> findActiveById(@Param("id") UUID id);
+
+    /** 논리 삭제 CAS — 아직 살아 있을 때만 1 row. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.deletedAt = :now
+             where p.id = :paperId
+               and p.deletedAt is null
+            """)
+    int markDeleted(@Param("paperId") UUID paperId, @Param("now") Instant now);
 
     /**
      * 검증 완료된 Paper를 Document에 연결. 미연결·미만료일 때만 1 row다.
@@ -57,16 +67,6 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                and p.expiredAt is null
             """)
     int markExpired(@Param("paperId") UUID paperId, @Param("now") Instant now);
-
-    /** 만료 잔재 제거 — 같은 파일명 재등록이 만료 row를 대체할 수 있게 한다. */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            delete from Paper p
-             where p.ownerId = :ownerId and p.filename = :filename
-               and p.expiredAt is not null
-            """)
-    int deleteExpiredByOwnerAndFilename(@Param("ownerId") UUID ownerId,
-            @Param("filename") String filename);
 
     @Query("select p.id from Paper p where p.documentId = :documentId")
     List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);

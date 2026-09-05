@@ -28,8 +28,8 @@ function formatBytes(bytes: number | undefined): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-// ApiError면 code·message, 아니면 message만 보여준다 (409 DUPLICATE_FILENAME / presigned 만료(403) /
-// S3 PUT 실패 / complete 4xx 4경로를 다이얼로그 안에 그대로 노출).
+// ApiError면 code·message, 아니면 message만 보여준다 (presigned 만료(403) /
+// S3 PUT 실패 / complete 4xx 경로를 다이얼로그 안에 그대로 노출).
 function describeError(err: unknown): string {
   if (err instanceof ApiError) return err.code ? `${err.code}: ${err.message}` : err.message;
   if (err instanceof Error) return err.message;

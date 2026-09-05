@@ -19,9 +19,6 @@ public enum ErrorCode {
     /** 업로드된 원본이 단일 파일 최대 용량을 초과함 */
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE),
 
-    /** 같은 파일명의 논문이 이미 있음 (create) */
-    DUPLICATE_FILENAME(HttpStatus.CONFLICT),
-
     /** 존재하지 않는 paperId */
     PAPER_NOT_FOUND(HttpStatus.NOT_FOUND),
 
