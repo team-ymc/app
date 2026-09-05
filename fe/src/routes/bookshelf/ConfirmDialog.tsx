@@ -1,5 +1,5 @@
 // UploadDialog와 같은 오버레이 프레임의 소형 확인 모달. 오버레이 클릭은 취소.
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -12,6 +12,16 @@ export interface ConfirmDialogProps {
 }
 
 export default function ConfirmDialog({ open, title, message, confirmLabel, busy, onConfirm, onCancel }: ConfirmDialogProps) {
+  // 열려 있고 처리 중이 아닐 때 Esc로 취소한다
+  useEffect(() => {
+    if (!open || busy) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, busy, onCancel]);
+
   if (!open) return null;
   const btn = {
     fontFamily: 'var(--font-sans)',
@@ -50,7 +60,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, busy
           {message}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button onClick={onCancel} disabled={busy} style={{ ...btn, border: '1px solid var(--color-border)', background: 'var(--color-bg-paper)', color: 'var(--color-text-body)' }}>
+          <button onClick={onCancel} disabled={busy} autoFocus style={{ ...btn, border: '1px solid var(--color-border)', background: 'var(--color-bg-paper)', color: 'var(--color-text-body)' }}>
             취소
           </button>
           <button onClick={onConfirm} disabled={busy} style={{ ...btn, border: '1px solid var(--color-danger)', background: 'var(--color-danger)', color: '#FFFDF7' }}>

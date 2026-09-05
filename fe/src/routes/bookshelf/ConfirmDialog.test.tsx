@@ -26,4 +26,18 @@ describe('ConfirmDialog', () => {
     expect((screen.getByRole('button', { name: '삭제' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: '취소' }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('Esc로 취소된다', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { rerender } = render(
+      <ConfirmDialog open title="논문을 삭제할까요?" message="본문" confirmLabel="삭제" busy={false} onConfirm={onConfirm} onCancel={onCancel} />,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    rerender(<ConfirmDialog open title="논문을 삭제할까요?" message="본문" confirmLabel="삭제" busy onConfirm={onConfirm} onCancel={onCancel} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 });

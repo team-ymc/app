@@ -2,6 +2,8 @@
 
 > **대체됨** — 이 문서가 설명하는 임시 UI는 폐기되었다. 현행 설계: docs/superpowers/specs/2026-07-31-fe-v1-redesign-design.md
 
+> 2026-09-06 (YMC-369): 파일명 중복 판정(409 DUPLICATE_FILENAME)은 폐지됐다. 아래의 409 관련 검증 단계는 더 이상 성립하지 않는다.
+
 Source: project-docs/features/FT-003-논문-등록-분석.md / Jira: YMC-221 (에픽 YMC-179)
 Decision: project-docs/decisions/ADR-001-pdf-upload-presigned-url.md
 

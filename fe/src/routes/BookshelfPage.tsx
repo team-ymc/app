@@ -570,9 +570,10 @@ function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, on
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(paper)}
+      // 이름 변경 중에는 blur로 저장되는 클릭이 곧바로 페이지 이동으로 이어지지 않게 막는다
+      onClick={() => { if (!renaming) onSelect(paper); }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onSelect(paper);
+        if ((e.key === 'Enter' || e.key === ' ') && !renaming) onSelect(paper);
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -698,9 +699,9 @@ function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, o
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(paper)}
+      onClick={() => { if (!renaming) onSelect(paper); }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onSelect(paper);
+        if ((e.key === 'Enter' || e.key === ' ') && !renaming) onSelect(paper);
       }}
       style={{
         width: '200px',

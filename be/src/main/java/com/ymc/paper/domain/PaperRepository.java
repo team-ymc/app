@@ -25,7 +25,7 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
             """)
     List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
 
-    /** 사용자 경로용 조회 — 논리 삭제된 행은 없는 것으로 본다. 내부 정산·정리 경로는 findById를 그대로 쓴다. */
+    /** 사용자 경로용 조회 — 논리 삭제된 행은 없는 것으로 본다. 내부 경로(Document 연결 검증·정산·정체 정리)는 삭제 행을 그대로 봐야 하므로 이 메서드를 쓰지 않는다. */
     @Query("select p from Paper p where p.id = :id and p.deletedAt is null")
     Optional<Paper> findActiveById(@Param("id") UUID id);
 

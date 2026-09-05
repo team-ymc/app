@@ -116,7 +116,7 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("파일명 중복 판정은 사용자 단위 — 다른 사용자는 같은 파일명 등록 가능 (YMC-215)")
+    @DisplayName("다른 사용자가 같은 파일명을 등록해도 각각 201")
     void 중복_판정은_사용자_스코프다() throws Exception {
         String body = createPaperJson("same.pdf");
         mockMvc.perform(post("/api/papers").with(userJwt())

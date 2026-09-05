@@ -137,7 +137,7 @@ export default function PaperRowMenu({ paper, onDownload, onRename, onDelete, si
             onSelect={() => select(onDownload)}
           />
           <MenuItem icon={<PencilSimple size={16} />} label="이름 변경" onSelect={() => select(onRename)} />
-          <div style={{ height: '1px', background: 'var(--color-border)', margin: '2px 6px' }} />
+          <div role="separator" style={{ height: '1px', background: 'var(--color-border)', margin: '2px 6px' }} />
           <MenuItem icon={<Trash size={16} />} label="삭제" danger onSelect={() => select(onDelete)} />
         </div>
       )}
