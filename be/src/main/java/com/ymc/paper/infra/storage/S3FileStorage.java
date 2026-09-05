@@ -64,10 +64,15 @@ public class S3FileStorage implements FileStorage {
                                 .bucket(props.s3().bucket())
                                 .key(fileKey)
                                 .responseContentDisposition(
-                                        "attachment; filename=\"" + filename + "\"")
+                                        "attachment; filename=\"" + headerSafe(filename) + "\"")
                                 .build())
                         .build());
         return new PresignedDownload(presigned.url().toString(), presigned.expiration());
+    }
+
+    /** 헤더를 깨는 큰따옴표와 제어 문자만 뺀다. 한글 등 비ASCII는 브라우저가 처리하므로 그대로 둔다. */
+    static String headerSafe(String filename) {
+        return filename.replaceAll("[\"\\p{Cntrl}]", "");
     }
 
     /**
