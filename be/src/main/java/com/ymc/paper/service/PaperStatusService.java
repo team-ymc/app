@@ -26,7 +26,7 @@ public class PaperStatusService {
      */
     @Transactional(readOnly = true)
     public PaperStatusView getStatus(UUID paperId, UUID ownerId) {
-        Paper paper = paperRepository.findById(paperId)
+        Paper paper = paperRepository.findActiveById(paperId)
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId));
         if (!paper.getOwnerId().equals(ownerId)) {

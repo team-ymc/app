@@ -223,4 +223,18 @@ class PaperUsageIntegrationTest extends IntegrationTest {
             throw new IllegalStateException(e);
         }
     }
+
+    @Test
+    @DisplayName("삭제된 PROCESSING paper도 document 종결 시 정산된다")
+    void settlesDeletedPaper() {
+        Paper paper = givenReservedPendingPaper("deleted.pdf");
+        Document document = givenLinkedDocument(paper);
+        documentTransitions.markProcessing(document.getId());
+        tx.executeWithoutResult(s -> paperRepository.markDeleted(paper.getId(), Instant.now()));
+
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.COMPLETED, null));
+
+        assertThat(recordStatusOf(paper.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
+    }
 }

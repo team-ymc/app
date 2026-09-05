@@ -2,6 +2,7 @@ package com.ymc.paper.domain;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,9 +20,24 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     @Query("""
             select p from Paper p
              where p.ownerId = :ownerId
+               and p.deletedAt is null
              order by coalesce(p.lastAccessedAt, p.createdAt) desc
             """)
     List<Paper> findAllByOwnerIdOrderByRecentAccess(@Param("ownerId") UUID ownerId);
+
+    /** 사용자 경로용 조회 — 논리 삭제된 행은 없는 것으로 본다. 내부 정산·정리 경로는 findById를 그대로 쓴다. */
+    @Query("select p from Paper p where p.id = :id and p.deletedAt is null")
+    Optional<Paper> findActiveById(@Param("id") UUID id);
+
+    /** 논리 삭제 CAS — 아직 살아 있을 때만 1 row. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.deletedAt = :now
+             where p.id = :paperId
+               and p.deletedAt is null
+            """)
+    int markDeleted(@Param("paperId") UUID paperId, @Param("now") Instant now);
 
     /**
      * 검증 완료된 Paper를 Document에 연결. 미연결·미만료일 때만 1 row다.

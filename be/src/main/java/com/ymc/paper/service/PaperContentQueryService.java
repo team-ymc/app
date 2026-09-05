@@ -44,7 +44,7 @@ public class PaperContentQueryService {
      */
     @Transactional
     public PaperContentView getContent(UUID paperId, UUID ownerId) {
-        Paper paper = paperRepository.findById(paperId).orElseThrow(
+        Paper paper = paperRepository.findActiveById(paperId).orElseThrow(
                 () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
