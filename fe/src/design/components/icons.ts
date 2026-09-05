@@ -12,6 +12,10 @@ import {
   Moon,
   Sun,
   SealCheck,
+  DotsThree,
+  DownloadSimple,
+  PencilSimple,
+  Trash,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -28,6 +32,10 @@ export const ICONS: Record<string, Icon> = {
   moon: Moon,
   sun: Sun,
   'seal-check': SealCheck,
+  'dots-three': DotsThree,
+  'download-simple': DownloadSimple,
+  'pencil-simple': PencilSimple,
+  trash: Trash,
 };
 
 export function iconComponent(kebab: string): Icon | undefined {

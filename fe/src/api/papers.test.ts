@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createPaper, completeUpload, getStatus, getDownloadUrl, uploadToS3, listPapers, fetchPaperContent,
+  renamePaper, deletePaper,
 } from './papers';
 
 function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; status?: number; body?: unknown }) {
@@ -64,10 +65,32 @@ describe('api.js — fetch 계열', () => {
     await expect(fetchPaperContent('p1')).rejects.toMatchObject({ code: 'PAPER_NOT_READY' });
   });
 
+  it('renamePaper: PATCH /api/papers/{id}에 filename을 JSON으로 보내고 행을 돌려준다', async () => {
+    mockFetch({ body: { paperId: 'p1', filename: 'b.pdf', status: 'COMPLETED' } });
+    const res = await renamePaper('p1', 'b.pdf');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1', expect.objectContaining({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'b.pdf' }),
+    }));
+    expect(res.filename).toBe('b.pdf');
+  });
+
+  it('deletePaper: DELETE /api/papers/{id}, 204면 본문을 읽지 않는다', async () => {
+    mockFetch({ status: 204, body: undefined });
+    await expect(deletePaper('p1')).resolves.toBeUndefined();
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('deletePaper: 404는 ApiError(code)로 던진다', async () => {
+    mockFetch({ ok: false, status: 404, body: { code: 'PAPER_NOT_FOUND', message: '' } });
+    await expect(deletePaper('p1')).rejects.toMatchObject({ code: 'PAPER_NOT_FOUND', httpStatus: 404 });
+  });
+
   it('실패 응답: code·httpStatus를 실은 Error를 던진다', async () => {
-    mockFetch({ ok: false, status: 409, body: { code: 'DUPLICATE_FILENAME', message: '중복' } });
+    mockFetch({ ok: false, status: 429, body: { code: 'PAPER_USAGE_LIMIT_EXCEEDED', message: '중복' } });
     await expect(createPaper('a.pdf', 'application/pdf', 1234, 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=')).rejects.toMatchObject({
-      code: 'DUPLICATE_FILENAME', httpStatus: 409, message: '중복',
+      code: 'PAPER_USAGE_LIMIT_EXCEEDED', httpStatus: 429, message: '중복',
     });
   });
 });
