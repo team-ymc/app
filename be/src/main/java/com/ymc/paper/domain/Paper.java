@@ -8,7 +8,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import lombok.Getter;
 
@@ -23,11 +22,7 @@ import lombok.Getter;
  */
 @Getter
 @Entity
-@Table(
-        name = "paper",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_paper_owner_filename",
-                columnNames = {"owner_id", "filename"}))
+@Table(name = "paper")
 public class Paper {
 
     /**
@@ -46,8 +41,8 @@ public class Paper {
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
-    /** 원본 파일명. 소유자별 중복 판정의 기준이자 서재 목록의 제목 (FT-003 Story 2). */
-    @Column(name = "filename", nullable = false, updatable = false)
+    /** 원본 파일명. 서재 목록의 제목이자 다운로드 저장 파일명. 소유자별 중복을 허용한다. */
+    @Column(name = "filename", nullable = false)
     private String filename;
 
     @Column(name = "file_key", nullable = false, updatable = false)
@@ -71,6 +66,10 @@ public class Paper {
     /** 정리 스케줄러가 채우는 만료 시각. 정상 경로에서는 항상 null이다. */
     @Column(name = "expired_at")
     private Instant expiredAt;
+
+    /** 논리 삭제 시각. 값이 있으면 사용자 경로에서 보이지 않는다. 내부 정산·정리 경로는 그대로 본다. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     protected Paper() {
         // JPA
@@ -102,5 +101,21 @@ public class Paper {
 
     public void markAccessed(Instant now) {
         this.lastAccessedAt = Objects.requireNonNull(now, "now");
+    }
+
+    public void rename(String filename) {
+        Objects.requireNonNull(filename, "filename");
+        if (filename.isBlank()) {
+            throw new IllegalArgumentException("filename은 비어 있을 수 없습니다.");
+        }
+        this.filename = filename;
+    }
+
+    public void markDeleted(Instant now) {
+        this.deletedAt = Objects.requireNonNull(now, "now");
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

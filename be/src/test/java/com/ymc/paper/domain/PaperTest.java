@@ -91,4 +91,45 @@ class PaperTest {
             assertThat(status.isTerminal()).isFalse();
         }
     }
+
+    @Nested
+    @DisplayName("rename")
+    class Rename {
+
+        @Test
+        @DisplayName("파일명이 바뀌고 updatedAt은 그대로다")
+        void changesFilenameOnly() {
+            Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
+
+            paper.rename("renamed.pdf");
+
+            assertThat(paper.getFilename()).isEqualTo("renamed.pdf");
+            assertThat(paper.getUpdatedAt()).isEqualTo(NOW);
+        }
+
+        @Test
+        @DisplayName("빈 파일명은 거부한다")
+        void rejectsBlank() {
+            Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
+
+            assertThatIllegalArgumentException().isThrownBy(() -> paper.rename("  "));
+        }
+    }
+
+    @Nested
+    @DisplayName("markDeleted")
+    class MarkDeleted {
+
+        @Test
+        @DisplayName("deletedAt이 채워지고 isDeleted가 참이다")
+        void marksDeleted() {
+            Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
+            Instant later = NOW.plusSeconds(60);
+
+            paper.markDeleted(later);
+
+            assertThat(paper.getDeletedAt()).isEqualTo(later);
+            assertThat(paper.isDeleted()).isTrue();
+        }
+    }
 }

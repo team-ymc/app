@@ -26,15 +26,15 @@ create table paper (
     last_accessed_at timestamp(6) with time zone,
     -- 정리 스케줄러의 만료 시각 (null = 만료 아님). 값이 있으면 상태가 EXPIRED로 파생된다
     expired_at       timestamp(6) with time zone,
+    -- 논리 삭제 시각 (null = 살아 있음). 값이 있으면 목록·조회·채팅에서 보이지 않는다
+    deleted_at       timestamp(6) with time zone,
 
     primary key (id),
-
-    -- 파일명 중복 판정(409 DUPLICATE_FILENAME)의 최종 방어선. 사전 조회를 나란히 통과한
-    -- 동시 요청은 이 제약이 잡는다 (design D4). 상태를 가리지 않으므로 업로드에 실패해
-    -- document 미연결로 남은 레코드도 중복으로 걸린다 (MVP는 같은 파일명 재업로드 미지원).
-    constraint uk_paper_owner_filename unique (owner_id, filename),
 
     constraint fk_paper_document foreign key (document_id) references document (id)
 );
 
 create index ix_paper_document on paper (document_id);
+
+-- 기존 환경(local·dev)은 ddl-auto가 제약을 지우지 않으므로 배포 전에 수동으로 실행한다.
+-- alter table paper drop constraint if exists uk_paper_owner_filename;
