@@ -122,8 +122,8 @@ class PaperExpiryIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("같은 파일명 재등록이 만료 row를 대체한다")
-    void reregisterReplacesExpiredRow() throws Exception {
+    @DisplayName("같은 파일명 재등록은 만료 row를 지우지 않고 나란히 추가된다")
+    void reregisterKeepsExpiredRow() throws Exception {
         Paper expired = givenExpiredPaper("retry.pdf");
 
         mockMvc.perform(post("/api/papers")
@@ -132,20 +132,7 @@ class PaperExpiryIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isCreated());
 
-        assertThat(paperRepository.findById(expired.getId())).isEmpty();
-        assertThat(paperRepository.count()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("만료 안 된 같은 파일명은 여전히 DUPLICATE_FILENAME")
-    void nonExpiredDuplicateStillRejected() throws Exception {
-        givenPendingPaper("dup.pdf");
-
-        mockMvc.perform(post("/api/papers")
-                        .contentType("application/json")
-                        .content(createPaperJson("dup.pdf"))
-                        .with(userJwt()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
+        assertThat(paperRepository.findById(expired.getId())).isPresent();
+        assertThat(paperRepository.count()).isEqualTo(2);
     }
 }

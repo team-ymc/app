@@ -10,15 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,24 +21,18 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.ymc.common.error.ApiException;
-import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.domain.Paper;
-import com.ymc.paper.service.PaperRegistrationService;
 import com.ymc.paper.service.PaperUploadPolicy;
 import com.ymc.support.IntegrationTest;
 
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 
 /**
- * spec: paper-registration — 정상 201 / 중복 409 / 검증 400 (tasks 3.4).
+ * spec: paper-registration — 정상 201 / 검증 400 (tasks 3.4).
  */
 class PaperRegistrationIntegrationTest extends IntegrationTest {
 
     private static final String FILENAME = "attention-is-all-you-need.pdf";
-
-    @Autowired
-    private PaperRegistrationService registrationService;
 
     @Autowired
     private PaperUploadPolicy uploadPolicy;
@@ -106,29 +93,12 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("중복 파일명: 레코드를 만들지 않고 409 DUPLICATE_FILENAME")
-    void rejectsDuplicateFilename() throws Exception {
+    @DisplayName("같은 파일명을 두 번 등록해도 각각 레코드가 생긴다")
+    void allowsDuplicateFilename() throws Exception {
+        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
         mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
 
-        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
-
-        assertThat(paperRepository.count()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("업로드에 실패해 UPLOAD_PENDING으로 남은 레코드도 중복으로 걸린다 (MVP 재업로드 미지원)")
-    void pendingRecordAlsoCountsAsDuplicate() throws Exception {
-        // 업로드하지 않아 document 미연결(파생 상태 UPLOAD_PENDING)로 머무는 레코드
-        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt())).andExpect(status().isCreated());
-        assertThat(paperRepository.findAll()).singleElement()
-                .extracting(Paper::getDocumentId)
-                .isNull();
-
-        mockMvc.perform(createRequest(FILENAME, "application/pdf").with(userJwt()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("DUPLICATE_FILENAME"));
+        assertThat(paperRepository.count()).isEqualTo(2);
     }
 
     @Test
@@ -159,53 +129,6 @@ class PaperRegistrationIntegrationTest extends IntegrationTest {
                                 .jwt().jwt(j -> j.subject(otherUser.toString())))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
-    }
-
-    /**
-     * 사전 조회를 나란히 통과한 동시 요청은 DB 유니크 제약이 잡아 409로 변환돼야 한다 (design D4).
-     * MockMvc는 동시 호출을 보장하지 않으므로 서비스를 직접 경쟁시킨다.
-     */
-    @Test
-    @DisplayName("동시 등록 경쟁: 한 건만 성공하고 나머지는 유니크 제약에 의해 409 DUPLICATE_FILENAME으로 변환된다")
-    void concurrentRegistrationLetsOnlyOneWin() throws Exception {
-        int attempts = 4;
-        CountDownLatch startLine = new CountDownLatch(1);
-
-        List<Outcome> outcomes;
-        try (ExecutorService pool = Executors.newFixedThreadPool(attempts)) {
-            List<Callable<Outcome>> calls = Collections.nCopies(attempts, () -> {
-                startLine.await();
-                try {
-                    registrationService.register(TEST_USER_ID, "race.pdf", "application/pdf",
-                            TEST_PDF_BYTES.length, checksumOf(TEST_PDF_BYTES));
-                    return Outcome.CREATED;
-                } catch (ApiException e) {
-                    return e.code() == ErrorCode.DUPLICATE_FILENAME
-                            ? Outcome.DUPLICATE
-                            : Outcome.OTHER_ERROR;
-                }
-            });
-
-            List<Future<Outcome>> futures = calls.stream().map(pool::submit).toList();
-            startLine.countDown();
-            outcomes = futures.stream().map(PaperRegistrationIntegrationTest::get).toList();
-        }
-
-        assertThat(outcomes).filteredOn(Outcome.CREATED::equals).hasSize(1);
-        assertThat(outcomes).filteredOn(Outcome.DUPLICATE::equals).hasSize(attempts - 1);
-        assertThat(paperRepository.count()).isEqualTo(1);
-    }
-
-    private enum Outcome {
-        CREATED, DUPLICATE, OTHER_ERROR
-    }
-
-    private static Outcome get(Future<Outcome> future) {
-        try {
-            return future.get();
-        } catch (Exception e) {
-            throw new IllegalStateException("동시 등록 시도가 예상치 못하게 실패했습니다.", e);
-        }
     }
 
     @Test

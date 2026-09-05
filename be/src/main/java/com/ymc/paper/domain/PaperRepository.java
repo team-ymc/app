@@ -15,12 +15,6 @@ import org.springframework.data.repository.query.Param;
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
-    /**
-     * 파일명 중복 판정. 상태를 가리지 않는다 — 업로드에 실패한 {@code UPLOAD_PENDING} 레코드도
-     * 중복으로 걸린다 (계약 주의사항, MVP는 같은 파일명 재업로드 미지원).
-     */
-    boolean existsByOwnerIdAndFilename(UUID ownerId, String filename);
-
     /** 서재 목록. 최근 접근순 — 접근 이력이 없으면 등록 시각을 접근 시각처럼 취급한다 (계약 `GET /api/papers`). */
     @Query("""
             select p from Paper p
@@ -57,16 +51,6 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
                and p.expiredAt is null
             """)
     int markExpired(@Param("paperId") UUID paperId, @Param("now") Instant now);
-
-    /** 만료 잔재 제거 — 같은 파일명 재등록이 만료 row를 대체할 수 있게 한다. */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            delete from Paper p
-             where p.ownerId = :ownerId and p.filename = :filename
-               and p.expiredAt is not null
-            """)
-    int deleteExpiredByOwnerAndFilename(@Param("ownerId") UUID ownerId,
-            @Param("filename") String filename);
 
     @Query("select p.id from Paper p where p.documentId = :documentId")
     List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
