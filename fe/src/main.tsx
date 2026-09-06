@@ -8,10 +8,13 @@ import { RequireAuth } from './auth/RequireAuth';
 import LandingPage from './routes/LandingPage';
 import BookshelfPage from './routes/BookshelfPage';
 import StudyPage from './routes/StudyPage';
+import ComingSoonPage from './routes/ComingSoonPage';
 
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
+  { path: '/plans', element: <ComingSoonPage eyebrow="Plans" /> },
+  { path: '/features', element: <ComingSoonPage eyebrow="Features" /> },
   {
     element: <RequireAuth />,
     children: [

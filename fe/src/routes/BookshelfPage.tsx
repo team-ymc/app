@@ -2,7 +2,7 @@
 // R5 페이지네이션 / Profile dropdown / Custom top bar overlay / Toast). Upload dialog는 Task 11 소유 — 자리만 남긴다.
 // sc-if→{cond && …}, x-map→.map, style="{{ x }}"→style={x} 기계적 전사 (플랜 공통 변환표).
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Books,
@@ -15,7 +15,6 @@ import {
 } from '@phosphor-icons/react';
 import { Button } from '../design/components/Button';
 import { IconButton } from '../design/components/IconButton';
-import { PaperStackMark } from '../design/components/PaperStackMark';
 import { usePapersQuery } from './bookshelf/usePapersQuery';
 import { usePlanQuery } from '../plan/usePlanQuery';
 import { isExhausted, uploadLimitNotice } from '../plan/planLabels';
@@ -27,7 +26,7 @@ import { ApiError } from '../api/types';
 import PaperRowMenu from './bookshelf/PaperRowMenu';
 import PaperTitleEditor from './bookshelf/PaperTitleEditor';
 import ConfirmDialog from './bookshelf/ConfirmDialog';
-import { AccountMenu } from '../account/AccountMenu';
+import { GlobalNav } from '../nav/GlobalNav';
 import type { Paper, PaperStatus } from '../api/types';
 
 const PAGE_SIZE = 10;
@@ -408,33 +407,7 @@ export default function BookshelfPage() {
         </div>
       </div>
 
-      {/* Custom top bar overlay (GlobalNav 자리에 절대 위치) */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '64px',
-          background: 'var(--color-bg-walnut)',
-          color: 'var(--color-on-dark)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          fontFamily: 'var(--font-sans)',
-          boxSizing: 'border-box',
-          zIndex: 5,
-        }}
-      >
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
-          <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
-          <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>Paper Teacher</span>
-        </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <AccountMenu />
-        </div>
-      </div>
+      <GlobalNav />
 
       {uploadOpen && (
         <UploadDialog

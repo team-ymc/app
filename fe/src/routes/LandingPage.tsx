@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../design/components/Button';
-import { PaperStackMark } from '../design/components/PaperStackMark';
+import { GlobalNav } from '../nav/GlobalNav';
 
 const accentGradient = {
   background: 'linear-gradient(120deg, #2E9E6B 0%, #2C5EAA 55%, #7C4DBE 100%)',
@@ -32,32 +32,7 @@ export default function LandingPage() {
         overflow: 'hidden',
       }}
     >
-      {/* top bar, consistent with bookshelf/study pages */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '64px',
-          background: 'var(--color-bg-walnut)',
-          color: 'var(--color-on-dark)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          fontFamily: 'var(--font-sans)',
-          boxSizing: 'border-box',
-          zIndex: 5,
-        }}
-      >
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
-          <PaperStackMark size={22} color="var(--color-on-dark)" />
-          <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>
-            Paper Teacher
-          </span>
-        </Link>
-      </div>
+      <GlobalNav />
 
       <div
         style={{
