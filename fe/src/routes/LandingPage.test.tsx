@@ -10,6 +10,14 @@ vi.mock('react-router', async (importOriginal) => ({
   useNavigate: () => navigateMock,
 }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
+vi.mock('../nav/GlobalNav', () => ({
+  GlobalNav: () => (
+    <nav data-testid="global-nav">
+      <a href="/">Paper Teacher</a>
+    </nav>
+  ),
+  GLOBAL_NAV_HEIGHT: 64,
+}));
 
 const useAuthMock = vi.mocked(useAuth);
 
@@ -56,10 +64,11 @@ describe('LandingPage', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('상단 바 로고는 랜딩으로 가는 링크다', () => {
+  it('상단 바는 공통 GlobalNav 하나만 쓴다', () => {
     mockAuth('guest');
     renderLanding();
-    expect(screen.getByRole('link', { name: /Paper Teacher/ }).getAttribute('href')).toBe('/');
+    expect(screen.getByTestId('global-nav')).toBeTruthy();
+    expect(screen.getAllByRole('link', { name: /Paper Teacher/ })).toHaveLength(1);
   });
 
   it('authed: 내 서재로 클릭 시 /library로 이동한다', () => {
