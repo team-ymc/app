@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   attachSelection,
   attachmentKindOf,
+  checkTranslationSelection,
   MAX_ATTACHMENTS,
+  MAX_SELECTION_BLOCKS,
+  MAX_SELECTION_CHARS,
   type SelectionAttachment,
 } from './selectionAttachments';
 import type { PaperBlock } from '../markdown/paperContent';
@@ -103,5 +106,25 @@ describe('attachSelection', () => {
     const r = attachSelection([], BLOCKS, { text: '', anchors: anchors('t0', 't0') });
     expect(r.ok).toBe(true);
     expect(r.attachments[0].kind).toBe('table');
+  });
+});
+
+describe('checkTranslationSelection — 번역 버튼 활성 판정', () => {
+  it('anchor가 없거나 블록을 못 찾으면 unknown (채팅 첨부와 달리 ok로 완화하지 않는다)', () => {
+    expect(checkTranslationSelection(BLOCKS, null)).toBe('unknown');
+    expect(checkTranslationSelection(BLOCKS, anchors('nope', 'b0'))).toBe('unknown');
+    expect(checkTranslationSelection(BLOCKS, anchors('b1', 'b0'))).toBe('unknown'); // 순서 뒤집힘
+  });
+
+  it('정상 범위는 ok', () => {
+    expect(checkTranslationSelection(BLOCKS, anchors('b0', 'b1'))).toBe('ok');
+    expect(checkTranslationSelection(BLOCKS, { start: { blockId: 'b0', offset: 1 }, end: { blockId: 'b0', offset: 2 } })).toBe('ok');
+  });
+
+  it('블록 수·글자 수 상한을 넘으면 사유를 돌려준다', () => {
+    const many: PaperBlock[] = Array.from({ length: MAX_SELECTION_BLOCKS + 1 }, (_, i) => para(`m${i}`, 'x'));
+    expect(checkTranslationSelection(many, anchors('m0', `m${MAX_SELECTION_BLOCKS}`))).toBe('too-many-blocks');
+    const long: PaperBlock[] = [para('L', 'a'.repeat(MAX_SELECTION_CHARS + 1))];
+    expect(checkTranslationSelection(long, anchors('L', 'L'))).toBe('too-long');
   });
 });

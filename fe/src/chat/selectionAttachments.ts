@@ -39,13 +39,15 @@ export function sameAnchors(a: SelectionAnchors, b: SelectionAnchors): boolean {
   return sameAnchor(a.start, b.start) && sameAnchor(a.end, b.end);
 }
 
+export type TranslationSelectionCheck = 'ok' | 'too-many-blocks' | 'too-long' | 'unknown';
+
 type SizeCheck = 'ok' | 'too-many-blocks' | 'too-long';
 
 // 렌더링 글자 수는 sourceText 길이 합으로 근사한다 — atomic 블록은 텍스트가 없어 0으로 친다.
-function checkSelectionSize(blocks: PaperBlock[], anchors: SelectionAnchors): SizeCheck {
+function measureSelection(blocks: PaperBlock[], anchors: SelectionAnchors): TranslationSelectionCheck {
   const startIdx = blocks.findIndex((b) => b.id === anchors.start.blockId);
   const endIdx = blocks.findIndex((b) => b.id === anchors.end.blockId);
-  if (startIdx < 0 || endIdx < 0 || startIdx > endIdx) return 'ok'; // 판정 불가 — 서버 방어선에 맡긴다
+  if (startIdx < 0 || endIdx < 0 || startIdx > endIdx) return 'unknown';
   if (endIdx - startIdx + 1 > MAX_SELECTION_BLOCKS) return 'too-many-blocks';
   let chars = 0;
   for (let i = startIdx; i <= endIdx; i += 1) {
@@ -57,6 +59,18 @@ function checkSelectionSize(blocks: PaperBlock[], anchors: SelectionAnchors): Si
     if (chars > MAX_SELECTION_CHARS) return 'too-long';
   }
   return 'ok';
+}
+
+// 채팅 첨부용 — 판정 불가는 서버 방어선에 맡긴다(ok).
+function checkSelectionSize(blocks: PaperBlock[], anchors: SelectionAnchors): SizeCheck {
+  const result = measureSelection(blocks, anchors);
+  return result === 'unknown' ? 'ok' : result;
+}
+
+// 번역 버튼 활성 판정 — anchor가 없거나 판정 불가면 비활성(unknown).
+export function checkTranslationSelection(blocks: PaperBlock[], anchors: SelectionAnchors | null): TranslationSelectionCheck {
+  if (!anchors) return 'unknown';
+  return measureSelection(blocks, anchors);
 }
 
 export function attachSelection(
