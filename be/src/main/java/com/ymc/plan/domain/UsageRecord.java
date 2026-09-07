@@ -45,6 +45,11 @@ public class UsageRecord {
     @Column(name = "source_id", nullable = false, updatable = false)
     private UUID sourceId;
 
+    /** 컬럼은 backfill 전 legacy 행 때문에 nullable이지만 새 행은 생성자가 non-null을 강제한다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", length = 32, updatable = false)
+    private UsageSourceType sourceType;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private UsageRecordStatus status;
@@ -62,18 +67,20 @@ public class UsageRecord {
         // JPA
     }
 
-    private UsageRecord(UUID bucketId, UsageType usageType, UUID sourceId, Instant now) {
+    private UsageRecord(UUID bucketId, UsageType usageType, UUID sourceId,
+            UsageSourceType sourceType, Instant now) {
         this.id = UUID.randomUUID();
         this.bucketId = Objects.requireNonNull(bucketId, "bucketId");
         this.usageType = Objects.requireNonNull(usageType, "usageType");
         this.sourceId = Objects.requireNonNull(sourceId, "sourceId");
+        this.sourceType = Objects.requireNonNull(sourceType, "sourceType");
         this.status = UsageRecordStatus.RESERVED;
         this.createdAt = Objects.requireNonNull(now, "now");
         this.updatedAt = Objects.requireNonNull(now, "now");
     }
 
     public static UsageRecord reserve(UUID bucketId, UsageType usageType, UUID sourceId,
-            Instant now) {
-        return new UsageRecord(bucketId, usageType, sourceId, now);
+            UsageSourceType sourceType, Instant now) {
+        return new UsageRecord(bucketId, usageType, sourceId, sourceType, now);
     }
 }

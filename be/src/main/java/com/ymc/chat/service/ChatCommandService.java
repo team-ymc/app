@@ -22,6 +22,7 @@ import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.paper.service.PaperAccessRecorder;
 import com.ymc.paper.service.PaperChatAccessValidator;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.infra.PlanProperties;
 import com.ymc.plan.service.UsageService;
@@ -120,7 +121,7 @@ public class ChatCommandService {
         try {
             // reserve도 같은 유니크 제약(usage_type+source_id) 경쟁에 걸릴 수 있어 메시지 저장과
             // 같은 재시도 경로를 타도록 여기 둔다 — 별도 catch를 두지 않는다.
-            usageService.reserve(ownerId, UsageType.AI_QUERY, clientMessageId);
+            usageService.reserve(ownerId, UsageType.AI_QUERY, clientMessageId, UsageSourceType.CHAT_MESSAGE);
             chatMessageRepository.save(
                     ChatMessage.userMessage(session, clientMessageId, content, userSeq, now));
             assistant = chatMessageRepository.saveAndFlush(

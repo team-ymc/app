@@ -14,6 +14,7 @@ import com.ymc.chat.domain.ChatMessage;
 import com.ymc.chat.domain.ChatMessageStatus;
 import com.ymc.chat.domain.ChatSession;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 import com.ymc.support.IntegrationTest;
@@ -35,7 +36,7 @@ class StaleChatCleanupTest extends IntegrationTest {
         chatMessageRepository.save(ChatMessage.assistantGenerating(
                 session, clientMessageId, 2, createdAt));
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.AI_QUERY, clientMessageId));
+                TEST_USER_ID, UsageType.AI_QUERY, clientMessageId, UsageSourceType.CHAT_MESSAGE));
         return clientMessageId;
     }
 

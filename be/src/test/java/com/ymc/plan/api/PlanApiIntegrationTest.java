@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.ymc.plan.domain.PlanCode;
 import com.ymc.plan.domain.PlanEntitlement;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 import com.ymc.support.IntegrationTest;
@@ -46,8 +47,8 @@ class PlanApiIntegrationTest extends IntegrationTest {
     void usedCountsReservedAndConfirmed() throws Exception {
         UUID confirmed = UUID.randomUUID();
         tx.executeWithoutResult(s -> {
-            usageService.reserve(TEST_USER_ID, UsageType.AI_QUERY, confirmed);
-            usageService.reserve(TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID());
+            usageService.reserve(TEST_USER_ID, UsageType.AI_QUERY, confirmed, UsageSourceType.CHAT_MESSAGE);
+            usageService.reserve(TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID(), UsageSourceType.CHAT_MESSAGE);
         });
         tx.executeWithoutResult(s -> usageService.confirm(UsageType.AI_QUERY, confirmed, null));
 

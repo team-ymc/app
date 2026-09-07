@@ -33,6 +33,8 @@ create table usage_record (
     usage_type         varchar(32) not null,
     -- AI 질의: clientMessageId, 문서 등록: paperId
     source_id          uuid not null,
+    -- 실행 종류: CHAT_MESSAGE / INLINE_TRANSLATION / PAPER. 집계 구분용, 유니크는 (usage_type, source_id) 유지
+    source_type        varchar(32) not null,
     -- RESERVED → CONFIRMED / RELEASED
     status             varchar(16) not null,
     -- AI CONFIRMED에만. run.completed의 추정 비용(USD)
@@ -43,3 +45,9 @@ create table usage_record (
     constraint uk_usage_record_type_source unique (usage_type, source_id)
 );
 create index idx_usage_record_bucket on usage_record (bucket_id);
+
+-- 기존 배포 DB에 source_type을 붙일 때 (컬럼이 이미 nullable로 있으면 alter add는 생략)
+-- alter table usage_record add column source_type varchar(32);
+-- update usage_record set source_type = case usage_type when 'AI_QUERY' then 'CHAT_MESSAGE' else 'PAPER' end
+--  where source_type is null;
+-- alter table usage_record alter column source_type set not null;

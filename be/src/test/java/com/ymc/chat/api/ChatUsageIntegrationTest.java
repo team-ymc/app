@@ -53,6 +53,7 @@ class ChatUsageIntegrationTest extends IntegrationTest {
         UsageRecord reserved = usageRecordRepository
                 .findByUsageTypeAndSourceId(UsageType.AI_QUERY, clientMessageId).orElseThrow();
         assertThat(reserved.getStatus()).isEqualTo(UsageRecordStatus.RESERVED);
+        assertThat(reserved.getSourceType()).isEqualTo(com.ymc.plan.domain.UsageSourceType.CHAT_MESSAGE);
 
         chatMessageTransitions.complete(started.assistantMessageId(), "답변",
                 clientMessageId, new java.math.BigDecimal("0.001"));
@@ -110,7 +111,8 @@ class ChatUsageIntegrationTest extends IntegrationTest {
                 com.ymc.plan.service.BucketPeriod.startOf(now), now));
         for (int i = 0; i < 100; i++) {
             usageRecordRepository.save(UsageRecord.reserve(
-                    bucket.getId(), UsageType.AI_QUERY, UUID.randomUUID(), now));
+                    bucket.getId(), UsageType.AI_QUERY, UUID.randomUUID(),
+                    com.ymc.plan.domain.UsageSourceType.CHAT_MESSAGE, now));
         }
 
         mockMvc.perform(MockMvcRequestBuilders
