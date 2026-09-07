@@ -20,6 +20,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.api.dto.ChatSelectionDto;
 import com.ymc.chat.infra.ai.AiAgentWebClientAdapter;
+import com.ymc.chat.infra.ai.AiSseEvents;
 import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.port.AiRunRequest;
 import com.ymc.chat.service.port.AiStreamListener;
@@ -72,7 +73,7 @@ class AiAgentWebClientAdapterTest {
                 scheduler,
                 new ChatStreamProperties(idleTimeout, Duration.ofSeconds(30),
                         Duration.ofSeconds(15), 65536, Duration.ofSeconds(31)),
-                new ObjectMapper());
+                new AiSseEvents(new ObjectMapper()));
     }
 
     @Test
