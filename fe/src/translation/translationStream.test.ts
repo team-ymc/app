@@ -71,6 +71,15 @@ describe('translationStream — 스트림 소비와 종결 판정', () => {
     expect(actions.at(-1)).toMatchObject({ type: 'failed', confirmed: true, code: 'SELECTION_TOO_LARGE', retryable: false });
   });
 
+  it('error event: retryable true도 그대로 전달한다', async () => {
+    mockStreamFetch([
+      frame('translation.started', { type: 'translation.started', translationId: 't-1' }),
+      frame('error', { type: 'error', status: 'FAILED', error: { code: 'AI_RUN_FAILED', message: '실패', retryable: true } }),
+    ]);
+    const actions = await collect();
+    expect(actions.at(-1)).toMatchObject({ type: 'failed', confirmed: true, code: 'AI_RUN_FAILED', retryable: true });
+  });
+
   it('terminal 없는 EOF: 결과 미상 실패 — 성공으로 간주하지 않는다', async () => {
     mockStreamFetch([
       frame('translation.started', { type: 'translation.started', translationId: 't-1' }),
