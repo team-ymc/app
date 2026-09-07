@@ -93,7 +93,7 @@ describe('SelectionLayer — 현재 상태기계', () => {
     setup(selection({ anchors: null }));
     const button = screen.getByRole('button', { name: /번역/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe('번역할 수 없는 선택 영역입니다.');
+    expect(button.closest('span')?.title).toBe('번역할 수 없는 선택 영역입니다.');
     fireEvent.click(button);
     expect(streamTranslation).not.toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe('SelectionLayer — 현재 상태기계', () => {
     render(<div><div ref={viewerRef}><section data-block-id="L">x</section></div><SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={long} onAsk={vi.fn()} /></div>);
     const button = screen.getByRole('button', { name: /번역/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe('선택 영역이 너무 큽니다.');
+    expect(button.closest('span')?.title).toBe('선택 영역이 너무 큽니다.');
   });
 
   it('실패 이벤트는 팝업 안에 메시지로 보이고 닫을 수 있다', async () => {

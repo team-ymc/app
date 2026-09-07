@@ -3,8 +3,8 @@
 // 위치 모델은 목업과 다르다: 목업은 position:fixed + transform:translate(-50%, calc(-100% - 10px))로
 // 뷰포트 기준 중앙정렬하지만, 이 태스크의 브리프는 컨테이너 상대 absolute + computeToolbarPosition(선택
 // 영역 "아래" 배치)을 명시한다 — 그대로 따른다(브리프 계약이 목업 좌표식보다 우선).
-// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated) | askChoice.
-// translating/translated/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
+// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated | translateFailed) | askChoice.
+// translating/translated/translateFailed/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
 // 버튼 클릭으로 브라우저 selection이 collapse되어도(mousedown 기본 동작) 캡처값은 영향받지 않는다.
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { ArrowBendUpLeft, ChatCircleText, NotePencil, Translate, X } from '@phosphor-icons/react';
@@ -152,6 +152,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
   function handleTranslate() {
     if (layer.phase !== 'toolbar') return;
     const { text, rect, clear, anchors } = layer;
+    setPartial('');
     setLayer({ phase: 'translating', text, rect, clear, anchors });
   }
 
@@ -323,12 +324,17 @@ export function ToolbarButton({ icon, label, onClick, disabled = false, title }:
     transition: 'background 150ms ease',
     opacity: disabled ? 0.5 : 1,
   };
-  return (
-    <button onClick={onClick} disabled={disabled} title={title} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={style}>
+  const button = (
+    <button onClick={onClick} disabled={disabled} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={style}>
       {icon}
       {label}
     </button>
   );
+  if (title) {
+    // Safari는 disabled 컨트롤에서 title 툴팁을 억제한다 — span으로 감싸 pointer event를 받게 한다.
+    return <span title={title} style={{ display: 'inline-flex' }}>{button}</span>;
+  }
+  return button;
 }
 
 export function AskRow({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
