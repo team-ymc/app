@@ -225,10 +225,10 @@ public class ChatStreamService {
         }
 
         @Override
-        public void onRunFailed(String error) {
-            // AI가 만든 임의 문자열이라 사용자 입력이 섞일 수 있다 — 원인 파악이 가능한 선에서 절단해 남긴다
-            log.warn("AI run 실패. messageId={} error={}",
-                    ids.assistantMessageId(), truncate(error, 200));
+        public void onRunFailed(String code, String message) {
+            // message는 AI가 만든 임의 문자열이라 절단해서 남긴다. FE에는 code·message 모두 내보내지 않는다.
+            log.warn("AI run 실패. messageId={} code={} message={}",
+                    ids.assistantMessageId(), code, truncate(message, 200));
             failWith("AI_RUN_FAILED", "답변을 생성하지 못했습니다.", true);
         }
 

@@ -117,7 +117,8 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
                 }
                 case "run.failed" -> {
                     terminalSeen.set(true);
-                    listener.onRunFailed(errorField(event.data()));
+                    JsonNode error = errorObject(event.data());
+                    listener.onRunFailed(requireText(error, "code"), requireText(error, "message"));
                 }
                 default -> log.debug("알 수 없는 AI event 무시: {}", name);
             }
@@ -144,13 +145,13 @@ public class AiAgentWebClientAdapter implements AiAgentStreamPort {
         return requireText(objectMapper.readTree(data), fieldName);
     }
 
-    /** run.failed의 error 객체(code+message)를 로깅용 문자열로 합친다. code는 FE에 노출하지 않는다. */
-    private String errorField(String data) throws JsonProcessingException {
+    /** run.failed의 error 객체. code·message 둘 다 필수 — 없으면 계약 위반이라 transport error로 간다. */
+    private JsonNode errorObject(String data) throws JsonProcessingException {
         JsonNode error = objectMapper.readTree(data).get("error");
         if (error == null || !error.isObject()) {
             throw new IllegalArgumentException("run.failed data에 'error' 객체가 없습니다.");
         }
-        return requireText(error, "code") + ": " + requireText(error, "message");
+        return error;
     }
 
     private static String requireText(JsonNode node, String fieldName) {

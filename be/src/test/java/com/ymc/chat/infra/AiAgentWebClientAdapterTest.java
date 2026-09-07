@@ -47,7 +47,7 @@ class AiAgentWebClientAdapterTest {
             completedCost.set(estimatedCostUsd);
             events.add("run-completed");
         }
-        public void onRunFailed(String error) { events.add("run-failed:" + error); }
+        public void onRunFailed(String code, String message) { events.add("run-failed:" + code + ": " + message); }
         public void onTransportError(Exception cause) {
             events.add("transport-error:" + cause.getClass().getSimpleName());
         }

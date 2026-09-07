@@ -21,8 +21,8 @@ public interface AiStreamListener {
     /** run 성공 종결. estimatedCostUsd는 추정 비용(USD) — 없으면 null. */
     void onRunCompleted(BigDecimal estimatedCostUsd);
 
-    /** AI가 run.failed를 보냄. raw error는 FE에 노출하지 않는다. */
-    void onRunFailed(String error);
+    /** AI가 run.failed를 보냄. code는 BE↔AI 계약의 error.code, message는 FE에 노출하지 않는다. */
+    void onRunFailed(String code, String message);
 
     /** terminal event 없이 연결이 끊기거나 스트림 소비 중 예외가 남. */
     void onTransportError(Exception cause);
