@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.domain.ChatMessageRepository;
 import com.ymc.chat.domain.ChatSessionRepository;
+import com.ymc.chat.domain.TranslationRunRepository;
 import com.ymc.chat.service.port.AiAgentStreamPort;
 import com.ymc.common.config.AwsProperties;
 import com.ymc.plan.domain.PlanEntitlementRepository;
@@ -84,6 +85,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected ChatSessionRepository chatSessionRepository;
+
+    @Autowired
+    protected TranslationRunRepository translationRunRepository;
 
     @Autowired
     protected MockMvc mockMvc;
@@ -172,6 +176,7 @@ public abstract class IntegrationTest {
         usageRecordRepository.deleteAll();
         usageBucketRepository.deleteAll();
         planEntitlementRepository.deleteAll();
+        translationRunRepository.deleteAll();
         chatMessageRepository.deleteAll();
         chatSessionRepository.deleteAll();
         refreshTokenRepository.deleteAll();
