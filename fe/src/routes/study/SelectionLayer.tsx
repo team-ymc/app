@@ -1,13 +1,13 @@
 // 이식: project-docs/design/v1/Paper Study Page.dc.html — Selection popup(Translate/Ask) /
-// Ask popup(현재 채팅·새 채팅) / Direct translation popup 세 영역. 스타일 값은 목업 그대로.
+// Direct translation popup 두 영역. 스타일 값은 목업 그대로. 질문하기는 선택 팝업 없이 바로 현재 채팅에 첨부한다.
 // 위치 모델은 목업과 다르다: 목업은 position:fixed + transform:translate(-50%, calc(-100% - 10px))로
 // 뷰포트 기준 중앙정렬하지만, 이 태스크의 브리프는 컨테이너 상대 absolute + computeToolbarPosition(선택
 // 영역 "아래" 배치)을 명시한다 — 그대로 따른다(브리프 계약이 목업 좌표식보다 우선).
-// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated | translateFailed) | askChoice.
-// translating/translated/translateFailed/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
+// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → translating → translated | translateFailed.
+// translating/translated/translateFailed로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
 // 버튼 클릭으로 브라우저 selection이 collapse되어도(mousedown 기본 동작) 캡처값은 영향받지 않는다.
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { ArrowBendUpLeft, ChatCircleText, NotePencil, Translate, X } from '@phosphor-icons/react';
+import { ChatCircleText, Translate, X } from '@phosphor-icons/react';
 import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
 import { checkTranslationSelection, type TranslationSelectionCheck } from '../../chat/selectionAttachments';
@@ -27,15 +27,13 @@ export interface SelectionLayerProps {
 // 된다. 목업 CSS 실측값(번역 팝업 width:300 등)을 기준으로, DOM 측정 없이 쓸 근사치를 상수로 둔다.
 const TOOLBAR_POPUP_SIZE = { width: 190, height: 48 };
 const TRANSLATION_POPUP_SIZE = { width: 300, height: 120 };
-const ASK_POPUP_SIZE = { width: 150, height: 74 };
 
 type Layer =
   | { phase: 'idle' }
   | { phase: 'toolbar'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
   | { phase: 'translating'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
   | { phase: 'translated'; text: string; rect: DOMRect; clear: () => void; translation: string; anchors: SelectionAnchors | null }
-  | { phase: 'translateFailed'; text: string; rect: DOMRect; clear: () => void; message: string; anchors: SelectionAnchors | null }
-  | { phase: 'askChoice'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null };
+  | { phase: 'translateFailed'; text: string; rect: DOMRect; clear: () => void; message: string; anchors: SelectionAnchors | null };
 
 const TRANSLATE_BLOCKED_MESSAGE: Record<Exclude<TranslationSelectionCheck, 'ok'>, string> = {
   unknown: '번역할 수 없는 선택 영역입니다.',
@@ -47,16 +45,17 @@ function translateBlockedMessage(check: TranslationSelectionCheck): string | und
   return check === 'ok' ? undefined : TRANSLATE_BLOCKED_MESSAGE[check];
 }
 
-function truncate(text: string, n: number): string {
-  return text.length > n ? `${text.slice(0, n).trim()}…` : text;
-}
-
 export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
   const [partial, setPartial] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
+  // 번역 팝업은 선택 문장을 따라간다: 번역 시작 시점의 scrollTop을 기준으로 이후 스크롤량만큼 top을 보정한다.
+  const baseScrollTopRef = useRef(0);
+  const [scrollDelta, setScrollDelta] = useState(0);
+  // 원문 한 줄 영역을 잡아 끈 누적 이동량. 추종 위치에 더해지므로 옮긴 뒤에도 스크롤을 따라간다.
+  const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
 
   // 선택이 생기면 toolbar로, 사라지면(그리고 지금 toolbar 단계일 때만) idle로 — translating 이후
   // 단계는 캡처값으로 독립 운영되므로 브라우저 selection 변화에 영향받지 않는다.
@@ -68,11 +67,12 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     }
   }, [sel]);
 
-  // 스크롤 시 툴바 dismiss(선택이 사라지면 idle 복귀) — toolbar 단계에서만.
+  // 스크롤 시 툴바는 dismiss(선택이 사라지면 idle 복귀), 번역 팝업은 스크롤량을 기록해 따라간다.
   useEffect(() => {
     const el = viewerRef.current;
     if (!el) return;
     function handleScroll() {
+      setScrollDelta(el!.scrollTop - baseScrollTopRef.current);
       setLayer((prev) => {
         if (prev.phase === 'toolbar') {
           prev.clear();
@@ -87,7 +87,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
 
   // 바깥 클릭 dismiss — 목업 handleDocMouseDown(L360-370) 1:1 이식. 팝업이 열려 있을 때만 등록한다.
   // 판별 순서(목업과 동일): 팝업 내부 클릭 무시 → 뷰어 내부 클릭 무시(새 선택은 useTextSelection이
-  // 처리) → 그 외는 dismiss. 열려 있던 모든 phase(toolbar/translating/translated/askChoice)를
+  // 처리) → 그 외는 dismiss. 열려 있던 모든 phase(toolbar/translating/translated)를
   // idle로 되돌리고, 기존 닫기 버튼과 동일하게 clear()로 원문 읽기 상태를 복원한다.
   useEffect(() => {
     if (layer.phase === 'idle') return;
@@ -153,12 +153,34 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     if (layer.phase !== 'toolbar') return;
     const { text, rect, clear, anchors } = layer;
     setPartial('');
+    baseScrollTopRef.current = viewerRef.current?.scrollTop ?? 0;
+    setScrollDelta(0);
+    setDragOffset({ dx: 0, dy: 0 });
     setLayer({ phase: 'translating', text, rect, clear, anchors });
   }
 
+  function handleDragStart(e: React.MouseEvent) {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const start = dragOffset;
+    function onMove(ev: MouseEvent) {
+      setDragOffset({ dx: start.dx + ev.clientX - startX, dy: start.dy + ev.clientY - startY });
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  // 질문하기 → 바로 현재 채팅에 첨부. StudyPage가 첨부·챗 패널 열림·포커스를 처리한다.
   function handleAsk() {
     if (layer.phase !== 'toolbar') return;
-    setLayer({ phase: 'askChoice', text: layer.text, rect: layer.rect, clear: layer.clear, anchors: layer.anchors });
+    const { text, clear, anchors } = layer;
+    clear();
+    setLayer({ phase: 'idle' });
+    onAsk(text, 'current', anchors);
   }
 
   // 번역 팝업 닫기 → clear()로 원문 읽기 복귀 (FT-006 Story 2).
@@ -166,15 +188,6 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     if (layer.phase !== 'translating' && layer.phase !== 'translated' && layer.phase !== 'translateFailed') return;
     layer.clear();
     setLayer({ phase: 'idle' });
-  }
-
-  // AI에게 질문 선택 → onAsk(text, mode). StudyPage가 pendingContext 세팅 + 챗 패널 열림·포커스한다.
-  function handleAskChoice(mode: 'current' | 'new') {
-    if (layer.phase !== 'askChoice') return;
-    const { text, clear, anchors } = layer;
-    clear();
-    setLayer({ phase: 'idle' });
-    onAsk(text, mode, anchors);
   }
 
   if (layer.phase === 'toolbar') {
@@ -219,8 +232,8 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
         onMouseDown={(e) => e.preventDefault()}
         style={{
           position: 'absolute',
-          top: pos.top,
-          left: pos.left,
+          top: pos.top - scrollDelta + dragOffset.dy,
+          left: pos.left + dragOffset.dx,
           width: 300,
           boxSizing: 'border-box',
           background: 'var(--color-bg-paper)',
@@ -250,7 +263,11 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
           <X size={14} />
         </button>
         <div
+          title={layer.text}
+          onMouseDown={handleDragStart}
           style={{
+            cursor: 'move',
+            userSelect: 'none',
             fontFamily: 'var(--font-serif)',
             fontSize: 13,
             lineHeight: 1.6,
@@ -259,9 +276,12 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
             paddingBottom: 10,
             marginBottom: 10,
             borderBottom: '1px solid var(--color-border)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
-          {truncate(layer.text, 220)}
+          {layer.text}
         </div>
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, lineHeight: 1.7, color: 'var(--color-text-body)', maxHeight: 320, overflowY: 'auto' }}>
           {layer.phase === 'translating' && (partial || '번역 중…')}
@@ -274,33 +294,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     );
   }
 
-  // askChoice
-  const pos = computeToolbarPosition(layer.rect, container, ASK_POPUP_SIZE);
-  return (
-    <div
-      ref={popupRef}
-      onMouseDown={(e) => e.preventDefault()}
-      style={{
-        position: 'absolute',
-        top: pos.top,
-        left: pos.left,
-        width: 'max-content',
-        boxSizing: 'border-box',
-        background: 'var(--color-bg-paper)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 10,
-        boxShadow: 'var(--shadow-menu)',
-        padding: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 80,
-      }}
-    >
-      <AskRow icon={<ArrowBendUpLeft size={13} color="var(--color-primary)" />} label="현재 채팅" onClick={() => handleAskChoice('current')} />
-      <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 6px' }} />
-      <AskRow icon={<NotePencil size={13} color="var(--color-primary)" />} label="새 채팅" onClick={() => handleAskChoice('new')} />
-    </div>
-  );
+  return null;
 }
 
 export function ToolbarButton({ icon, label, onClick, disabled = false, title }: {
@@ -335,42 +329,4 @@ export function ToolbarButton({ icon, label, onClick, disabled = false, title }:
     return <span title={title} style={{ display: 'inline-flex' }}>{button}</span>;
   }
   return button;
-}
-
-export function AskRow({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  const [hover, setHover] = useState(false);
-  const style: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    width: '100%',
-    boxSizing: 'border-box',
-    textAlign: 'left',
-    whiteSpace: 'nowrap',
-    padding: '7px 12px 7px 7px',
-    border: 'none',
-    background: hover ? 'var(--color-primary-subtle)' : 'transparent',
-    borderRadius: 7,
-    cursor: 'pointer',
-    transition: 'background 150ms ease',
-  };
-  return (
-    <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={style}>
-      <span
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: '50%',
-          background: 'var(--color-primary-subtle)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </span>
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, color: 'var(--color-text-heading)' }}>{label}</span>
-    </button>
-  );
 }

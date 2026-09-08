@@ -146,13 +146,60 @@ describe('SelectionLayer — 현재 상태기계', () => {
     expect(screen.queryByText('어텐션')).toBeNull();
   });
 
-  it('질문하기 → 현재 채팅: onAsk(text, current, anchors)', () => {
+  it('질문하기 클릭 즉시 현재 채팅으로 onAsk(text, current, anchors)를 부르고 선택 팝업은 뜨지 않는다', () => {
     const sel = selection();
     const { onAsk } = setup(sel);
     fireEvent.click(screen.getByRole('button', { name: /질문하기/ }));
-    fireEvent.click(screen.getByRole('button', { name: '현재 채팅' }));
     expect(onAsk).toHaveBeenCalledWith('attention', 'current', sel.anchors);
     expect(sel.clear).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '현재 채팅' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '새 채팅' })).toBeNull();
+  });
+
+  it('원문 미리보기는 자르지 않고 한 줄 ellipsis로 보이며 전체 원문은 title로 남는다', async () => {
+    const long = 'w'.repeat(300);
+    setup(selection({ text: long }));
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const preview = screen.getByTitle(long) as HTMLElement;
+    expect(preview.textContent).toBe(long);
+    expect(preview.style.whiteSpace).toBe('nowrap');
+    expect(preview.style.overflow).toBe('hidden');
+    expect(preview.style.textOverflow).toBe('ellipsis');
+  });
+
+  it('번역 팝업은 뷰어 스크롤만큼 위로 따라 움직인다', async () => {
+    setup(selection());
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const popup = screen.getByRole('button', { name: '닫기' }).parentElement as HTMLElement;
+    const before = parseFloat(popup.style.top);
+    const viewer = document.querySelector('[data-block-id="b0"]')!.parentElement as HTMLElement;
+    Object.defineProperty(viewer, 'scrollTop', { value: 100, configurable: true });
+    act(() => { fireEvent.scroll(viewer); });
+    expect(parseFloat(popup.style.top)).toBe(before - 100);
+  });
+
+  it('원문 영역을 잡아 끌면 팝업이 이동량만큼 옮겨지고 이후 스크롤도 그 위치에서 따라간다', async () => {
+    const sel = selection();
+    setup(sel);
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const popup = screen.getByRole('button', { name: '닫기' }).parentElement as HTMLElement;
+    const top0 = parseFloat(popup.style.top);
+    const left0 = parseFloat(popup.style.left);
+    const handle = screen.getByTitle(sel.text);
+    fireEvent.mouseDown(handle, { clientX: 10, clientY: 10 });
+    fireEvent.mouseMove(window, { clientX: 40, clientY: 50 });
+    fireEvent.mouseUp(window);
+    expect(parseFloat(popup.style.top)).toBe(top0 + 40);
+    expect(parseFloat(popup.style.left)).toBe(left0 + 30);
+    expect(sel.clear).not.toHaveBeenCalled();
+
+    const viewer = document.querySelector('[data-block-id="b0"]')!.parentElement as HTMLElement;
+    Object.defineProperty(viewer, 'scrollTop', { value: 100, configurable: true });
+    act(() => { fireEvent.scroll(viewer); });
+    expect(parseFloat(popup.style.top)).toBe(top0 + 40 - 100);
   });
 
   it('팝업 밖 mousedown → clear 후 idle', async () => {
