@@ -45,7 +45,7 @@ public class InlineTranslationController {
         translationStreamService.begin(emitter, started, request.selection());
 
         return ResponseEntity.ok()
-                .header("Cache-Control", "no-cache, no-transform")
+                .header("Cache-Control", "no-store, no-transform")
                 .body(emitter);
     }
 }

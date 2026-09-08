@@ -85,7 +85,7 @@ class InlineTranslationStreamIntegrationTest extends IntegrationTest {
         assertThat(stream).doesNotContain("sessionId").doesNotContain("messageId");
         assertThat(usageRecordRepository.findByUsageTypeAndSourceId(UsageType.AI_QUERY, run.getId()).orElseThrow()
                 .getStatus()).isEqualTo(UsageRecordStatus.CONFIRMED);
-        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-cache, no-transform");
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store, no-transform");
     }
 
     @Test
