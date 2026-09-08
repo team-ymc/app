@@ -174,6 +174,16 @@ public class TranslationStreamService {
 
         @Override
         public void onMessageCompleted(String message) {
+            if (finished.get()) {
+                return;
+            }
+            if (message.length() > chatStreamProperties.maxContentLength()) {
+                // 완성본은 누적 delta보다 우선하므로 여기서도 상한을 잡아야 한다
+                log.warn("최종 번역 길이 상한 초과. translationId={} 길이={}자", ids.translationId(), message.length());
+                cancelUpstream();
+                failWith("AI_RESPONSE_TOO_LARGE", "번역이 허용 길이를 초과했습니다.", false);
+                return;
+            }
             this.finalContent = message; // 아직 성공 아님 — run.completed 대기
         }
 

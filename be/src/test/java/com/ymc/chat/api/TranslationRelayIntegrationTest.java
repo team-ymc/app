@@ -219,6 +219,26 @@ class TranslationRelayIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("delta 없이 온 message.completed가 상한(64자)을 넘어도 AI_RESPONSE_TOO_LARGE — 저장·전송하지 않는다")
+    void oversizedCompletedMessage() throws Exception {
+        Paper paper = givenCompletedPaper();
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted("t"),
+                FakeAiSseServer.messageCompleted("t", "b".repeat(100)),
+                FakeAiSseServer.runCompleted("t")));
+
+        MvcResult result = startStream(paper);
+        TranslationRun run = awaitTerminal();
+
+        assertThat(run.getStatus()).isEqualTo(TranslationRunStatus.FAILED);
+        assertThat(run.getTranslation()).isNull();
+        assertThat(usageStatus(run.getId())).isEqualTo(UsageRecordStatus.RELEASED);
+        String stream = streamBody(result);
+        assertThat(stream).contains("\"code\":\"AI_RESPONSE_TOO_LARGE\"").contains("\"retryable\":false");
+        assertThat(stream).doesNotContain("event:translation.completed");
+    }
+
+    @Test
     @DisplayName("누적 상한(64자) 초과 — AI_RESPONSE_TOO_LARGE")
     void oversized() throws Exception {
         Paper paper = givenCompletedPaper();
