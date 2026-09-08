@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.support.IntegrationTest;
 
@@ -29,7 +30,7 @@ class UsageServiceTest extends IntegrationTest {
 
     private void reserveInTx(UUID sourceId) {
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.PAPER_REGISTRATION, sourceId));
+                TEST_USER_ID, UsageType.PAPER_REGISTRATION, sourceId, UsageSourceType.PAPER));
     }
 
     @Test
@@ -52,10 +53,10 @@ class UsageServiceTest extends IntegrationTest {
         // Free AI 질의 100회를 원장으로 채운 뒤 101번째 예약
         for (int i = 0; i < 100; i++) {
             tx.executeWithoutResult(s -> usageService.reserve(
-                    TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID()));
+                    TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID(), UsageSourceType.CHAT_MESSAGE));
         }
         assertThatThrownBy(() -> tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID())))
+                TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID(), UsageSourceType.CHAT_MESSAGE)))
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).code())
                         .isEqualTo(ErrorCode.CHAT_USAGE_LIMIT_EXCEEDED));
@@ -139,7 +140,7 @@ class UsageServiceTest extends IntegrationTest {
     void confirmSettlesWithCost() {
         UUID sourceId = UUID.randomUUID();
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId, UsageSourceType.CHAT_MESSAGE));
 
         tx.executeWithoutResult(s -> usageService.confirm(
                 UsageType.AI_QUERY, sourceId, new BigDecimal("0.00123000")));
@@ -155,7 +156,7 @@ class UsageServiceTest extends IntegrationTest {
     void confirmRoundsCostToStorageScale() {
         UUID sourceId = UUID.randomUUID();
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId, UsageSourceType.CHAT_MESSAGE));
 
         tx.executeWithoutResult(s -> usageService.confirm(
                 UsageType.AI_QUERY, sourceId, new BigDecimal("0.123456789")));
@@ -172,7 +173,7 @@ class UsageServiceTest extends IntegrationTest {
         for (String invalid : List.of("-0.00000001", "1000000")) {
             UUID sourceId = UUID.randomUUID();
             tx.executeWithoutResult(s -> usageService.reserve(
-                    TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+                    TEST_USER_ID, UsageType.AI_QUERY, sourceId, UsageSourceType.CHAT_MESSAGE));
 
             tx.executeWithoutResult(s -> usageService.confirm(
                     UsageType.AI_QUERY, sourceId, new BigDecimal(invalid)));
@@ -216,7 +217,7 @@ class UsageServiceTest extends IntegrationTest {
     void settleIsIdempotentAndTolerant() {
         UUID sourceId = UUID.randomUUID();
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.AI_QUERY, sourceId));
+                TEST_USER_ID, UsageType.AI_QUERY, sourceId, UsageSourceType.CHAT_MESSAGE));
         tx.executeWithoutResult(s -> usageService.confirm(UsageType.AI_QUERY, sourceId, null));
         tx.executeWithoutResult(s -> usageService.confirm(UsageType.AI_QUERY, sourceId, null));
         tx.executeWithoutResult(s -> usageService.confirm(

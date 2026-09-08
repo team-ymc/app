@@ -61,6 +61,9 @@ public enum ErrorCode {
     /** 사용자 전체 동시 AI 실행 상한 초과 */
     CHAT_CONCURRENCY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
 
+    /** 사용자의 다른 인라인 번역이 아직 생성 중 (FT-006) */
+    TRANSLATION_IN_PROGRESS(HttpStatus.CONFLICT),
+
     /** 문서 등록 월간 사용량 한도 초과 (FT-011) */
     PAPER_USAGE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS);
 

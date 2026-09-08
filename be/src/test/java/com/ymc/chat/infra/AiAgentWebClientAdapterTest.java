@@ -20,6 +20,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.chat.api.dto.ChatSelectionDto;
 import com.ymc.chat.infra.ai.AiAgentWebClientAdapter;
+import com.ymc.chat.infra.ai.AiSseEvents;
 import com.ymc.chat.infra.ai.ChatStreamProperties;
 import com.ymc.chat.service.port.AiRunRequest;
 import com.ymc.chat.service.port.AiStreamListener;
@@ -47,7 +48,7 @@ class AiAgentWebClientAdapterTest {
             completedCost.set(estimatedCostUsd);
             events.add("run-completed");
         }
-        public void onRunFailed(String error) { events.add("run-failed:" + error); }
+        public void onRunFailed(String code, String message) { events.add("run-failed:" + code + ": " + message); }
         public void onTransportError(Exception cause) {
             events.add("transport-error:" + cause.getClass().getSimpleName());
         }
@@ -72,7 +73,7 @@ class AiAgentWebClientAdapterTest {
                 scheduler,
                 new ChatStreamProperties(idleTimeout, Duration.ofSeconds(30),
                         Duration.ofSeconds(15), 65536, Duration.ofSeconds(31)),
-                new ObjectMapper());
+                new AiSseEvents(new ObjectMapper()));
     }
 
     @Test

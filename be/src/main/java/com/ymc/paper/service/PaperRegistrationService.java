@@ -16,6 +16,7 @@ import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.PresignedUpload;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 
@@ -65,7 +66,7 @@ public class PaperRegistrationService {
         }
 
         Paper paper = Paper.register(ownerId, filename, Instant.now());
-        usageService.reserve(ownerId, UsageType.PAPER_REGISTRATION, paper.getId());
+        usageService.reserve(ownerId, UsageType.PAPER_REGISTRATION, paper.getId(), UsageSourceType.PAPER);
         paperRepository.save(paper);
 
         // S3는 외부 I/O가 발생하지만,

@@ -25,7 +25,7 @@ class FakeAiAgentStreamAdapterTest {
         public void onDelta(String delta) { events.add("delta:" + delta); }
         public void onMessageCompleted(String message) { events.add("completed:" + message); }
         public void onRunCompleted(BigDecimal estimatedCostUsd) { events.add("run-completed"); }
-        public void onRunFailed(String error) { events.add("run-failed:" + error); }
+        public void onRunFailed(String code, String message) { events.add("run-failed:" + code + ": " + message); }
         public void onTransportError(Exception cause) { events.add("transport-error"); }
     };
 

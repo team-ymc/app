@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.Paper;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 import com.ymc.support.IntegrationTest;
@@ -28,7 +29,7 @@ class StalePaperCleanupTest extends IntegrationTest {
     private Paper givenReservedPaperAt(String filename, Instant createdAt) {
         Paper paper = paperRepository.save(Paper.register(TEST_USER_ID, filename, createdAt));
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId()));
+                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId(), UsageSourceType.PAPER));
         return paper;
     }
 

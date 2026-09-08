@@ -59,7 +59,7 @@ public class ChatController {
         chatStreamService.begin(emitter, started, request.content(), request.selections());
 
         return ResponseEntity.ok()
-                .header("Cache-Control", "no-cache, no-transform") // 중간 계층 버퍼링·캐싱 방지 (계약)
+                .header("Cache-Control", "no-store, no-transform") // 저장 금지·변형 금지 (계약)
                 .body(emitter);
     }
 

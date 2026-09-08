@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.ymc.paper.domain.Paper;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 import com.ymc.support.IntegrationTest;
@@ -77,7 +78,7 @@ class PaperExpiryIntegrationTest extends IntegrationTest {
         Paper paper = paperRepository.save(
                 Paper.register(TEST_USER_ID, "expiry-race.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId()));
+                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId(), UsageSourceType.PAPER));
         givenUploadedObject(paper);
 
         CountDownLatch headEntered = new CountDownLatch(1);

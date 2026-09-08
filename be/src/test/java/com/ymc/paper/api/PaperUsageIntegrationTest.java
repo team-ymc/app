@@ -25,6 +25,7 @@ import com.ymc.paper.domain.Paper;
 import com.ymc.paper.service.DocumentTransitions;
 import com.ymc.paper.service.PaperDocumentLinkService;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.service.UsageService;
 import com.ymc.support.IntegrationTest;
@@ -46,7 +47,7 @@ class PaperUsageIntegrationTest extends IntegrationTest {
     private Paper givenReservedPendingPaper(String filename) {
         Paper paper = givenPendingPaper(filename);
         tx.executeWithoutResult(s -> usageService.reserve(
-                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId()));
+                TEST_USER_ID, UsageType.PAPER_REGISTRATION, paper.getId(), UsageSourceType.PAPER));
         return paper;
     }
 
@@ -85,7 +86,7 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         Paper second = paperRepository.save(
                 Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
-                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
         tx.executeWithoutResult(s -> linkService.linkOrCreate(
                 second.getId(), second.getFileKey(), document.getChecksumSha256()));
 
@@ -105,7 +106,7 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         Paper second = paperRepository.save(
                 Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
-                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
         tx.executeWithoutResult(s -> linkService.linkOrCreate(
                 second.getId(), second.getFileKey(), document.getChecksumSha256()));
 
@@ -121,7 +122,7 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         Paper second = paperRepository.save(
                 Paper.register(OTHER_USER_ID, "b.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
-                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
         tx.executeWithoutResult(s ->
                 paperRepository.linkDocument(second.getId(), document.getId(), Instant.now()));
         documentTransitions.markProcessing(document.getId());
@@ -185,7 +186,7 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         Paper second = paperRepository.save(
                 Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
-                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId()));
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
 
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);

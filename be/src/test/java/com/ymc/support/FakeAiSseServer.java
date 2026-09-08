@@ -65,6 +65,7 @@ public final class FakeAiSseServer implements AutoCloseable {
     private HttpServer server;
     private final ConcurrentLinkedQueue<Script> scripts = new ConcurrentLinkedQueue<>();
     private final AtomicReference<String> lastRequestBody = new AtomicReference<>();
+    private final AtomicReference<String> lastRequestPath = new AtomicReference<>();
 
     public void start() {
         try {
@@ -74,6 +75,7 @@ public final class FakeAiSseServer implements AutoCloseable {
         }
         server.createContext("/", exchange -> {
             lastRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            lastRequestPath.set(exchange.getRequestURI().getPath());
             Script script = scripts.poll();
             if (script == null) {
                 exchange.sendResponseHeaders(500, -1);
@@ -107,6 +109,10 @@ public final class FakeAiSseServer implements AutoCloseable {
 
     public String lastRequestBody() {
         return lastRequestBody.get();
+    }
+
+    public String lastRequestPath() {
+        return lastRequestPath.get();
     }
 
     @Override

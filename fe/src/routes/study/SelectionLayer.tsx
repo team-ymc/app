@@ -3,18 +3,21 @@
 // 위치 모델은 목업과 다르다: 목업은 position:fixed + transform:translate(-50%, calc(-100% - 10px))로
 // 뷰포트 기준 중앙정렬하지만, 이 태스크의 브리프는 컨테이너 상대 absolute + computeToolbarPosition(선택
 // 영역 "아래" 배치)을 명시한다 — 그대로 따른다(브리프 계약이 목업 좌표식보다 우선).
-// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated) | askChoice.
-// translating/translated/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
+// 상태기계: idle(선택 없음, 아무것도 렌더 안 함) → toolbar → (translating → translated | translateFailed) | askChoice.
+// translating/translated/translateFailed/askChoice로 전이한 뒤에는 클릭 시점에 캡처한 text/rect/clear를 쓴다 — 팝업
 // 버튼 클릭으로 브라우저 selection이 collapse되어도(mousedown 기본 동작) 캡처값은 영향받지 않는다.
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { ArrowBendUpLeft, ChatCircleText, NotePencil, Translate, X } from '@phosphor-icons/react';
 import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
-import { translateSelection } from '../../api/translate';
+import { checkTranslationSelection, type TranslationSelectionCheck } from '../../chat/selectionAttachments';
+import { streamTranslation } from '../../translation/translationStream';
+import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import type { SelectionAnchors } from './selectionAnchors';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 export interface SelectionLayerProps {
+  paperId: string;
   viewerRef: RefObject<HTMLDivElement | null>;
   blocks: PaperBlock[];
   onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
@@ -31,15 +34,28 @@ type Layer =
   | { phase: 'toolbar'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
   | { phase: 'translating'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null }
   | { phase: 'translated'; text: string; rect: DOMRect; clear: () => void; translation: string; anchors: SelectionAnchors | null }
+  | { phase: 'translateFailed'; text: string; rect: DOMRect; clear: () => void; message: string; anchors: SelectionAnchors | null }
   | { phase: 'askChoice'; text: string; rect: DOMRect; clear: () => void; anchors: SelectionAnchors | null };
+
+const TRANSLATE_BLOCKED_MESSAGE: Record<Exclude<TranslationSelectionCheck, 'ok'>, string> = {
+  unknown: '번역할 수 없는 선택 영역입니다.',
+  'too-many-blocks': '선택 영역이 너무 큽니다.',
+  'too-long': '선택 영역이 너무 큽니다.',
+};
+
+function translateBlockedMessage(check: TranslationSelectionCheck): string | undefined {
+  return check === 'ok' ? undefined : TRANSLATE_BLOCKED_MESSAGE[check];
+}
 
 function truncate(text: string, n: number): string {
   return text.length > n ? `${text.slice(0, n).trim()}…` : text;
 }
 
-export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps) {
+export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
+  // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
+  const [partial, setPartial] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
 
   // 선택이 생기면 toolbar로, 사라지면(그리고 지금 toolbar 단계일 때만) idle로 — translating 이후
@@ -87,21 +103,47 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
     return () => document.removeEventListener('mousedown', handleDocMouseDown, true);
   }, [layer, viewerRef]);
 
-  // 번역 요청 — 'translating' 단계 진입에 반응해 실행하고, effect cleanup에서 cancelled 플래그를
-  // 세운다. 팝업을 일찍 닫거나(바깥 클릭 포함) 다른 선택으로 새 번역을 시작해 layer가 바뀌면 cleanup이
-  // 먼저 실행되므로, 뒤늦게 도착하는 이전 요청의 응답이 최신 상태를 덮어쓰지 않는다.
+  // 'translating' 진입에 반응해 스트림을 연다. cleanup의 abort는 FE 수신 중단일 뿐이다 —
+  // translation.started 이후라면 BE는 완주하고, 그 전에 끊기면 run이 생기지 않을 수도 있다.
   useEffect(() => {
     if (layer.phase !== 'translating') return;
     const { text, rect, clear, anchors } = layer;
-    let cancelled = false;
-    translateSelection(text).then(({ translation }) => {
-      if (cancelled) return;
-      setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, translation, anchors } : prev));
+    if (!anchors) {
+      setLayer({ phase: 'translateFailed', text, rect, clear, anchors, message: TRANSLATE_BLOCKED_MESSAGE.unknown });
+      return;
+    }
+    const controller = new AbortController();
+    let accumulated = '';
+    setPartial('');
+    void streamTranslation({
+      paperId,
+      selection: anchors,
+      signal: controller.signal,
+      onEvent: (e) => {
+        if (controller.signal.aborted) return;
+        switch (e.type) {
+          case 'delta':
+            accumulated += e.delta;
+            setPartial(accumulated);
+            break;
+          case 'completed':
+            setLayer((prev) => (prev.phase === 'translating' ? { phase: 'translated', text, rect, clear, anchors, translation: e.translation } : prev));
+            break;
+          case 'failed':
+            setLayer((prev) => (prev.phase === 'translating'
+              ? {
+                  phase: 'translateFailed', text, rect, clear, anchors,
+                  message: e.code === 'TRANSLATION_IN_PROGRESS' ? '이전 번역이 끝나면 다시 시도해 주세요.' : e.message,
+                }
+              : prev));
+            break;
+          default:
+            break;
+        }
+      },
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [layer]);
+    return () => controller.abort();
+  }, [layer, paperId]);
 
   if (layer.phase === 'idle') return null;
 
@@ -110,6 +152,7 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
   function handleTranslate() {
     if (layer.phase !== 'toolbar') return;
     const { text, rect, clear, anchors } = layer;
+    setPartial('');
     setLayer({ phase: 'translating', text, rect, clear, anchors });
   }
 
@@ -120,7 +163,7 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
 
   // 번역 팝업 닫기 → clear()로 원문 읽기 복귀 (FT-006 Story 2).
   function handleCloseTranslation() {
-    if (layer.phase !== 'translating' && layer.phase !== 'translated') return;
+    if (layer.phase !== 'translating' && layer.phase !== 'translated' && layer.phase !== 'translateFailed') return;
     layer.clear();
     setLayer({ phase: 'idle' });
   }
@@ -136,6 +179,8 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
 
   if (layer.phase === 'toolbar') {
     const pos = computeToolbarPosition(layer.rect, container, TOOLBAR_POPUP_SIZE);
+    const blocked = translateBlockedMessage(checkTranslationSelection(blocks, layer.anchors));
+    const translateDisabled = blocked !== undefined;
     return (
       <div
         ref={popupRef}
@@ -153,14 +198,20 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
           zIndex: 80,
         }}
       >
-        <ToolbarButton icon={<Translate size={14} />} label="번역" onClick={handleTranslate} />
+        <ToolbarButton
+          icon={<Translate size={14} />}
+          label="번역"
+          onClick={handleTranslate}
+          disabled={translateDisabled}
+          title={blocked}
+        />
         <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,253,247,0.18)', margin: '4px 0' }} />
         <ToolbarButton icon={<ChatCircleText size={14} />} label="질문하기" onClick={handleAsk} />
       </div>
     );
   }
 
-  if (layer.phase === 'translating' || layer.phase === 'translated') {
+  if (layer.phase === 'translating' || layer.phase === 'translated' || layer.phase === 'translateFailed') {
     const pos = computeToolbarPosition(layer.rect, container, TRANSLATION_POPUP_SIZE);
     return (
       <div
@@ -212,8 +263,12 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
         >
           {truncate(layer.text, 220)}
         </div>
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, lineHeight: 1.7, color: 'var(--color-text-body)' }}>
-          {layer.phase === 'translating' ? '번역 중…' : layer.translation}
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, lineHeight: 1.7, color: 'var(--color-text-body)', maxHeight: 320, overflowY: 'auto' }}>
+          {layer.phase === 'translating' && (partial || '번역 중…')}
+          {layer.phase === 'translated' && <PaperMarkdown>{layer.translation}</PaperMarkdown>}
+          {layer.phase === 'translateFailed' && (
+            <span role="alert" style={{ color: 'var(--color-text-muted)' }}>{layer.message}</span>
+          )}
         </div>
       </div>
     );
@@ -248,15 +303,17 @@ export function SelectionLayer({ viewerRef, blocks, onAsk }: SelectionLayerProps
   );
 }
 
-export function ToolbarButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+export function ToolbarButton({ icon, label, onClick, disabled = false, title }: {
+  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; title?: string;
+}) {
   const [hover, setHover] = useState(false);
   const style: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    background: hover ? 'rgba(255,253,247,0.14)' : 'transparent',
+    background: hover && !disabled ? 'rgba(255,253,247,0.14)' : 'transparent',
     border: 'none',
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
     color: 'var(--color-on-dark)',
     fontFamily: 'var(--font-sans)',
     fontSize: 13,
@@ -265,13 +322,19 @@ export function ToolbarButton({ icon, label, onClick }: { icon: React.ReactNode;
     borderRadius: 'var(--radius-structural)',
     whiteSpace: 'nowrap',
     transition: 'background 150ms ease',
+    opacity: disabled ? 0.5 : 1,
   };
-  return (
-    <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={style}>
+  const button = (
+    <button onClick={onClick} disabled={disabled} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={style}>
       {icon}
       {label}
     </button>
   );
+  if (title) {
+    // Safari는 disabled 컨트롤에서 title 툴팁을 억제한다 — span으로 감싸 pointer event를 받게 한다.
+    return <span title={title} style={{ display: 'inline-flex' }}>{button}</span>;
+  }
+  return button;
 }
 
 export function AskRow({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {

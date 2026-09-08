@@ -22,6 +22,7 @@ import com.ymc.plan.domain.UsageBucketRepository;
 import com.ymc.plan.domain.UsageRecord;
 import com.ymc.plan.domain.UsageRecordRepository;
 import com.ymc.plan.domain.UsageRecordStatus;
+import com.ymc.plan.domain.UsageSourceType;
 import com.ymc.plan.domain.UsageType;
 import com.ymc.plan.infra.PlanProperties;
 
@@ -51,9 +52,10 @@ public class UsageService {
     /**
      * 한도 판정과 1회 예약을 원자적으로 처리한다. 유한 정책은 버킷 행 잠금으로 동시
      * 예약을 직렬화하고, UNLIMITED는 잠금 없이 기록만 남긴다.
+     * sourceType은 집계 구분용이며 유니크는 그대로 (usage_type, source_id)다.
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void reserve(UUID userId, UsageType usageType, UUID sourceId) {
+    public void reserve(UUID userId, UsageType usageType, UUID sourceId, UsageSourceType sourceType) {
         Instant now = Instant.now();
         Optional<UsageRecord> existing =
                 recordRepository.findByUsageTypeAndSourceId(usageType, sourceId);
@@ -85,7 +87,8 @@ public class UsageService {
         }
         // 동시 같은 sourceId는 유니크 제약이 최후 방어선이다 — flush로 위반을 호출 지점에서
         // 동기적으로 드러내 호출부 트랜잭션의 기존 방어가 받게 한다
-        recordRepository.saveAndFlush(UsageRecord.reserve(bucket.getId(), usageType, sourceId, now));
+        recordRepository.saveAndFlush(
+                UsageRecord.reserve(bucket.getId(), usageType, sourceId, sourceType, now));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

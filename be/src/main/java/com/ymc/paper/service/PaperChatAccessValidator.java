@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.domain.PaperStatus;
@@ -39,6 +40,24 @@ public class PaperChatAccessValidator {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
                     "논문이 아직 학습 가능한 상태가 아닙니다: " + status);
         }
+    }
+
+    /**
+     * 채팅 가능 검증 + AI가 패키지를 찾는 식별자 반환. AI 패키지 경로는 파싱 요청의
+     * paper_id(= Document.requestPaperId) 기준이라 중복 연결 논문에서는 Paper.id와 다르다.
+     *
+     * @throws ApiException PAPER_NOT_FOUND(404) / FORBIDDEN(403) / PAPER_NOT_READY(409)
+     */
+    @Transactional(readOnly = true)
+    public UUID requireReadyRequestPaperId(UUID paperId, UUID ownerId) {
+        Paper paper = getOwned(paperId, ownerId);
+        Document document = views.documentOf(paper).orElse(null);
+        PaperStatus status = PaperDocumentViews.derivedStatus(paper, document);
+        if (status != PaperStatus.COMPLETED) {
+            throw new ApiException(ErrorCode.PAPER_NOT_READY,
+                    "논문이 아직 학습 가능한 상태가 아닙니다: " + status);
+        }
+        return document.getRequestPaperId(); // COMPLETED면 document는 null이 아니다
     }
 
     /**

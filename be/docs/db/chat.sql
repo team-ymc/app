@@ -4,7 +4,7 @@
 -- 테이블이 미리 없으면 애플리케이션이 뜨지 않는다. 배포 전에 이 스크립트를 운영 DB에 반영해야 한다.
 -- 마이그레이션 도구(Flyway 등) 도입은 별도 결정이며, 그때까지는 이 파일이 산출물이다 (paper.sql과 동일).
 --
--- ⚠ ChatSession·ChatMessage 엔티티가 바뀌면 이 파일도 함께 고쳐야 한다.
+-- ⚠ ChatSession·ChatMessage·TranslationRun 엔티티가 바뀌면 이 파일도 함께 고쳐야 한다.
 --
 -- 상태 라이프사이클(계약 openapi.yaml ChatMessageStatus):
 --   assistant: GENERATING → COMPLETED | FAILED (조건부 UPDATE로만 전이)
@@ -55,3 +55,23 @@ create table chat_message (
     -- 이 유니크 인덱스가 세션 내 히스토리 정렬 조회와 GENERATING 존재 검증도 겸한다 (YMC-260).
     constraint uk_chat_message_session_seq unique (session_id, seq)
 );
+
+-- 인라인 번역 실행 기록 (FT-006). GENERATING → COMPLETED | FAILED (조건부 UPDATE로만 전이)
+create table translation_run (
+    id           uuid                        not null,
+    owner_id     uuid                        not null,
+    paper_id     uuid                        not null,
+    status       varchar(16)                 not null
+        check (status in ('GENERATING', 'COMPLETED', 'FAILED')),
+    -- 요청 selection(start/end anchor) 그대로 — 입력 맥락 추적용
+    selection    jsonb                       not null,
+    -- COMPLETED에만. 최종 한국어 번역 Markdown
+    translation  text,
+    created_at   timestamp(6) with time zone not null,
+    completed_at timestamp(6) with time zone,
+
+    primary key (id)
+);
+
+-- 사용자당 GENERATING 1개 검사 (users 행 잠금 아래에서 실행)
+create index ix_translation_run_owner_status on translation_run (owner_id, status);

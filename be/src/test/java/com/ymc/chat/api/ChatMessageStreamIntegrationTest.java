@@ -126,7 +126,7 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
             Thread.startVirtualThread(() -> {
                 listener.onRunStarted();
                 listener.onDelta("일부");
-                listener.onRunFailed("upstream raw error");
+                listener.onRunFailed("UPSTREAM_ERROR", "upstream raw error");
             });
             return (com.ymc.chat.service.port.AiRunHandle) () -> { };
         }).when(aiAgentStreamPort).stream(any(), any(AiStreamListener.class));
