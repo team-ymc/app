@@ -80,7 +80,7 @@ class ChatStreamMetricsTest {
     @Test void timeoutAndLateCallbacksOnlyProduceOneResult() {
         begin();
         listener.get().onTransportError(new TimeoutException());
-        listener.get().onRunFailed("late");
+        listener.get().onRunFailed("AI_RUN_FAILED", "late");
         assertThat(count("timeout")).isEqualTo(1);
         assertThat(count("error")).isZero();
         assertThat(active()).isZero();
