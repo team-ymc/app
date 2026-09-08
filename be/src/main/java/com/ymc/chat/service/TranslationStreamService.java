@@ -214,7 +214,7 @@ public class TranslationStreamService {
                 return;
             }
             send("translation.completed",
-                    TranslationSseEventData.Completed.of(ids.paperId(), ids.translationId(), finalContent));
+                    TranslationSseEventData.Completed.of(ids.paperId(), ids.translationId(), finalContent), true);
             complete();
         }
 
@@ -259,7 +259,7 @@ public class TranslationStreamService {
                 return;
             }
             send("error", TranslationSseEventData.StreamError.of(
-                    ids.paperId(), ids.translationId(), code, message, retryable));
+                    ids.paperId(), ids.translationId(), code, message, retryable), true);
             complete();
         }
 
@@ -271,11 +271,19 @@ public class TranslationStreamService {
         }
 
         private void send(String eventName, Object payload) {
+            send(eventName, payload, false);
+        }
+
+        /** terminal이 아닌 이벤트는 lock 안에서 finished를 다시 본다 — terminal 전송 뒤 늦은 delta·heartbeat를 막는다. */
+        private void send(String eventName, Object payload, boolean terminal) {
             if (!feConnected.get()) {
                 return;
             }
             sendLock.lock(); // synchronized는 virtual thread를 pinning한다 — ReentrantLock은 아니다
             try {
+                if (!terminal && finished.get()) {
+                    return;
+                }
                 emitter.send(SseEmitter.event().name(eventName).data(payload, MediaType.APPLICATION_JSON));
                 lastOutboundNanos = System.nanoTime();
             } catch (IOException | IllegalStateException e) {
