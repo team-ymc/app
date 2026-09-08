@@ -51,12 +51,14 @@ public class ChatController {
             @PathVariable UUID paperId,
             @Valid @RequestBody ChatMessageStreamRequest request) {
 
+        // BE 측정 시작점. 인증 필터·요청 검증 이전 시간은 제외하고 시작 트랜잭션 시간은 포함한다.
+        long requestedAtNanos = System.nanoTime();
         UUID ownerId = UUID.fromString(jwt.getSubject());
         ChatStartResult started = chatCommandService.start(
                 ownerId, paperId, request.sessionId(), request.clientMessageId(), request.content());
 
         SseEmitter emitter = new SseEmitter(chatStreamProperties.emitterTimeout().toMillis());
-        chatStreamService.begin(emitter, started, request.content(), request.selections());
+        chatStreamService.begin(emitter, started, request.content(), request.selections(), requestedAtNanos);
 
         return ResponseEntity.ok()
                 .header("Cache-Control", "no-cache, no-transform") // 중간 계층 버퍼링·캐싱 방지 (계약)
