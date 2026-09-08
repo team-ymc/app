@@ -146,13 +146,14 @@ describe('SelectionLayer — 현재 상태기계', () => {
     expect(screen.queryByText('어텐션')).toBeNull();
   });
 
-  it('질문하기 → 현재 채팅: onAsk(text, current, anchors)', () => {
+  it('질문하기 클릭 즉시 현재 채팅으로 onAsk(text, current, anchors)를 부르고 선택 팝업은 뜨지 않는다', () => {
     const sel = selection();
     const { onAsk } = setup(sel);
     fireEvent.click(screen.getByRole('button', { name: /질문하기/ }));
-    fireEvent.click(screen.getByRole('button', { name: '현재 채팅' }));
     expect(onAsk).toHaveBeenCalledWith('attention', 'current', sel.anchors);
     expect(sel.clear).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '현재 채팅' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '새 채팅' })).toBeNull();
   });
 
   it('팝업 밖 mousedown → clear 후 idle', async () => {

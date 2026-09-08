@@ -1,9 +1,9 @@
-// 구성요소(이미지·표·수식) 클릭 → 블록 우측 상단 "질문하기" → 현재/새 채팅 선택 → 블록 단위
+// 구성요소(이미지·표·수식) 클릭 → 블록 우측 상단 "질문하기" → 바로 현재 채팅에 블록 단위
 // atomic 첨부 (FT-006 Story 6, design/v2 contentAskAction 이식). 텍스트 선택 흐름(SelectionLayer)과
 // 동일한 onAsk 계약을 쓴다 — StudyPage가 첨부·패널 열림을 처리한다.
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { ArrowBendUpLeft, ChatCircleText, NotePencil } from '@phosphor-icons/react';
-import { AskRow, ToolbarButton } from './SelectionLayer';
+import { ChatCircleText } from '@phosphor-icons/react';
+import { ToolbarButton } from './SelectionLayer';
 import type { SelectionAnchors } from './selectionAnchors';
 import type { PaperBlock } from '../../markdown/paperContent';
 
@@ -17,7 +17,7 @@ const ATOMIC_TYPES = new Set(['figure', 'table', 'equation']);
 
 type Layer =
   | { phase: 'idle' }
-  | { phase: 'action' | 'askChoice'; blockId: string; rect: DOMRect };
+  | { phase: 'action'; blockId: string; rect: DOMRect };
 
 export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerProps) {
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
@@ -88,33 +88,11 @@ export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerPro
     zIndex: 80,
   };
 
-  function handleChoice(mode: 'current' | 'new') {
-    if (layer.phase !== 'askChoice') return;
+  function handleAsk() {
+    if (layer.phase !== 'action') return;
     const { blockId } = layer;
     setLayer({ phase: 'idle' });
-    onAsk('', mode, { start: { blockId }, end: { blockId } });
-  }
-
-  if (layer.phase === 'action') {
-    return (
-      <div
-        ref={popupRef}
-        style={{
-          ...position,
-          display: 'inline-flex',
-          background: 'var(--color-bg-walnut)',
-          borderRadius: 'var(--radius-control)',
-          boxShadow: 'var(--shadow-menu)',
-          padding: 4,
-        }}
-      >
-        <ToolbarButton
-          icon={<ChatCircleText size={14} />}
-          label="질문하기"
-          onClick={() => setLayer({ phase: 'askChoice', blockId: layer.blockId, rect: layer.rect })}
-        />
-      </div>
-    );
+    onAsk('', 'current', { start: { blockId }, end: { blockId } });
   }
 
   return (
@@ -122,20 +100,14 @@ export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerPro
       ref={popupRef}
       style={{
         ...position,
-        width: 'max-content',
-        boxSizing: 'border-box',
-        background: 'var(--color-bg-paper)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 10,
+        display: 'inline-flex',
+        background: 'var(--color-bg-walnut)',
+        borderRadius: 'var(--radius-control)',
         boxShadow: 'var(--shadow-menu)',
         padding: 4,
-        display: 'flex',
-        flexDirection: 'column',
       }}
     >
-      <AskRow icon={<ArrowBendUpLeft size={13} color="var(--color-primary)" />} label="현재 채팅" onClick={() => handleChoice('current')} />
-      <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 6px' }} />
-      <AskRow icon={<NotePencil size={13} color="var(--color-primary)" />} label="새 채팅" onClick={() => handleChoice('new')} />
+      <ToolbarButton icon={<ChatCircleText size={14} />} label="질문하기" onClick={handleAsk} />
     </div>
   );
 }

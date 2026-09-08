@@ -41,20 +41,13 @@ describe('ContentAskLayer — 구성요소 질문하기', () => {
     expect(screen.queryByRole('button', { name: '질문하기' })).toBeNull();
   });
 
-  it('질문하기 → 현재 채팅 선택 시 블록 단위 anchors로 onAsk를 부른다', () => {
+  it('질문하기 클릭 즉시 현재 채팅으로 블록 단위 anchors를 onAsk에 넘기고 선택 팝업은 뜨지 않는다', () => {
     const { onAsk } = setup();
     fireEvent.click(document.querySelector('[data-block-id="t0"]')!);
     fireEvent.click(screen.getByRole('button', { name: '질문하기' }));
-    fireEvent.click(screen.getByRole('button', { name: '현재 채팅' }));
     expect(onAsk).toHaveBeenCalledWith('', 'current', { start: { blockId: 't0' }, end: { blockId: 't0' } });
-  });
-
-  it('질문하기 → 새 채팅 선택은 mode new로 전달한다', () => {
-    const { onAsk } = setup();
-    fireEvent.click(document.querySelector('[data-block-id="f0"]')!);
-    fireEvent.click(screen.getByRole('button', { name: '질문하기' }));
-    fireEvent.click(screen.getByRole('button', { name: '새 채팅' }));
-    expect(onAsk).toHaveBeenCalledWith('', 'new', { start: { blockId: 'f0' }, end: { blockId: 'f0' } });
+    expect(screen.queryByRole('button', { name: '현재 채팅' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '새 채팅' })).toBeNull();
   });
 
   it('레이어가 열리면 대상 블록에 data-context-target 하이라이트가 켜지고, 닫히면 꺼진다', () => {
@@ -63,17 +56,13 @@ describe('ContentAskLayer — 구성요소 질문하기', () => {
     fireEvent.click(section);
     expect(section.getAttribute('data-context-target')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: '질문하기' }));
-    expect(section.getAttribute('data-context-target')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: '현재 채팅' }));
     expect(section.getAttribute('data-context-target')).toBeNull();
   });
 
-  it('선택 후 onAsk가 불리면 레이어가 닫힌다', () => {
+  it('질문하기 후 레이어가 닫힌다', () => {
     setup();
     fireEvent.click(document.querySelector('[data-block-id="f0"]')!);
     fireEvent.click(screen.getByRole('button', { name: '질문하기' }));
-    fireEvent.click(screen.getByRole('button', { name: '현재 채팅' }));
     expect(screen.queryByRole('button', { name: '질문하기' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '현재 채팅' })).toBeNull();
   });
 });
