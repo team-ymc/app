@@ -55,10 +55,15 @@ public class ChatStreamService {
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
     public void begin(SseEmitter emitter, ChatStartResult started, String userContent, List<ChatSelectionDto> selections, long requestedAtNanos) {
         Run run = new Run(emitter, started, requestedAtNanos);
-        run.sendStarted();
-        AiRunHandle handle = aiAgentStreamPort.stream(
-                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selections), run);
-        run.arm(handle);
+        try {
+            run.sendStarted();
+            AiRunHandle handle = aiAgentStreamPort.stream(
+                    new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selections), run);
+            run.arm(handle);
+        } catch (RuntimeException e) {
+            run.cancelUpstream();
+            run.onTransportError(e);
+        }
     }
 
     /** 한 스트림의 상태. 어댑터가 콜백을 직렬 호출하므로 필드 동기화는 FE 단절 플래그만 필요하다. */
