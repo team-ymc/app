@@ -51,6 +51,11 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
   // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
   const [partial, setPartial] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
+  // 번역 팝업은 선택 문장을 따라간다: 번역 시작 시점의 scrollTop을 기준으로 이후 스크롤량만큼 top을 보정한다.
+  const baseScrollTopRef = useRef(0);
+  const [scrollDelta, setScrollDelta] = useState(0);
+  // 원문 한 줄 영역을 잡아 끈 누적 이동량. 추종 위치에 더해지므로 옮긴 뒤에도 스크롤을 따라간다.
+  const [dragOffset, setDragOffset] = useState({ dx: 0, dy: 0 });
 
   // 선택이 생기면 toolbar로, 사라지면(그리고 지금 toolbar 단계일 때만) idle로 — translating 이후
   // 단계는 캡처값으로 독립 운영되므로 브라우저 selection 변화에 영향받지 않는다.
@@ -62,11 +67,12 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     }
   }, [sel]);
 
-  // 스크롤 시 툴바 dismiss(선택이 사라지면 idle 복귀) — toolbar 단계에서만.
+  // 스크롤 시 툴바는 dismiss(선택이 사라지면 idle 복귀), 번역 팝업은 스크롤량을 기록해 따라간다.
   useEffect(() => {
     const el = viewerRef.current;
     if (!el) return;
     function handleScroll() {
+      setScrollDelta(el!.scrollTop - baseScrollTopRef.current);
       setLayer((prev) => {
         if (prev.phase === 'toolbar') {
           prev.clear();
@@ -147,7 +153,25 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
     if (layer.phase !== 'toolbar') return;
     const { text, rect, clear, anchors } = layer;
     setPartial('');
+    baseScrollTopRef.current = viewerRef.current?.scrollTop ?? 0;
+    setScrollDelta(0);
+    setDragOffset({ dx: 0, dy: 0 });
     setLayer({ phase: 'translating', text, rect, clear, anchors });
+  }
+
+  function handleDragStart(e: React.MouseEvent) {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const start = dragOffset;
+    function onMove(ev: MouseEvent) {
+      setDragOffset({ dx: start.dx + ev.clientX - startX, dy: start.dy + ev.clientY - startY });
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 
   // 질문하기 → 바로 현재 채팅에 첨부. StudyPage가 첨부·챗 패널 열림·포커스를 처리한다.
@@ -208,8 +232,8 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
         onMouseDown={(e) => e.preventDefault()}
         style={{
           position: 'absolute',
-          top: pos.top,
-          left: pos.left,
+          top: pos.top - scrollDelta + dragOffset.dy,
+          left: pos.left + dragOffset.dx,
           width: 300,
           boxSizing: 'border-box',
           background: 'var(--color-bg-paper)',
@@ -240,7 +264,10 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
         </button>
         <div
           title={layer.text}
+          onMouseDown={handleDragStart}
           style={{
+            cursor: 'move',
+            userSelect: 'none',
             fontFamily: 'var(--font-serif)',
             fontSize: 13,
             lineHeight: 1.6,

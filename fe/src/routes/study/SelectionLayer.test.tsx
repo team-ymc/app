@@ -168,6 +168,40 @@ describe('SelectionLayer — 현재 상태기계', () => {
     expect(preview.style.textOverflow).toBe('ellipsis');
   });
 
+  it('번역 팝업은 뷰어 스크롤만큼 위로 따라 움직인다', async () => {
+    setup(selection());
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const popup = screen.getByRole('button', { name: '닫기' }).parentElement as HTMLElement;
+    const before = parseFloat(popup.style.top);
+    const viewer = document.querySelector('[data-block-id="b0"]')!.parentElement as HTMLElement;
+    Object.defineProperty(viewer, 'scrollTop', { value: 100, configurable: true });
+    act(() => { fireEvent.scroll(viewer); });
+    expect(parseFloat(popup.style.top)).toBe(before - 100);
+  });
+
+  it('원문 영역을 잡아 끌면 팝업이 이동량만큼 옮겨지고 이후 스크롤도 그 위치에서 따라간다', async () => {
+    const sel = selection();
+    setup(sel);
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const popup = screen.getByRole('button', { name: '닫기' }).parentElement as HTMLElement;
+    const top0 = parseFloat(popup.style.top);
+    const left0 = parseFloat(popup.style.left);
+    const handle = screen.getByTitle(sel.text);
+    fireEvent.mouseDown(handle, { clientX: 10, clientY: 10 });
+    fireEvent.mouseMove(window, { clientX: 40, clientY: 50 });
+    fireEvent.mouseUp(window);
+    expect(parseFloat(popup.style.top)).toBe(top0 + 40);
+    expect(parseFloat(popup.style.left)).toBe(left0 + 30);
+    expect(sel.clear).not.toHaveBeenCalled();
+
+    const viewer = document.querySelector('[data-block-id="b0"]')!.parentElement as HTMLElement;
+    Object.defineProperty(viewer, 'scrollTop', { value: 100, configurable: true });
+    act(() => { fireEvent.scroll(viewer); });
+    expect(parseFloat(popup.style.top)).toBe(top0 + 40 - 100);
+  });
+
   it('팝업 밖 mousedown → clear 후 idle', async () => {
     const sel = selection();
     setup(sel);
