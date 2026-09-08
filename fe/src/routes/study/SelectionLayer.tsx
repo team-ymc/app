@@ -45,10 +45,6 @@ function translateBlockedMessage(check: TranslationSelectionCheck): string | und
   return check === 'ok' ? undefined : TRANSLATE_BLOCKED_MESSAGE[check];
 }
 
-function truncate(text: string, n: number): string {
-  return text.length > n ? `${text.slice(0, n).trim()}…` : text;
-}
-
 export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
@@ -243,6 +239,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
           <X size={14} />
         </button>
         <div
+          title={layer.text}
           style={{
             fontFamily: 'var(--font-serif)',
             fontSize: 13,
@@ -252,9 +249,12 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
             paddingBottom: 10,
             marginBottom: 10,
             borderBottom: '1px solid var(--color-border)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
-          {truncate(layer.text, 220)}
+          {layer.text}
         </div>
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, lineHeight: 1.7, color: 'var(--color-text-body)', maxHeight: 320, overflowY: 'auto' }}>
           {layer.phase === 'translating' && (partial || '번역 중…')}

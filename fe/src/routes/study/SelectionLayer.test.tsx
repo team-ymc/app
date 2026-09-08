@@ -156,6 +156,18 @@ describe('SelectionLayer — 현재 상태기계', () => {
     expect(screen.queryByRole('button', { name: '새 채팅' })).toBeNull();
   });
 
+  it('원문 미리보기는 자르지 않고 한 줄 ellipsis로 보이며 전체 원문은 title로 남는다', async () => {
+    const long = 'w'.repeat(300);
+    setup(selection({ text: long }));
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const preview = screen.getByTitle(long) as HTMLElement;
+    expect(preview.textContent).toBe(long);
+    expect(preview.style.whiteSpace).toBe('nowrap');
+    expect(preview.style.overflow).toBe('hidden');
+    expect(preview.style.textOverflow).toBe('ellipsis');
+  });
+
   it('팝업 밖 mousedown → clear 후 idle', async () => {
     const sel = selection();
     setup(sel);
