@@ -277,7 +277,7 @@ class AiRelayIntegrationTest extends IntegrationTest {
         var started = chatCommandService.start(
                 TEST_USER_ID, paper.getId(), null, UUID.randomUUID(), "질문");
         var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(6_000L);
-        chatStreamService.begin(emitter, started, "질문", null);
+        chatStreamService.begin(emitter, started, "질문", null, System.nanoTime());
         emitter.complete(); // onCompletion → feConnected=false
 
         ChatMessage assistant = awaitAssistantTerminal();

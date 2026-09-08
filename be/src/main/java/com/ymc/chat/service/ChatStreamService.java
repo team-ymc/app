@@ -45,6 +45,7 @@ public class ChatStreamService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatStreamService.class);
 
+    private final ChatRunMetrics metrics;
     private final AiAgentStreamPort aiAgentStreamPort;
     private final ChatMessageTransitions transitions;
     private final ChatStreamProperties chatStreamProperties;
@@ -52,17 +53,23 @@ public class ChatStreamService {
     private final ExecutorService chatRelayExecutor;
 
     /** message.started를 보내고 AI 스트림을 시작한다. 호출 시점은 시작 트랜잭션 commit 후다. */
-    public void begin(SseEmitter emitter, ChatStartResult started, String userContent, List<ChatSelectionDto> selections) {
-        Run run = new Run(emitter, started);
-        run.sendStarted();
-        AiRunHandle handle = aiAgentStreamPort.stream(
-                new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selections), run);
-        run.arm(handle);
+    public void begin(SseEmitter emitter, ChatStartResult started, String userContent, List<ChatSelectionDto> selections, long requestedAtNanos) {
+        Run run = new Run(emitter, started, requestedAtNanos);
+        try {
+            run.sendStarted();
+            AiRunHandle handle = aiAgentStreamPort.stream(
+                    new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selections), run);
+            run.arm(handle);
+        } catch (RuntimeException e) {
+            run.cancelUpstream();
+            run.onTransportError(e);
+        }
     }
 
     /** 한 스트림의 상태. 어댑터가 콜백을 직렬 호출하므로 필드 동기화는 FE 단절 플래그만 필요하다. */
     private class Run implements AiStreamListener {
 
+        private final ChatRunMetrics.Measurement measurement;
         private final SseEmitter emitter;
         private final ChatStartResult ids;
         private final AtomicBoolean feConnected = new AtomicBoolean(true);
@@ -72,7 +79,9 @@ public class ChatStreamService {
         private final ReentrantLock sendLock = new ReentrantLock();
         private volatile AiRunHandle handle;
 
-        private Run(SseEmitter emitter, ChatStartResult ids) {
+        private Run(SseEmitter emitter, ChatStartResult ids, long requestedAtNanos) {
+            // 실제 실행 수는 시작 트랜잭션 커밋 후부터 센다. FE 단절 후에도 저장까지 계속 유지한다.
+            this.measurement = metrics.start(requestedAtNanos);
             this.emitter = emitter;
             this.ids = ids;
             emitter.onCompletion(() -> feConnected.set(false));
@@ -180,6 +189,10 @@ public class ChatStreamService {
                 failWith("AI_RESPONSE_TOO_LARGE", "답변이 허용 길이를 초과했습니다.", false);
                 return;
             }
+            // TTFT : AI 첫 텍스트를 중계
+            if (!delta.isEmpty()) {
+                measurement.firstDelta();
+            }
             accumulated.append(delta);
             send("message.delta", ChatSseEventData.Delta.of(
                     ids.paperId(), ids.sessionId(), ids.assistantMessageId(), delta));
@@ -215,10 +228,14 @@ public class ChatStreamService {
                 return;
             }
             if (!committed) {
+                measurement.finish("error");
                 // 이미 다른 경로가 FAILED로 확정 — 성공 event를 보내지 않는다
                 complete();
                 return;
             }
+            // 별도 Spring Bean의 @Transactional complete()가 true로 반환했으므로 커밋도 성공했다.
+            // save 호출 직후나 AI run.completed 수신 시점이 아닌, 여기서 성공을 집계한다.
+            measurement.finish("success");
             send("message.completed", ChatSseEventData.Completed.of(
                     ids.paperId(), ids.sessionId(), ids.assistantMessageId(), finalContent));
             complete();
@@ -260,9 +277,11 @@ public class ChatStreamService {
             } catch (RuntimeException e) {
                 log.error("FAILED 전이조차 실패 — terminal 없이 종료. messageId={}",
                         ids.assistantMessageId(), e);
+                measurement.finish("error");
                 emitter.completeWithError(e);
                 return;
             }
+            measurement.finish("AI_TIMEOUT".equals(code) ? "timeout" : "error");
             send("error", ChatSseEventData.StreamError.of(
                     ids.paperId(), ids.sessionId(), ids.assistantMessageId(), code, message, retryable));
             complete();
