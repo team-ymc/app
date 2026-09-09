@@ -58,6 +58,21 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void source_language와_textKor가_있는_패키지는_그대로_적재된다() {
+        Paper paper = givenProcessingPaper("translated.pdf");
+        UUID documentId = paper.getDocumentId();
+        String manifestKey = givenTranslatedPackageOnS3(paper.getId());
+
+        ingestService.ingest(documentId, manifestKey);
+
+        assertThat(contentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
+
+        List<DocumentContentBlock> blocks = blockRepository.findAllByDocumentIdOrderByGlobalOrderAsc(documentId);
+        assertThat(blocks.get(1).getContent().get("textKor").asText()).contains("새로운 구조");
+        assertThat(blocks.get(3).getContent().has("textKor")).isFalse();
+    }
+
+    @Test
     void 재적재는_중복_없이_대체된다_멱등() {
         Paper paper = givenProcessingPaper("reingest.pdf");
         UUID documentId = paper.getDocumentId();

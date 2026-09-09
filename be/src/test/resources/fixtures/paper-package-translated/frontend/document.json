@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture-translated",
+  "source_language": "en",
+  "blocks": [
+    {"block_id": "p0000-b0000", "page_index": 0, "global_block_order": 0, "block_label": "doc_title", "heading_level": 1, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "Attention Is All You Need", "text_kor": "필요한 건 어텐션뿐"}},
+    {"block_id": "p0000-b0001", "page_index": 0, "global_block_order": 1, "block_label": "abstract", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "We propose a new architecture.", "text_kor": "우리는 새로운 구조를 제안한다."}},
+    {"block_id": "p0000-b0002", "page_index": 0, "global_block_order": 2, "block_label": "text", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "Body paragraph in English.", "text_kor": "영어로 된 본문 단락."}},
+    {"block_id": "p0000-b0003", "page_index": 0, "global_block_order": 3, "block_label": "reference_content", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "[1] Fixture reference."}},
+    {"block_id": "p0000-b0004", "page_index": 0, "global_block_order": 4, "block_label": "image", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "image", "asset_key": "image_0"}}
+  ]
+}

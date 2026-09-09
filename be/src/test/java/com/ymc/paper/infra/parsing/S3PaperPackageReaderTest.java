@@ -7,11 +7,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.paper.service.port.FileStorage;
@@ -20,15 +27,28 @@ import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
 
+@ExtendWith(OutputCaptureExtension.class)
 class S3PaperPackageReaderTest {
 
-    /** S3 대신 클래스패스 fixtures/paper-package/ (또는 broken 변형)를 읽는 가짜 저장소. */
+    /** fileKey의 prefix로 어느 fixtures/paper-package* 디렉터리를 읽을지 정한다. */
+    private static final Map<String, String> PREFIX_TO_FIXTURE = new LinkedHashMap<>();
+
+    static {
+        PREFIX_TO_FIXTURE.put("papers/broken/", "paper-package-broken");
+        PREFIX_TO_FIXTURE.put("papers/translated/", "paper-package-translated");
+        PREFIX_TO_FIXTURE.put("papers/badlang/", "paper-package-badlang");
+        PREFIX_TO_FIXTURE.put("papers/p1/", "paper-package");
+    }
+
+    /** S3 대신 클래스패스 fixtures/paper-package* 디렉터리를 읽는 가짜 저장소. */
     private static final FileStorage FAKE_STORAGE = new FileStorage() {
         @Override
         public String readUtf8(String fileKey) {
-            String resource = fileKey.startsWith("papers/broken/")
-                    ? "/fixtures/paper-package-broken/" + fileKey.substring("papers/broken/".length())
-                    : "/fixtures/paper-package/" + fileKey.substring("papers/p1/".length());
+            String prefix = PREFIX_TO_FIXTURE.keySet().stream()
+                    .filter(fileKey::startsWith)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("매핑되지 않은 fileKey: " + fileKey));
+            String resource = "/fixtures/" + PREFIX_TO_FIXTURE.get(prefix) + "/" + fileKey.substring(prefix.length());
             try (InputStream in = S3PaperPackageReaderTest.class.getResourceAsStream(resource)) {
                 if (in == null) {
                     throw new IllegalStateException("픽스처 없음: " + resource);
@@ -171,6 +191,143 @@ class S3PaperPackageReaderTest {
         assertThatThrownBy(() -> reader.read("papers/y/manifest.json"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("b0");
+    }
+
+    @Test
+    void 번역이_있는_패키지는_sourceLanguage와_textKor를_담고_WARN이_없다(CapturedOutput output) {
+        ParsedPaperPackage pkg = reader.read("papers/translated/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isEqualTo("en");
+
+        ParsedPaperPackage.Block abstractBlock = blockById(pkg, "p0000-b0001");
+        assertThat(abstractBlock.content().get("textKor").asText()).contains("새로운 구조");
+        ParsedPaperPackage.Block textBlock = blockById(pkg, "p0000-b0002");
+        assertThat(textBlock.content().get("textKor").asText()).contains("영어로 된 본문");
+
+        ParsedPaperPackage.Block reference = blockById(pkg, "p0000-b0003");
+        assertThat(reference.content().has("textKor")).isFalse();
+        ParsedPaperPackage.Block image = blockById(pkg, "p0000-b0004");
+        assertThat(image.content().has("textKor")).isFalse();
+
+        assertThat(output.getOut()).doesNotContain("WARN");
+    }
+
+    @Test
+    void 번역_도입_전_패키지는_sourceLanguage가_null이고_textKor가_없으며_WARN이_없다(CapturedOutput output) {
+        ParsedPaperPackage pkg = reader.read("papers/p1/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isNull();
+        assertThat(pkg.blocks()).allSatisfy(b -> assertThat(b.content().has("textKor")).isFalse());
+        assertThat(output.getOut()).doesNotContain("WARN");
+    }
+
+    @Test
+    void frontend만_형식이_어긋나면_manifest값으로_폴백하고_정합성_A와_C_WARN을_남긴다(CapturedOutput output) {
+        ParsedPaperPackage pkg = reader.read("papers/badlang/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isEqualTo("en");
+        assertThat(output.getOut()).contains("unknown");
+        assertThat(output.getOut()).contains("번역이 없는 블록");
+        assertThat(output.getOut()).contains("참고문헌");
+        // 한쪽만 유효하므로(정규화 후 비교) 불일치 WARN은 뜨지 않는다.
+        assertThat(output.getOut()).doesNotContain("불일치");
+    }
+
+    @Test
+    void manifest와_frontend가_둘다_유효하고_다르면_불일치_WARN을_남기고_frontend값을_쓴다(CapturedOutput output) {
+        Map<String, String> files = new HashMap<>();
+        files.put("papers/langmismatch/manifest.json", """
+                {
+                  "manifest_version": 1,
+                  "document_id": "langmismatch",
+                  "source_language": "ko",
+                  "artifacts": {
+                    "frontend_document": {"path": "frontend/document.json"},
+                    "structure_document": {"path": "structure/document.json"}
+                  }
+                }
+                """);
+        files.put("papers/langmismatch/frontend/document.json", """
+                {"schema_version":1,"source_language":"en","blocks":[
+                  {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
+                   "block_content":{"format":"text","text":"본문","text_kor":"번역"}}
+                ]}
+                """);
+        files.put("papers/langmismatch/structure/document.json", """
+                {"assets": {}}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        ParsedPaperPackage pkg = reader.read("papers/langmismatch/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isEqualTo("en");
+        assertThat(output.getOut()).contains("불일치");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"zz", "EN", "en-US", ""})
+    void 형식이_아닌_source_language는_null로_적재되고_WARN을_남긴다(String invalid, CapturedOutput output) {
+        Map<String, String> files = sourceLanguageOnlyPackage("z1", invalid);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        ParsedPaperPackage pkg = reader.read("papers/z1/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isNull();
+        assertThat(output.getOut()).contains("papers/z1/manifest.json");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ko", "und"})
+    void 유효한_source_language는_그대로_적재되고_WARN이_없다(String valid, CapturedOutput output) {
+        Map<String, String> files = sourceLanguageOnlyPackage("z2", valid);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        ParsedPaperPackage pkg = reader.read("papers/z2/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isEqualTo(valid);
+        assertThat(output.getOut()).doesNotContain("WARN");
+    }
+
+    @Test
+    void en이_아닌데_text_kor가_있으면_정합성_B_WARN을_남긴다(CapturedOutput output) {
+        Map<String, String> files = sourceLanguageOnlyPackage("z3", "ko");
+        files.put("papers/z3/frontend/document.json", """
+                {"schema_version":1,"source_language":"ko","blocks":[
+                  {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
+                   "block_content":{"format":"text","text":"본문","text_kor":"번역되면 안 되는 값"}}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        ParsedPaperPackage pkg = reader.read("papers/z3/manifest.json");
+
+        assertThat(pkg.sourceLanguage()).isEqualTo("ko");
+        assertThat(output.getOut()).contains("en이 아닌데");
+    }
+
+    /** manifest·frontend 모두 source_language만 다르고 나머지는 최소인 패키지. */
+    private static Map<String, String> sourceLanguageOnlyPackage(String paperId, String frontendSourceLanguage) {
+        Map<String, String> files = new HashMap<>();
+        files.put("papers/" + paperId + "/manifest.json", """
+                {
+                  "manifest_version": 1,
+                  "document_id": "%s",
+                  "artifacts": {
+                    "frontend_document": {"path": "frontend/document.json"},
+                    "structure_document": {"path": "structure/document.json"}
+                  }
+                }
+                """.formatted(paperId));
+        files.put("papers/" + paperId + "/frontend/document.json", """
+                {"schema_version":1,"source_language":"%s","blocks":[
+                  {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
+                   "block_content":{"format":"text","text":"본문"}}
+                ]}
+                """.formatted(frontendSourceLanguage));
+        files.put("papers/" + paperId + "/structure/document.json", """
+                {"assets": {}}
+                """);
+        return files;
     }
 
     private static ParsedPaperPackage.Block blockById(ParsedPaperPackage pkg, String blockId) {

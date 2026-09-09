@@ -73,6 +73,7 @@ public class PaperContentQueryService {
                     new PaperContentView.Asset(presigned.url(), a.getMediaType(), presigned.expiresAt()));
         });
 
-        return new PaperContentView(paper.getId(), content.getTitle(), content.getSchemaVersion(), blocks, assets);
+        return new PaperContentView(paper.getId(), content.getTitle(), content.getSourceLanguage(),
+                content.getSchemaVersion(), blocks, assets);
     }
 }

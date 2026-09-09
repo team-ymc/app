@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture-badlang",
+  "source_language": "unknown",
+  "blocks": [
+    {"block_id": "p0000-b0000", "page_index": 0, "global_block_order": 0, "block_label": "doc_title", "heading_level": 1, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "Broken Language Paper"}},
+    {"block_id": "p0000-b0001", "page_index": 0, "global_block_order": 1, "block_label": "text", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "Body paragraph without translation."}},
+    {"block_id": "p0000-b0002", "page_index": 0, "global_block_order": 2, "block_label": "reference_content", "heading_level": null, "section_path": ["p0000-b0000"], "block_content": {"format": "text", "text": "[1] Fixture reference.", "text_kor": "[1] 픽스처 참고문헌."}}
+  ]
+}

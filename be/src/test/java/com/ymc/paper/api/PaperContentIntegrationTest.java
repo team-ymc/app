@@ -25,6 +25,37 @@ class PaperContentIntegrationTest extends IntegrationTest {
         return reload(paper.getId());
     }
 
+    /** COMPLETED + source_language·text_kor가 있는 패키지로 적재까지 끝난 논문. */
+    private Paper givenIngestedTranslatedPaper() {
+        Paper paper = givenProcessingPaper("translated-content.pdf");
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
+        return reload(paper.getId());
+    }
+
+    @Test
+    void 번역이_있는_문서는_응답에_sourceLanguage와_textKor를_담는다() throws Exception {
+        Paper paper = givenIngestedTranslatedPaper();
+
+        mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceLanguage").value("en"))
+                .andExpect(jsonPath("$.blocks[1].content.textKor").value(org.hamcrest.Matchers.containsString("새로운 구조")))
+                .andExpect(jsonPath("$.blocks[3].content.textKor").doesNotExist())
+                .andExpect(jsonPath("$.blocks[4].content.textKor").doesNotExist());
+    }
+
+    @Test
+    void 번역_도입_전_패키지는_응답의_sourceLanguage가_명시적으로_null이다() throws Exception {
+        Paper paper = givenIngestedPaper();
+
+        String body = mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("\"sourceLanguage\":null");
+    }
+
     @Test
     void 적재된_논문의_본문을_계약형으로_돌려준다() throws Exception {
         Paper paper = givenIngestedPaper();
@@ -114,12 +145,14 @@ class PaperContentIntegrationTest extends IntegrationTest {
         tx.execute(s -> documentRepository.markParsed(
                 document.getId(), DocumentStatus.COMPLETED, null, Instant.now()));
 
-        String manifestKey = givenPackageOnS3(document.getRequestPaperId());
+        String manifestKey = givenTranslatedPackageOnS3(document.getRequestPaperId());
         documentContentIngestService.ingest(document.getId(), manifestKey);
 
         mockMvc.perform(get("/api/papers/{id}/content", mine.getId()).with(userJwt()))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceLanguage").value("en"));
         mockMvc.perform(get("/api/papers/{id}/content", theirs.getId()).with(otherUserJwt()))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceLanguage").value("en"));
     }
 }

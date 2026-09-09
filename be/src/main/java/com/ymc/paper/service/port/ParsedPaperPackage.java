@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 public record ParsedPaperPackage(
         String title,
         int schemaVersion,
+        String sourceLanguage,
         List<Block> blocks,
         List<Asset> assets) {
 

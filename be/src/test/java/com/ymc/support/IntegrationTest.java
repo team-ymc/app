@@ -286,14 +286,26 @@ public abstract class IntegrationTest {
 
     /** 클래스패스의 축소판 파서 패키지를 LocalStack S3의 주어진 prefix로 올린다. */
     protected String givenPackageOnS3(UUID paperId) {
-        String prefix = "papers/" + paperId + "/";
-        for (String relative : List.of(
+        return givenPackageOnS3(paperId, "paper-package", List.of(
                 "manifest.json",
                 "frontend/document.json",
                 "structure/document.json",
                 "assets/formulas/formula_0.tex",
-                "assets/tables/table_0.html")) {
-            byte[] body = readFixture("/fixtures/paper-package/" + relative);
+                "assets/tables/table_0.html"));
+    }
+
+    /** source_language·text_kor가 채워진 fixtures/paper-package-translated/를 올린다. */
+    protected String givenTranslatedPackageOnS3(UUID paperId) {
+        return givenPackageOnS3(paperId, "paper-package-translated", List.of(
+                "manifest.json",
+                "frontend/document.json",
+                "structure/document.json"));
+    }
+
+    private String givenPackageOnS3(UUID paperId, String fixtureName, List<String> relatives) {
+        String prefix = "papers/" + paperId + "/";
+        for (String relative : relatives) {
+            byte[] body = readFixture("/fixtures/" + fixtureName + "/" + relative);
             s3.putObject(PutObjectRequest.builder()
                             .bucket(awsProperties.s3().bucket())
                             .key(prefix + relative)

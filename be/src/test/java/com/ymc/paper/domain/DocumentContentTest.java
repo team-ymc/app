@@ -18,18 +18,26 @@ class DocumentContentTest {
 
     @Test
     void DocumentContent는_documentId와_시각이_필수다() {
-        DocumentContent content = DocumentContent.of(DOCUMENT_ID, "Attention Is All You Need", 1, Instant.now());
+        DocumentContent content =
+                DocumentContent.of(DOCUMENT_ID, "Attention Is All You Need", 1, "en", Instant.now());
         assertThat(content.getDocumentId()).isEqualTo(DOCUMENT_ID);
         assertThat(content.getSchemaVersion()).isEqualTo(1);
+        assertThat(content.getSourceLanguage()).isEqualTo("en");
 
-        assertThatThrownBy(() -> DocumentContent.of(null, "t", 1, Instant.now()))
+        assertThatThrownBy(() -> DocumentContent.of(null, "t", 1, "en", Instant.now()))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     void title은_null을_허용한다_파서가_제목을_못_찾은_문서() {
-        DocumentContent content = DocumentContent.of(DOCUMENT_ID, null, 1, Instant.now());
+        DocumentContent content = DocumentContent.of(DOCUMENT_ID, null, 1, "en", Instant.now());
         assertThat(content.getTitle()).isNull();
+    }
+
+    @Test
+    void sourceLanguage는_null을_허용한다_번역_도입_전_패키지() {
+        DocumentContent content = DocumentContent.of(DOCUMENT_ID, "t", 1, null, Instant.now());
+        assertThat(content.getSourceLanguage()).isNull();
     }
 
     @Test

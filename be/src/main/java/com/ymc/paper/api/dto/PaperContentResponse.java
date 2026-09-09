@@ -12,6 +12,7 @@ import com.ymc.paper.service.PaperContentView;
 public record PaperContentResponse(
         UUID paperId,
         String title,
+        String sourceLanguage,
         int schemaVersion,
         List<Block> blocks,
         Map<String, Asset> assets) {
@@ -20,6 +21,7 @@ public record PaperContentResponse(
         return new PaperContentResponse(
                 view.paperId(),
                 view.title(),
+                view.sourceLanguage(),
                 view.schemaVersion(),
                 view.blocks().stream()
                         .map(b -> new Block(b.blockId(), b.globalOrder(), b.label(),
