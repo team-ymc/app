@@ -19,13 +19,21 @@ function sectionClass(b: PaperBlock): string | undefined {
   return undefined;
 }
 
+export type TranslationMode = 'off' | 'below' | 'side';
+
 export interface PaperViewerProps {
   blocks: PaperBlock[];
   containerRef: Ref<HTMLDivElement>;
+  translationMode: TranslationMode;
   onImageError?: () => void;
 }
 
-export function PaperViewer({ blocks, containerRef, onImageError }: PaperViewerProps) {
+export function PaperViewer({ blocks, containerRef, translationMode, onImageError }: PaperViewerProps) {
+  const side = translationMode === 'side';
+  // 옆 배치에서만 바깥 wrap을 넓혀 두 열을 담는다. 시트(article)는 아트보드대로
+  // wrap보다 좁게 한 번 더 조여 본문 폭을 1160px로 맞춘다(wrap 1320 - 시트 padding 40*2 = 1240 시트, 1240 - 40*2 = 1160 본문).
+  const wrapWidth = side ? '1320px' : '1000px';
+  const sheetWidth = side ? '1240px' : '1000px';
   return (
     <div
       ref={containerRef}
@@ -39,24 +47,42 @@ export function PaperViewer({ blocks, containerRef, onImageError }: PaperViewerP
         justifyContent: 'center',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '1000px' }}>
-        <PaperSheet style={{ width: '100%', maxWidth: '1000px', padding: '28px 36px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {blocks.map((b) => (
-              <section
-                key={b.id}
-                data-block-id={b.id}
-                id={b.id}
-                className={sectionClass(b)}
-                style={{ scrollMarginTop: '24px' }}
-              >
-                {b.type === 'table' && b.tableHtml != null ? (
-                  <SanitizedHtmlTable html={b.tableHtml} />
-                ) : (
-                  <PaperMarkdown sourcePos onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
-                )}
-              </section>
-            ))}
+      <div style={{ width: '100%', maxWidth: wrapWidth }}>
+        <PaperSheet style={{ width: '100%', maxWidth: sheetWidth, padding: side ? '28px 40px' : '28px 36px' }}>
+          {/* 아래 배치는 쌍 사이를 문단 간격보다 넓혀 어떤 원문의 번역인지 구분한다. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: translationMode === 'below' ? '34px' : '24px' }}>
+            {blocks.map((b) => {
+              const translation = translationMode === 'off' ? undefined : b.translation;
+              return (
+                <div
+                  key={b.id}
+                  className={translation ? 'pt-row pt-row-pair' : 'pt-row'}
+                  data-mode={translationMode}
+                >
+                  <section
+                    data-block-id={b.id}
+                    id={b.id}
+                    className={sectionClass(b)}
+                    style={{ scrollMarginTop: '24px' }}
+                  >
+                    {b.type === 'table' && b.tableHtml != null ? (
+                      <SanitizedHtmlTable html={b.tableHtml} />
+                    ) : (
+                      <PaperMarkdown sourcePos onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
+                    )}
+                  </section>
+                  {translation ? (
+                    <>
+                      <span className="pt-rule" aria-hidden="true" />
+                      {/* data-block-id를 붙이지 않아 선택 앵커·질문하기 대상에서 빠진다. */}
+                      <aside className="pt-translation" aria-label="한국어 번역">
+                        <PaperMarkdown>{translation}</PaperMarkdown>
+                      </aside>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </PaperSheet>
       </div>

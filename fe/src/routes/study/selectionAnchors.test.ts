@@ -143,6 +143,35 @@ describe('computeSelectionAnchors', () => {
     expect(computeSelectionAnchors(range, blocks)).toBeNull();
   });
 
+  it('번역 셀 안에서만 선택하면 null이다', () => {
+    const body = mount(
+      '<div class="pt-row"><section data-block-id="b1"><p>'
+      + '<span data-src-start="0" data-src-end="4">첫 문단</span></p></section>'
+      + '<aside class="pt-translation"><p>번역문이다</p></aside></div>',
+    );
+    const node = textIn(body.querySelector('.pt-translation p')!);
+    const range = document.createRange();
+    range.setStart(node, 0);
+    range.setEnd(node, 3);
+    expect(computeSelectionAnchors(range, blocks)).toBeNull();
+  });
+
+  it('원문에서 시작해 번역 셀로 넘어간 선택은 원문 끝에서 잘린다', () => {
+    const body = mount(
+      '<div class="pt-row"><section data-block-id="b1"><p>'
+      + `<span data-src-start="0" data-src-end="${SRC_A.length}">${SRC_A}</span></p></section>`
+      + '<aside class="pt-translation"><p>번역문이다</p></aside></div>',
+    );
+    const source = textIn(body.querySelector('section span')!);
+    const translated = textIn(body.querySelector('.pt-translation p')!);
+    const range = document.createRange();
+    range.setStart(source, 0);
+    range.setEnd(translated, 5);
+    expect(computeSelectionAnchors(range, blocks)).toEqual({
+      start: { blockId: 'b1', offset: 0 }, end: { blockId: 'b1', offset: SRC_A.length },
+    });
+  });
+
   it('blocks에 없는 blockId면 offset 없이 블록 단위로 준다', () => {
     const body = mount(
       '<section data-block-id="unknown"><p><span data-src-start="0" data-src-end="4">모르는</span></p></section>',

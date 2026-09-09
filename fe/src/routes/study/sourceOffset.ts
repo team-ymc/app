@@ -8,17 +8,25 @@ export interface SelectionRun {
   to: number;
 }
 
+/** 번역 셀 텍스트 — 원문 offset 대상이 아니라 선택에 섞여도 무시한다. */
+function isTranslationText(text: Text): boolean {
+  return text.parentElement?.closest('.pt-translation') != null;
+}
+
 /** Range와 겹치는 텍스트 구간을 문서 순서로 모은다. 길이 0인 구간은 제외된다. */
 export function collectRuns(range: Range): SelectionRun[] {
   const root = range.commonAncestorContainer;
   if (root.nodeType === Node.TEXT_NODE) {
-    const run = clip(root as Text, range);
+    const text = root as Text;
+    if (isTranslationText(text)) return [];
+    const run = clip(text, range);
     return run ? [run] : [];
   }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const runs: SelectionRun[] = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node as Text;
+    if (isTranslationText(text)) continue;
     if (!range.intersectsNode(text)) continue;
     const run = clip(text, range);
     if (run) runs.push(run);

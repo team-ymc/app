@@ -72,6 +72,37 @@ describe('collectRuns', () => {
     expect(collectRuns(range).map((r) => r.node.data.slice(r.from, r.to))).toEqual(['첫 문단']);
   });
 
+  it('번역 셀 안 텍스트 노드는 건너뛴다', () => {
+    const body = mount(
+      '<div class="pt-row"><section data-block-id="b1"><p>'
+      + '<span data-src-start="0" data-src-end="4">첫 문단</span></p></section>'
+      + '<aside class="pt-translation"><p>번역문</p></aside></div>',
+    );
+    const source = textIn(body.querySelector('section span')!);
+    const translated = textIn(body.querySelector('.pt-translation p')!);
+    const range = document.createRange();
+    range.setStart(source, 0);
+    range.setEnd(translated, 3);
+    expect(collectRuns(range).map((r) => r.node.data.slice(r.from, r.to))).toEqual(['첫 문단']);
+  });
+
+  it('원문 A → 다음 행 원문 B 선택에 사이 번역 셀이 섞이지 않는다', () => {
+    const body = mount(
+      '<div class="pt-row"><section data-block-id="b1"><p>'
+      + '<span data-src-start="0" data-src-end="4">첫 문단</span></p></section>'
+      + '<aside class="pt-translation"><p>첫 번역</p></aside></div>'
+      + '<div class="pt-row"><section data-block-id="b2"><p>'
+      + '<span data-src-start="0" data-src-end="4">둘째 문단</span></p></section>'
+      + '<aside class="pt-translation"><p>둘째 번역</p></aside></div>',
+    );
+    const first = textIn(body.querySelector('[data-block-id="b1"] span')!);
+    const second = textIn(body.querySelector('[data-block-id="b2"] span')!);
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(second, 5);
+    expect(collectRuns(range).map((r) => r.node.data.slice(r.from, r.to))).toEqual(['첫 문단', '둘째 문단']);
+  });
+
   it('역방향 드래그도 문서 순서로 정규화된다', () => {
     const body = mount(
       '<p><span data-src-start="0" data-src-end="2">가나</span>'

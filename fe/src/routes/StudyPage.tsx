@@ -308,7 +308,7 @@ function StudyPageContent({ paperId }: { paperId: string }) {
               position: 'relative',
             }}
           >
-            <PaperViewer blocks={blocks} containerRef={viewerRef} onImageError={handleImageError} />
+            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode="off" onImageError={handleImageError} />
             <SelectionLayer paperId={paperId} viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
             <ContentAskLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
           </div>
