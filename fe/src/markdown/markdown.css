@@ -121,3 +121,22 @@
 }
 .pt-markdown tr:first-child th { border-top: 2px solid var(--color-text-heading); }
 .pt-markdown tr:last-child td { border-bottom: 2px solid var(--color-text-heading); }
+
+/* 전체 번역 표시 — 원문 section 옆·아래에 형제 aside를 덧붙인다.
+   번역 셀은 data-block-id가 없어 선택 앵커 대상이 아니고 드래그로 선택되지 않는다. */
+.pt-row[data-mode="side"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: start;
+}
+.pt-row[data-mode="side"]:not(.pt-row-pair) > section { grid-column: 1 / -1; }
+.pt-row[data-mode="side"] .pt-rule { align-self: stretch; background: var(--color-border); }
+.pt-row[data-mode="below"] .pt-rule { display: none; }
+.pt-row[data-mode="below"] .pt-translation {
+  border-left: 2px solid var(--color-primary-subtle);
+  padding-left: 18px;
+  margin-top: 8px;
+}
+.pt-translation { user-select: none; cursor: default; }
+.pt-translation .pt-markdown { color: var(--color-text-muted); }

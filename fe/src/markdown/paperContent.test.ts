@@ -3,7 +3,7 @@ import { adaptPaperContent } from './paperContent';
 import type { PaperContentResponse } from '../api/types';
 
 function res(partial: Partial<PaperContentResponse>): PaperContentResponse {
-  return { paperId: 'p1', title: null, schemaVersion: 1, blocks: [], assets: {}, ...partial };
+  return { paperId: 'p1', title: null, sourceLanguage: null, schemaVersion: 1, blocks: [], assets: {}, ...partial };
 }
 
 describe('adaptPaperContent', () => {
@@ -124,5 +124,42 @@ describe('adaptPaperContent', () => {
       expect(block.sourceOffsetShift).toBeDefined();
       expect((block.markdown ?? '').slice(block.sourceOffsetShift!)).toBe(block.sourceText);
     }
+  });
+
+  it('para·caption의 textKor는 translation으로 옮기고, 제목 계열은 textKor가 있어도 translation이 없다', () => {
+    const out = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'p0', globalOrder: 0, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'para', textKor: '문단' } },
+        { blockId: 'c0', globalOrder: 1, label: 'figure_title', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'caption', textKor: '캡션' } },
+        { blockId: 'h0', globalOrder: 2, label: 'doc_title', headingLevel: 1, sectionPath: [], content: { format: 'text', text: 'Title', textKor: '제목' } },
+        { blockId: 'h1', globalOrder: 3, label: 'paragraph_title', headingLevel: 2, sectionPath: [], content: { format: 'text', text: 'Sub', textKor: '소제목' } },
+      ],
+    }));
+    expect(out.blocks[0]).toMatchObject({ translation: '문단' });
+    expect(out.blocks[1]).toMatchObject({ translation: '캡션' });
+    expect(out.blocks[2].translation).toBeUndefined();
+    expect(out.blocks[3].translation).toBeUndefined();
+  });
+
+  it('hasTranslation은 translation이 있는 블록이 하나라도 있으면 true, 없으면 false다', () => {
+    const withTranslation = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'p0', globalOrder: 0, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'para', textKor: '문단' } },
+      ],
+    }));
+    expect(withTranslation.hasTranslation).toBe(true);
+
+    const withoutTranslation = adaptPaperContent(res({
+      blocks: [
+        { blockId: 'p0', globalOrder: 0, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'para' } },
+        { blockId: 'h0', globalOrder: 1, label: 'doc_title', headingLevel: 1, sectionPath: [], content: { format: 'text', text: 'Title', textKor: '제목' } },
+      ],
+    }));
+    expect(withoutTranslation.hasTranslation).toBe(false);
+  });
+
+  it('sourceLanguage는 응답값 그대로 전달된다', () => {
+    expect(adaptPaperContent(res({ sourceLanguage: 'en' })).sourceLanguage).toBe('en');
+    expect(adaptPaperContent(res({ sourceLanguage: null })).sourceLanguage).toBeNull();
   });
 });

@@ -43,7 +43,7 @@ export class ApiError extends Error {
 
 // 본문 블록 내용 — format으로 판별한다.
 export type PaperBlockContentDto =
-  | { format: 'text'; text: string }
+  | { format: 'text'; text: string; textKor?: string }
   | { format: 'formula'; tex: string }
   | { format: 'table'; html: string }
   | { format: 'image'; assetKey: string };
@@ -63,6 +63,8 @@ export interface PaperContentAssetDto { url: string; mediaType: string; expiresA
 export interface PaperContentResponse {
   paperId: string;
   title: string | null;
+  /** BE가 검증한 문서 언어. 없거나 무효면 null. */
+  sourceLanguage: string | null;
   schemaVersion: number;
   blocks: PaperContentBlockDto[];
   assets: Record<string, PaperContentAssetDto>;

@@ -32,6 +32,10 @@ public class DocumentContent {
     @Column(name = "schema_version", nullable = false)
     private int schemaVersion;
 
+    /** BE가 검증한 문서 언어(en/ISO 639-1/und). 없거나 무효면 null (계약 sourceLanguage). */
+    @Column(name = "source_language", length = 8)
+    private String sourceLanguage;
+
     @Column(name = "ingested_at", nullable = false)
     private Instant ingestedAt;
 
@@ -39,16 +43,19 @@ public class DocumentContent {
         // JPA
     }
 
-    private DocumentContent(UUID documentId, String title, int schemaVersion, Instant ingestedAt) {
+    private DocumentContent(UUID documentId, String title, int schemaVersion, String sourceLanguage,
+            Instant ingestedAt) {
         this.documentId = documentId;
         this.title = title;
         this.schemaVersion = schemaVersion;
+        this.sourceLanguage = sourceLanguage;
         this.ingestedAt = ingestedAt;
     }
 
-    public static DocumentContent of(UUID documentId, String title, int schemaVersion, Instant now) {
+    public static DocumentContent of(UUID documentId, String title, int schemaVersion, String sourceLanguage,
+            Instant now) {
         Objects.requireNonNull(documentId, "documentId");
         Objects.requireNonNull(now, "now");
-        return new DocumentContent(documentId, title, schemaVersion, now);
+        return new DocumentContent(documentId, title, schemaVersion, sourceLanguage, now);
     }
 }

@@ -2,12 +2,14 @@
 -- prod는 validate라 배포 전에 반영해야 한다. ⚠ 엔티티가 바뀌면 이 파일도 함께 고칠 것.
 
 create table document_content (
-    document_id    uuid                        not null,
-    title          varchar(255),
-    schema_version integer                     not null,
-    ingested_at    timestamp(6) with time zone not null,
+    document_id     uuid                        not null,
+    title           varchar(255),
+    schema_version  integer                     not null,
+    source_language varchar(8),
+    ingested_at     timestamp(6) with time zone not null,
     primary key (document_id)
 );
+-- alter table document_content add column if not exists source_language varchar(8);
 
 create table document_content_block (
     id            bigserial                   not null,

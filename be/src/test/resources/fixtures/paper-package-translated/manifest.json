@@ -1,0 +1,12 @@
+{
+  "manifest_version": 1,
+  "document_id": "fixture-translated",
+  "source_language": "en",
+  "page_count": 1,
+  "parser": {"provider": "paddleocr", "model": "PaddleOCR-VL-1.6"},
+  "artifacts": {
+    "structure_document": {"path": "structure/document.json", "media_type": "application/json", "schema_version": 2},
+    "frontend_document": {"path": "frontend/document.json", "media_type": "application/json", "schema_version": 1}
+  },
+  "assets": {"path": "assets", "registry": "structure_document"}
+}

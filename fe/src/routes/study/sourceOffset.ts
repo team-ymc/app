@@ -8,17 +8,25 @@ export interface SelectionRun {
   to: number;
 }
 
+/** 번역 셀 텍스트 — 원문 offset 대상이 아니라 선택에 섞여도 무시한다. */
+function isTranslationText(text: Text): boolean {
+  return text.parentElement?.closest('.pt-translation') != null;
+}
+
 /** Range와 겹치는 텍스트 구간을 문서 순서로 모은다. 길이 0인 구간은 제외된다. */
 export function collectRuns(range: Range): SelectionRun[] {
   const root = range.commonAncestorContainer;
   if (root.nodeType === Node.TEXT_NODE) {
-    const run = clip(root as Text, range);
+    const text = root as Text;
+    if (isTranslationText(text)) return [];
+    const run = clip(text, range);
     return run ? [run] : [];
   }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const runs: SelectionRun[] = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node as Text;
+    if (isTranslationText(text)) continue;
     if (!range.intersectsNode(text)) continue;
     const run = clip(text, range);
     if (run) runs.push(run);
@@ -56,6 +64,19 @@ function leadingSpaces(run: SelectionRun): number {
 
 function trailingSpaces(run: SelectionRun): number {
   return /\s*$/.exec(run.node.data.slice(run.from, run.to))![0].length;
+}
+
+/** run 텍스트를 표시용 문자열로 잇는다. 블록이 바뀌는 지점만 줄바꿈으로 나눈다. */
+export function runsToText(runs: SelectionRun[]): string {
+  let text = '';
+  let prevBlock: Element | null = null;
+  for (const run of runs) {
+    const block = run.node.parentElement?.closest('[data-block-id]') ?? null;
+    if (text && block !== prevBlock) text += '\n';
+    text += run.node.data.slice(run.from, run.to);
+    prevBlock = block;
+  }
+  return text.trim();
 }
 
 /** 경계가 수식 래퍼 안인지 — 안이면 래퍼 바깥으로 스냅해야 한다. */

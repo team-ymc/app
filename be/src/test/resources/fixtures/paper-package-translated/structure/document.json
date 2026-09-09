@@ -1,0 +1,7 @@
+{
+  "schema_version": 2,
+  "document_id": "fixture-translated",
+  "assets": {
+    "image_0": {"kind": "image", "media_type": "image/jpeg", "path": "assets/images/image_0.jpg", "source_block_id": "p0000-b0004"}
+  }
+}

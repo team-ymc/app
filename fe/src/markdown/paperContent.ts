@@ -17,16 +17,22 @@ export interface PaperBlock {
   sourceText?: string;
   /** markdown offset − 원문 offset. heading의 '## ' 길이. */
   sourceOffsetShift?: number;
+  /** 한국어 번역. 제목 계열은 textKor가 와도 채우지 않는다. */
+  translation?: string;
 }
 
 export interface TocEntry { blockId: string; text: string; level: number; }
 
 export interface PaperContent {
   title: string | null;
+  /** BE가 검증한 문서 언어. 없거나 무효면 null. */
+  sourceLanguage: string | null;
   blocks: PaperBlock[];
   toc: TocEntry[];
   /** 이미지 presigned URL 중 가장 이른 만료 시각. asset이 없으면 null. */
   assetExpiresAt: string | null;
+  /** 블록 중 translation이 하나라도 있으면 true. */
+  hasTranslation: boolean;
 }
 
 export async function getPaperContent(paperId: string): Promise<PaperContent> {
@@ -42,7 +48,8 @@ export function adaptPaperContent(res: PaperContentResponse): PaperContent {
   const earliest = expiries.length
     ? expiries.reduce((min, v) => (Date.parse(v) < Date.parse(min) ? v : min))
     : null;
-  return { title: res.title, blocks, toc, assetExpiresAt: earliest };
+  const hasTranslation = blocks.some((b) => b.translation !== undefined);
+  return { title: res.title, sourceLanguage: res.sourceLanguage, blocks, toc, assetExpiresAt: earliest, hasTranslation };
 }
 
 function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBlock {
@@ -64,10 +71,11 @@ function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBl
           headingLevel: level,
         }, c.text, hashes.length + 1);
       }
+      const translation = c.textKor ? c.textKor : undefined;
       if (b.label === 'figure_title') {
-        return withSource({ id: b.blockId, type: 'caption', markdown: c.text }, c.text, 0);
+        return withSource({ id: b.blockId, type: 'caption', markdown: c.text, translation }, c.text, 0);
       }
-      return withSource({ id: b.blockId, type: 'para', markdown: c.text }, c.text, 0);
+      return withSource({ id: b.blockId, type: 'para', markdown: c.text, translation }, c.text, 0);
     }
     case 'formula':
       return { id: b.blockId, type: 'equation', markdown: `$$\n${c.tex}\n$$` };

@@ -41,7 +41,8 @@ public class DocumentContentIngestService {
         assetRepository.deleteByDocumentId(documentId);
         contentRepository.deleteByDocumentId(documentId);
 
-        contentRepository.save(DocumentContent.of(documentId, pkg.title(), pkg.schemaVersion(), Instant.now()));
+        contentRepository.save(DocumentContent.of(
+                documentId, pkg.title(), pkg.schemaVersion(), pkg.sourceLanguage(), Instant.now()));
         blockRepository.saveAll(pkg.blocks().stream()
                 .map(b -> DocumentContentBlock.of(documentId, b.blockId(), b.globalOrder(), b.label(),
                         b.headingLevel(), b.sectionPath(), b.content()))

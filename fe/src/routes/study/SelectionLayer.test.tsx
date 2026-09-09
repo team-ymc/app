@@ -24,7 +24,7 @@ function selection(overrides: Partial<TextSelection> = {}): TextSelection {
   };
 }
 
-function setup(sel: TextSelection | null) {
+function setup(sel: TextSelection | null, translationVisible = false) {
   vi.mocked(useTextSelection).mockReturnValue(sel);
   const onAsk = vi.fn();
   const viewerRef = createRef<HTMLDivElement>();
@@ -34,7 +34,7 @@ function setup(sel: TextSelection | null) {
         <section data-block-id="b0">An attention function</section>
         <section data-block-id="b1">can be described</section>
       </div>
-      <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} />
+      <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} translationVisible={translationVisible} />
     </div>,
   );
   return { onAsk };
@@ -102,7 +102,7 @@ describe('SelectionLayer — 현재 상태기계', () => {
     const long: PaperBlock[] = [{ id: 'L', type: 'para', markdown: 'x', sourceText: 'a'.repeat(30001), sourceOffsetShift: 0 }];
     vi.mocked(useTextSelection).mockReturnValue(selection({ anchors: { start: { blockId: 'L' }, end: { blockId: 'L' } } }));
     const viewerRef = createRef<HTMLDivElement>();
-    render(<div><div ref={viewerRef}><section data-block-id="L">x</section></div><SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={long} onAsk={vi.fn()} /></div>);
+    render(<div><div ref={viewerRef}><section data-block-id="L">x</section></div><SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={long} onAsk={vi.fn()} translationVisible={false} /></div>);
     const button = screen.getByRole('button', { name: /번역/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.closest('span')?.title).toBe('선택 영역이 너무 큽니다.');
@@ -211,5 +211,17 @@ describe('SelectionLayer — 현재 상태기계', () => {
     act(() => { fireEvent.mouseDown(document.body); });
     expect(sel.clear).toHaveBeenCalled();
     expect(screen.queryByText('어텐션')).toBeNull();
+  });
+
+  it('전체 번역이 켜져 있으면 번역 버튼 없이 질문하기만 뜬다', () => {
+    setup(selection(), true);
+    expect(screen.queryByRole('button', { name: /번역/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /질문하기/ })).toBeTruthy();
+  });
+
+  it('전체 번역이 꺼져 있으면 번역 버튼이 그대로 있다', () => {
+    setup(selection(), false);
+    expect(screen.getByRole('button', { name: /번역/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /질문하기/ })).toBeTruthy();
   });
 });

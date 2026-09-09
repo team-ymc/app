@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 public record PaperContentView(
         UUID paperId,
         String title,
+        String sourceLanguage,
         int schemaVersion,
         List<Block> blocks,
         Map<String, Asset> assets) {
