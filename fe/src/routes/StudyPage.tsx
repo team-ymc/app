@@ -15,7 +15,8 @@ import { IconButton } from '../design/components/IconButton';
 import { getStatus } from '../api/papers';
 import { ApiError } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
-import { PaperViewer } from './study/PaperViewer';
+import { PaperViewer, type TranslationMode } from './study/PaperViewer';
+import { TranslationModeButton } from './study/TranslationModeButton';
 import { SelectionLayer } from './study/SelectionLayer';
 import { ContentAskLayer } from './study/ContentAskLayer';
 import { TocRail } from './study/TocRail';
@@ -28,9 +29,20 @@ import { usePlanQuery } from '../plan/usePlanQuery';
 import { isExhausted, exhaustedPlaceholder } from '../plan/planLabels';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
+const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
 const SPLIT_MIN = 30;
 const SPLIT_MAX = 75;
 const SPLIT_DEFAULT = 70;
+// 옆 배치로 들어갈 때 맞추는 채팅 폭과 스플리터 폭.
+const CHAT_SIDE_WIDTH = 320;
+const SPLITTER_WIDTH = 6;
+
+/** 채팅이 CHAT_SIDE_WIDTH가 되는 뷰어 비율. 폭을 못 재면 null(기존 비율 유지). */
+export function splitPctForChatWidth(regionWidth: number): number | null {
+  if (!(regionWidth > 0)) return null;
+  const pct = ((regionWidth - CHAT_SIDE_WIDTH - SPLITTER_WIDTH) / regionWidth) * 100;
+  return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, pct));
+}
 
 export default function StudyPage() {
   const { paperId } = useParams<{ paperId: string }>();
@@ -84,6 +96,14 @@ function StudyPageContent({ paperId }: { paperId: string }) {
       return false;
     }
   });
+  const [translationMode, setTranslationMode] = useState<TranslationMode>(() => {
+    try {
+      const saved = localStorage.getItem(TRANSLATION_STORAGE_KEY);
+      return saved === 'below' || saved === 'side' ? saved : 'off';
+    } catch {
+      return 'off';
+    }
+  });
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -121,6 +141,24 @@ function StudyPageContent({ paperId }: { paperId: string }) {
       /* storage 접근 불가 — night 상태는 세션 내에서만 유지된다 */
     }
   }, [nightMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TRANSLATION_STORAGE_KEY, translationMode);
+    } catch {
+      /* storage 접근 불가 — 번역 배치는 세션 내에서만 유지된다 */
+    }
+  }, [translationMode]);
+
+  // 옆 배치로 들어갈 때만 채팅 폭을 한 번 맞춘다. 이후 스플리터 조작과 off 복귀는 건드리지 않는다.
+  function handleCycleTranslation() {
+    const next: TranslationMode = translationMode === 'off' ? 'below' : translationMode === 'below' ? 'side' : 'off';
+    if (next === 'side' && !chatCollapsed) {
+      const pct = splitPctForChatWidth(splitRegionRef.current?.getBoundingClientRect().width ?? 0);
+      if (pct !== null) setSplitPct(pct);
+    }
+    setTranslationMode(next);
+  }
 
   function handleJump(blockId: string) {
     document.getElementById(blockId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -192,6 +230,10 @@ function StudyPageContent({ paperId }: { paperId: string }) {
       </div>
     );
   }
+
+  const hasTranslation = contentQuery.data?.hasTranslation ?? false;
+  // 저장된 선호값은 그대로 두고, 번역이 없는 논문에서는 off로만 적용한다.
+  const effectiveMode: TranslationMode = hasTranslation ? translationMode : 'off';
 
   const titleText =
     contentQuery.data?.title
@@ -280,6 +322,16 @@ function StudyPageContent({ paperId }: { paperId: string }) {
             borderLeft: '1px solid rgba(255,253,247,0.14)',
           }}
         >
+          <TranslationModeButton
+            mode={effectiveMode}
+            disabled={!hasTranslation}
+            disabledReason={
+              contentQuery.data?.sourceLanguage === 'ko'
+                ? '한국어 논문은 번역하지 않습니다'
+                : '이 논문은 번역이 준비되지 않았습니다'
+            }
+            onCycle={handleCycleTranslation}
+          />
           <IconButton
             icon={nightMode ? 'sun' : 'moon'}
             label={nightMode ? '주간 모드로 전환' : 'Night Study Mode 켜기'}
@@ -308,8 +360,14 @@ function StudyPageContent({ paperId }: { paperId: string }) {
               position: 'relative',
             }}
           >
-            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode="off" onImageError={handleImageError} />
-            <SelectionLayer paperId={paperId} viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
+            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode={effectiveMode} onImageError={handleImageError} />
+            <SelectionLayer
+              paperId={paperId}
+              viewerRef={viewerRef}
+              blocks={blocks}
+              onAsk={handleAsk}
+              translationVisible={effectiveMode !== 'off'}
+            />
             <ContentAskLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
           </div>
 

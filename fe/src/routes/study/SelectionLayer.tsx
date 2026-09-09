@@ -21,6 +21,8 @@ export interface SelectionLayerProps {
   viewerRef: RefObject<HTMLDivElement | null>;
   blocks: PaperBlock[];
   onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
+  /** 전체 번역이 켜져 있으면 선택 팝업의 번역 버튼을 숨긴다. */
+  translationVisible: boolean;
 }
 
 // computeToolbarPosition의 top 계산은 popup.height를 쓰지 않는다(brief 구현 참고) — width만 정확하면
@@ -45,7 +47,7 @@ function translateBlockedMessage(check: TranslationSelectionCheck): string | und
   return check === 'ok' ? undefined : TRANSLATE_BLOCKED_MESSAGE[check];
 }
 
-export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionLayerProps) {
+export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationVisible }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
@@ -211,14 +213,18 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk }: SelectionL
           zIndex: 80,
         }}
       >
-        <ToolbarButton
-          icon={<Translate size={14} />}
-          label="번역"
-          onClick={handleTranslate}
-          disabled={translateDisabled}
-          title={blocked}
-        />
-        <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,253,247,0.18)', margin: '4px 0' }} />
+        {!translationVisible && (
+          <>
+            <ToolbarButton
+              icon={<Translate size={14} />}
+              label="번역"
+              onClick={handleTranslate}
+              disabled={translateDisabled}
+              title={blocked}
+            />
+            <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,253,247,0.18)', margin: '4px 0' }} />
+          </>
+        )}
         <ToolbarButton icon={<ChatCircleText size={14} />} label="질문하기" onClick={handleAsk} />
       </div>
     );
