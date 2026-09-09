@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectRuns, isMathRun, resolveOffset, trimRuns } from './sourceOffset';
+import { collectRuns, isMathRun, resolveOffset, runsToText, trimRuns } from './sourceOffset';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 const para: PaperBlock = {
@@ -187,5 +187,48 @@ describe('resolveOffset', () => {
     const node = textIn(body.querySelector('span')!);
     expect(resolveOffset(node, 3, emoji, 'end')).toBeUndefined(); // 🚀 중간
     expect(resolveOffset(node, 4, emoji, 'end')).toBe(4);         // 🚀 뒤
+  });
+});
+
+describe('runsToText', () => {
+  it('같은 블록 안 연속 run은 그대로 잇는다', () => {
+    const body = mount(
+      '<section data-block-id="b1"><p><span data-src-start="0" data-src-end="2">가나</span>'
+      + '<strong><span data-src-start="2" data-src-end="4">다라</span></strong></p></section>',
+    );
+    const spans = body.querySelectorAll('span');
+    const range = document.createRange();
+    range.setStart(textIn(spans[0]), 0);
+    range.setEnd(textIn(spans[1]), 2);
+    expect(runsToText(trimRuns(collectRuns(range)))).toBe('가나다라');
+  });
+
+  it('블록이 바뀌는 지점만 줄바꿈으로 나눈다', () => {
+    const body = mount(
+      '<section data-block-id="b1"><span data-src-start="0" data-src-end="4">첫 문단</span></section>'
+      + '<section data-block-id="b2"><span data-src-start="0" data-src-end="5">둘째 문단</span></section>',
+    );
+    const first = textIn(body.querySelector('[data-block-id="b1"] span')!);
+    const second = textIn(body.querySelector('[data-block-id="b2"] span')!);
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(second, second.data.length);
+    expect(runsToText(trimRuns(collectRuns(range)))).toBe('첫 문단\n둘째 문단');
+  });
+
+  it('원문 A → 번역 셀 → 원문 B 선택에 번역문이 섞이지 않는다', () => {
+    const body = mount(
+      '<div class="pt-row"><section data-block-id="b1"><span data-src-start="0" data-src-end="4">첫 문단</span></section>'
+      + '<aside class="pt-translation"><p>첫 번역</p></aside></div>'
+      + '<div class="pt-row"><section data-block-id="b2"><span data-src-start="0" data-src-end="5">둘째 문단</span></section></div>',
+    );
+    const first = textIn(body.querySelector('[data-block-id="b1"] span')!);
+    const second = textIn(body.querySelector('[data-block-id="b2"] span')!);
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(second, second.data.length);
+    const text = runsToText(trimRuns(collectRuns(range)));
+    expect(text).toBe('첫 문단\n둘째 문단');
+    expect(text).not.toContain('첫 번역');
   });
 });

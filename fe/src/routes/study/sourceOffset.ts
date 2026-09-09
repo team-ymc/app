@@ -66,6 +66,19 @@ function trailingSpaces(run: SelectionRun): number {
   return /\s*$/.exec(run.node.data.slice(run.from, run.to))![0].length;
 }
 
+/** run 텍스트를 표시용 문자열로 잇는다. 블록이 바뀌는 지점만 줄바꿈으로 나눈다. */
+export function runsToText(runs: SelectionRun[]): string {
+  let text = '';
+  let prevBlock: Element | null = null;
+  for (const run of runs) {
+    const block = run.node.parentElement?.closest('[data-block-id]') ?? null;
+    if (text && block !== prevBlock) text += '\n';
+    text += run.node.data.slice(run.from, run.to);
+    prevBlock = block;
+  }
+  return text.trim();
+}
+
 /** 경계가 수식 래퍼 안인지 — 안이면 래퍼 바깥으로 스냅해야 한다. */
 export function isMathRun(node: Text): boolean {
   return node.parentElement?.closest('[data-src-start]')?.hasAttribute('data-src-math') ?? false;
