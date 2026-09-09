@@ -20,9 +20,10 @@ export function TranslationModeButton({ mode, disabled, disabledReason, onCycle 
   const active = mode !== 'off';
   const paperChip = active && !disabled;
 
-  const bg = disabled ? 'rgba(255,253,247,0.05)' : paperChip ? 'var(--color-bg-paper)' : 'rgba(255,253,247,0.08)';
-  const border = disabled ? 'rgba(255,253,247,0.12)' : paperChip ? 'var(--color-bg-paper)' : 'rgba(255,253,247,0.18)';
-  const color = paperChip ? 'var(--color-primary)' : 'rgba(255,253,247,0.88)';
+  // 활성 칩은 야간 모드에서도 상단바(월넛, 불변)와 대비를 유지해야 하므로 야간 불변 원색 변수를 쓴다.
+  const bg = disabled ? 'rgba(255,253,247,0.05)' : paperChip ? 'var(--paper)' : 'rgba(255,253,247,0.08)';
+  const border = disabled ? 'rgba(255,253,247,0.12)' : paperChip ? 'var(--paper)' : 'rgba(255,253,247,0.18)';
+  const color = paperChip ? 'var(--navy-ink)' : 'rgba(255,253,247,0.88)';
   const hovered = hover && !disabled;
 
   return (
@@ -42,8 +43,8 @@ export function TranslationModeButton({ mode, disabled, disabledReason, onCycle 
         justifyContent: 'center',
         gap: '7px',
         flexShrink: 0,
-        background: hovered ? (paperChip ? 'var(--color-bg-surface)' : 'rgba(255,253,247,0.16)') : bg,
-        border: `1px solid ${hovered ? (paperChip ? 'var(--color-bg-surface)' : 'rgba(255,253,247,0.32)') : border}`,
+        background: hovered ? (paperChip ? 'var(--surface-warm)' : 'rgba(255,253,247,0.16)') : bg,
+        border: `1px solid ${hovered ? (paperChip ? 'var(--surface-warm)' : 'rgba(255,253,247,0.32)') : border}`,
         borderRadius: '8px',
         color: hovered && !paperChip ? 'var(--color-on-dark)' : color,
         opacity: disabled ? 0.42 : 1,

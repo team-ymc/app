@@ -75,7 +75,7 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
                     <>
                       <span className="pt-rule" aria-hidden="true" />
                       {/* data-block-id를 붙이지 않아 선택 앵커·질문하기 대상에서 빠진다. */}
-                      <aside className="pt-translation" aria-label="한국어 번역">
+                      <aside className="pt-translation" role="note">
                         <PaperMarkdown>{translation}</PaperMarkdown>
                       </aside>
                     </>

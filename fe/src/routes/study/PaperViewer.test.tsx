@@ -42,7 +42,7 @@ describe('PaperViewer 번역 표시', () => {
     expect(section.contains(aside)).toBe(false);
     expect(aside.hasAttribute('data-block-id')).toBe(false);
     expect(aside.closest('[data-block-id]')).toBeNull();
-    expect(aside.getAttribute('aria-label')).toBe('한국어 번역');
+    expect(aside.getAttribute('role')).toBe('note');
     expect(aside.textContent).toContain('어텐션 함수는');
     expect(section.textContent).not.toContain('어텐션');
   });
