@@ -58,7 +58,7 @@ describe('PaperViewer 번역 표시', () => {
       const row = container.querySelector<HTMLElement>(`section[data-block-id="${id}"]`)!.parentElement!;
       expect(row.querySelector('aside.pt-translation')).toBeNull();
     }
-    expect(container.querySelectorAll('aside.pt-translation')).toHaveLength(1);
+    expect(container.querySelectorAll('aside.pt-translation')).toHaveLength(2);
   });
 
   it('off에서는 aside가 없다', () => {
@@ -85,19 +85,22 @@ describe('PaperViewer 번역 표시', () => {
     expect(heading.querySelector('h2')?.textContent).toBe('Introduction');
   });
 
-  it('캡션 번역은 별도 셀 없이 캡션 박스 안 두 번째 줄로 붙인다', () => {
+  it('캡션 번역은 문단처럼 별도 칸이고 캡션 박스 모양이다', () => {
     const container = setup('side');
     const row = container.querySelector('[data-block-id="c1"]')!.parentElement!;
-    expect(row.classList.contains('pt-row-pair')).toBe(false);
-    expect(row.querySelector('aside.pt-translation')).toBeNull();
-    const line = row.querySelector('section > .pt-caption-translation')!;
-    expect(line).not.toBeNull();
-    expect(line.classList.contains('pt-translation')).toBe(true);
-    expect(line.textContent).toContain('그림 1');
+    expect(row.classList.contains('pt-row-pair')).toBe(true);
+    const section = row.querySelector('section')!;
+    expect(section.querySelector('.pt-translation')).toBeNull();
+    const aside = row.querySelector('aside.pt-translation')!;
+    expect(aside).not.toBeNull();
+    expect(aside.classList.contains('pt-caption-block')).toBe(true);
+    expect(aside.hasAttribute('data-block-id')).toBe(false);
+    expect(aside.textContent).toContain('그림 1');
   });
 
-  it('off에서는 캡션 번역 줄도 없다', () => {
-    const container = setup('off');
-    expect(container.querySelector('.pt-caption-translation')).toBeNull();
+  it('문단 번역 칸에는 캡션 박스 클래스가 없다', () => {
+    const container = setup('side');
+    const aside = container.querySelector('[data-block-id="p1"]')!.parentElement!.querySelector('aside.pt-translation')!;
+    expect(aside.classList.contains('pt-caption-block')).toBe(false);
   });
 });
