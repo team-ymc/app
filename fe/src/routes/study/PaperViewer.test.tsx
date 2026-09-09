@@ -18,6 +18,11 @@ const BLOCKS: PaperBlock[] = [
     id: 'p2', type: 'para', markdown: 'No translation here.',
     sourceText: 'No translation here.', sourceOffsetShift: 0,
   },
+  {
+    id: 'c1', type: 'caption', markdown: 'Figure 1: The Transformer.',
+    sourceText: 'Figure 1: The Transformer.', sourceOffsetShift: 0,
+    translation: '그림 1: 트랜스포머.',
+  },
 ];
 
 function setup(mode: 'off' | 'below' | 'side') {
@@ -78,5 +83,21 @@ describe('PaperViewer 번역 표시', () => {
     expect(heading.id).toBe('h1');
     expect(heading.className).toContain('pt-section-start');
     expect(heading.querySelector('h2')?.textContent).toBe('Introduction');
+  });
+
+  it('캡션 번역은 별도 셀 없이 캡션 박스 안 두 번째 줄로 붙인다', () => {
+    const container = setup('side');
+    const row = container.querySelector('[data-block-id="c1"]')!.parentElement!;
+    expect(row.classList.contains('pt-row-pair')).toBe(false);
+    expect(row.querySelector('aside.pt-translation')).toBeNull();
+    const line = row.querySelector('section > .pt-caption-translation')!;
+    expect(line).not.toBeNull();
+    expect(line.classList.contains('pt-translation')).toBe(true);
+    expect(line.textContent).toContain('그림 1');
+  });
+
+  it('off에서는 캡션 번역 줄도 없다', () => {
+    const container = setup('off');
+    expect(container.querySelector('.pt-caption-translation')).toBeNull();
   });
 });

@@ -53,10 +53,13 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
           <div style={{ display: 'flex', flexDirection: 'column', gap: translationMode === 'below' ? '34px' : '24px' }}>
             {blocks.map((b) => {
               const translation = translationMode === 'off' ? undefined : b.translation;
+              // 캡션은 아트보드대로 캡션 박스 안 두 번째 줄로 붙인다. 옆·아래 배치의 별도 셀은 문단만.
+              const captionTranslation = b.type === 'caption' ? translation : undefined;
+              const cellTranslation = b.type === 'caption' ? undefined : translation;
               return (
                 <div
                   key={b.id}
-                  className={translation ? 'pt-row pt-row-pair' : 'pt-row'}
+                  className={cellTranslation ? 'pt-row pt-row-pair' : 'pt-row'}
                   data-mode={translationMode}
                 >
                   <section
@@ -70,13 +73,18 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
                     ) : (
                       <PaperMarkdown sourcePos onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
                     )}
+                    {captionTranslation ? (
+                      <div className="pt-translation pt-caption-translation">
+                        <PaperMarkdown>{captionTranslation}</PaperMarkdown>
+                      </div>
+                    ) : null}
                   </section>
-                  {translation ? (
+                  {cellTranslation ? (
                     <>
                       <span className="pt-rule" aria-hidden="true" />
                       {/* data-block-id를 붙이지 않아 선택 앵커·질문하기 대상에서 빠진다. */}
                       <aside className="pt-translation" role="note">
-                        <PaperMarkdown>{translation}</PaperMarkdown>
+                        <PaperMarkdown>{cellTranslation}</PaperMarkdown>
                       </aside>
                     </>
                   ) : null}
