@@ -22,4 +22,8 @@ describe('translationDisabledReason', () => {
     expect(translationDisabledReason('READY', false)).toBe('이 논문은 번역이 준비되지 않았습니다');
     expect(translationDisabledReason(undefined, false)).toBe('이 논문은 번역이 준비되지 않았습니다');
   });
+
+  it('READY이고 번역 블록이 있으면 비활성 사유가 없다', () => {
+    expect(translationDisabledReason('READY', true)).toBe('');
+  });
 });
