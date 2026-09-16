@@ -1,6 +1,7 @@
 package com.ymc.paper.infra.parsing;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -107,6 +108,43 @@ public class S3PaperPackageReader implements PaperPackageReader {
 
         return new ParsedPaperPackage(
                 title, frontend.schemaVersion(), sourceLanguage, List.copyOf(blocks), List.copyOf(assets));
+    }
+
+    @Override
+    public Map<String, String> readTranslations(String manifestKey) {
+        String prefix = packagePrefix(manifestKey);
+        Manifest manifest = parse(fileStorage.readUtf8(manifestKey), Manifest.class, manifestKey);
+        Manifest.Artifact sidecar = manifest.artifacts() == null ? null : manifest.artifacts().frontendTranslationKo();
+        if (sidecar == null || sidecar.path() == null) {
+            log.warn("manifest에 frontend_translation_ko가 없습니다, 번역 없이 진행: manifestKey={}", manifestKey);
+            return Map.of();
+        }
+        String sidecarKey = prefix + sidecar.path();
+        TranslationSidecar doc;
+        try {
+            doc = parse(fileStorage.readUtf8(sidecarKey), TranslationSidecar.class, sidecarKey);
+        } catch (RuntimeException e) {
+            log.warn("번역 사이드카를 읽지 못했습니다, 번역 없이 진행: key={}", sidecarKey, e);
+            return Map.of();
+        }
+        if (doc.schemaVersion() == null || doc.schemaVersion() != 1 || doc.blocks() == null) {
+            log.warn("번역 사이드카 schema_version 불일치 또는 blocks 없음, 번역 없이 진행: key={}, schema_version={}",
+                    sidecarKey, doc.schemaVersion());
+            return Map.of();
+        }
+        Map<String, String> translations = new LinkedHashMap<>();
+        for (TranslationSidecarBlock block : doc.blocks()) {
+            if (!"translated".equals(block.translationStatus())) {
+                continue;
+            }
+            String textKor = block.translatedBlockContent() == null ? null : block.translatedBlockContent().textKor();
+            if (block.blockId() == null || textKor == null || textKor.isEmpty()) {
+                log.warn("translated인데 text_kor가 없는 블록, 건너뜀: blockId={}, key={}", block.blockId(), sidecarKey);
+                continue;
+            }
+            translations.put(block.blockId(), textKor);
+        }
+        return translations;
     }
 
     /** manifest·frontend의 source_language를 정규화 후 병합한다. 둘 다 유효하고 다르면 WARN 후 frontend 값을 쓴다. */
@@ -225,7 +263,8 @@ public class S3PaperPackageReader implements PaperPackageReader {
         @JsonIgnoreProperties(ignoreUnknown = true)
         record Artifacts(
                 @JsonProperty("frontend_document") Artifact frontendDocument,
-                @JsonProperty("structure_document") Artifact structureDocument) {
+                @JsonProperty("structure_document") Artifact structureDocument,
+                @JsonProperty("frontend_translation_ko") Artifact frontendTranslationKo) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
@@ -256,5 +295,22 @@ public class S3PaperPackageReader implements PaperPackageReader {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record RegisteredAsset(String path, @JsonProperty("media_type") String mediaType) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslationSidecar(
+            @JsonProperty("schema_version") Integer schemaVersion,
+            List<TranslationSidecarBlock> blocks) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslationSidecarBlock(
+            @JsonProperty("block_id") String blockId,
+            @JsonProperty("translation_status") String translationStatus,
+            @JsonProperty("translated_block_content") TranslatedBlockContent translatedBlockContent) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslatedBlockContent(@JsonProperty("text_kor") String textKor) {
     }
 }

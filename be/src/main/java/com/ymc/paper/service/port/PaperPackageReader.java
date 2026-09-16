@@ -1,5 +1,7 @@
 package com.ymc.paper.service.port;
 
+import java.util.Map;
+
 /**
  * S3의 파서 산출물 패키지를 읽어 계약형으로 변환한다.
  * 구현: {@code infra/parsing/S3PaperPackageReader}.
@@ -13,4 +15,12 @@ public interface PaperPackageReader {
      *         — SQS 재전달 5회 후 DLQ로 빠진다.
      */
     ParsedPaperPackage read(String manifestKey);
+
+    /**
+     * 컴파일 산출물 사이드카(frontend/translation-ko.json)에서 번역된 블록만 읽는다.
+     *
+     * @return blockId → text_kor. manifest에 사이드카가 없거나 형식이 어긋나면 WARN 후 빈 Map.
+     *         manifest 자체를 못 읽으면 예외 — 파싱 때 읽은 같은 파일이라 일시 장애로 본다.
+     */
+    Map<String, String> readTranslations(String manifestKey);
 }
