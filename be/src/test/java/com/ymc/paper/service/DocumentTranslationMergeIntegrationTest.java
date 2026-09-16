@@ -46,7 +46,7 @@ class DocumentTranslationMergeIntegrationTest extends IntegrationTest {
 
         assertThat(merged).isEqualTo(2);
         List<DocumentContentBlock> blocks = blocksOf(paper.getDocumentId());
-        // block 0(doc_title)은 fixture에 파서 시점 text_kor가 남아 있어 여기서는 검증하지 않는다 — 다음 태스크에서 fixture 정리 후 재검증.
+        assertThat(blocks.get(0).getContent().has("textKor")).isFalse();   // doc_title
         assertThat(blocks.get(1).getContent().get("textKor").asText()).contains("새로운 구조");
         assertThat(blocks.get(2).getContent().get("textKor").asText()).contains("영어로 된 본문");
         assertThat(blocks.get(3).getContent().has("textKor")).isFalse();   // reference_content

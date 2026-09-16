@@ -300,7 +300,7 @@ public abstract class IntegrationTest {
                 "assets/tables/table_0.html"));
     }
 
-    /** source_language·text_kor가 채워진 fixtures/paper-package-translated/를 올린다. */
+    /** source_language=en이고 컴파일 사이드카가 있는 fixtures/paper-package-translated/를 올린다. */
     protected String givenTranslatedPackageOnS3(UUID paperId) {
         return givenPackageOnS3(paperId, "paper-package-translated", List.of(
                 "manifest.json",

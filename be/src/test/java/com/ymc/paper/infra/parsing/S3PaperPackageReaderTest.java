@@ -194,21 +194,11 @@ class S3PaperPackageReaderTest {
     }
 
     @Test
-    void 번역이_있는_패키지는_sourceLanguage와_textKor를_담고_WARN이_없다(CapturedOutput output) {
+    void read는_사이드카가_있어도_본문에_textKor를_넣지_않는다(CapturedOutput output) {
         ParsedPaperPackage pkg = reader.read("papers/translated/manifest.json");
 
         assertThat(pkg.sourceLanguage()).isEqualTo("en");
-
-        ParsedPaperPackage.Block abstractBlock = blockById(pkg, "p0000-b0001");
-        assertThat(abstractBlock.content().get("textKor").asText()).contains("새로운 구조");
-        ParsedPaperPackage.Block textBlock = blockById(pkg, "p0000-b0002");
-        assertThat(textBlock.content().get("textKor").asText()).contains("영어로 된 본문");
-
-        ParsedPaperPackage.Block reference = blockById(pkg, "p0000-b0003");
-        assertThat(reference.content().has("textKor")).isFalse();
-        ParsedPaperPackage.Block image = blockById(pkg, "p0000-b0004");
-        assertThat(image.content().has("textKor")).isFalse();
-
+        assertThat(pkg.blocks()).allSatisfy(b -> assertThat(b.content().has("textKor")).isFalse());
         assertThat(output.getOut()).doesNotContain("WARN");
     }
 
@@ -222,14 +212,11 @@ class S3PaperPackageReaderTest {
     }
 
     @Test
-    void frontend만_형식이_어긋나면_manifest값으로_폴백하고_정합성_A와_C_WARN을_남긴다(CapturedOutput output) {
+    void frontend만_형식이_어긋나면_manifest값으로_폴백하고_형식_WARN만_남긴다(CapturedOutput output) {
         ParsedPaperPackage pkg = reader.read("papers/badlang/manifest.json");
 
         assertThat(pkg.sourceLanguage()).isEqualTo("en");
         assertThat(output.getOut()).contains("unknown");
-        assertThat(output.getOut()).contains("번역이 없는 블록");
-        assertThat(output.getOut()).contains("참고문헌");
-        // 한쪽만 유효하므로(정규화 후 비교) 불일치 WARN은 뜨지 않는다.
         assertThat(output.getOut()).doesNotContain("불일치");
     }
 
@@ -250,7 +237,7 @@ class S3PaperPackageReaderTest {
         files.put("papers/langmismatch/frontend/document.json", """
                 {"schema_version":1,"source_language":"en","blocks":[
                   {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
-                   "block_content":{"format":"text","text":"본문","text_kor":"번역"}}
+                   "block_content":{"format":"text","text":"본문"}}
                 ]}
                 """);
         files.put("papers/langmismatch/structure/document.json", """
@@ -286,23 +273,6 @@ class S3PaperPackageReaderTest {
 
         assertThat(pkg.sourceLanguage()).isEqualTo(valid);
         assertThat(output.getOut()).doesNotContain("WARN");
-    }
-
-    @Test
-    void en이_아닌데_text_kor가_있으면_정합성_B_WARN을_남긴다(CapturedOutput output) {
-        Map<String, String> files = sourceLanguageOnlyPackage("z3", "ko");
-        files.put("papers/z3/frontend/document.json", """
-                {"schema_version":1,"source_language":"ko","blocks":[
-                  {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
-                   "block_content":{"format":"text","text":"본문","text_kor":"번역되면 안 되는 값"}}
-                ]}
-                """);
-        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
-
-        ParsedPaperPackage pkg = reader.read("papers/z3/manifest.json");
-
-        assertThat(pkg.sourceLanguage()).isEqualTo("ko");
-        assertThat(output.getOut()).contains("en이 아닌데");
     }
 
     /** manifest·frontend 모두 source_language만 다르고 나머지는 최소인 패키지. */
