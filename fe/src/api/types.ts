@@ -2,6 +2,9 @@
 export type PaperStatus =
   | 'UPLOAD_PENDING' | 'UPLOADED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 
+// 전체 번역 준비 상태. 파싱 status와 별개다 — 파싱이 COMPLETED인 채로 번역만 뒤따라 바뀐다.
+export type TranslationStatus = 'NOT_APPLICABLE' | 'PENDING' | 'READY' | 'FAILED';
+
 export const TERMINAL_STATUSES: ReadonlySet<PaperStatus> = new Set(['COMPLETED', 'FAILED', 'EXPIRED']);
 
 export interface Paper {
@@ -30,7 +33,12 @@ export interface CreatePaperResponse {
   createdAt: string;
 }
 
-export interface PaperStatusResponse { paperId: string; status: PaperStatus; updatedAt: string; }
+export interface PaperStatusResponse {
+  paperId: string;
+  status: PaperStatus;
+  translationStatus: TranslationStatus;
+  updatedAt: string;
+}
 
 export interface AuthUser { email?: string; displayName?: string; }
 
@@ -65,6 +73,7 @@ export interface PaperContentResponse {
   title: string | null;
   /** BE가 검증한 문서 언어. 없거나 무효면 null. */
   sourceLanguage: string | null;
+  translationStatus: TranslationStatus;
   schemaVersion: number;
   blocks: PaperContentBlockDto[];
   assets: Record<string, PaperContentAssetDto>;

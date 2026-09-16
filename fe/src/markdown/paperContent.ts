@@ -2,7 +2,7 @@
 // 제목·본문·수식·이미지는 markdown 문자열로 변환해 기존 PaperMarkdown 렌더러를 재사용하고,
 // 표는 html 그대로 넘겨 렌더 측에서 정화한다.
 import { fetchPaperContent } from '../api/papers';
-import type { PaperContentBlockDto, PaperContentResponse } from '../api/types';
+import type { PaperContentBlockDto, PaperContentResponse, TranslationStatus } from '../api/types';
 
 export type BlockType = 'heading' | 'subheading' | 'para' | 'caption' | 'figure' | 'equation' | 'table' | 'other';
 
@@ -27,6 +27,7 @@ export interface PaperContent {
   title: string | null;
   /** BE가 검증한 문서 언어. 없거나 무효면 null. */
   sourceLanguage: string | null;
+  translationStatus: TranslationStatus;
   blocks: PaperBlock[];
   toc: TocEntry[];
   /** 이미지 presigned URL 중 가장 이른 만료 시각. asset이 없으면 null. */
@@ -49,7 +50,15 @@ export function adaptPaperContent(res: PaperContentResponse): PaperContent {
     ? expiries.reduce((min, v) => (Date.parse(v) < Date.parse(min) ? v : min))
     : null;
   const hasTranslation = blocks.some((b) => b.translation !== undefined);
-  return { title: res.title, sourceLanguage: res.sourceLanguage, blocks, toc, assetExpiresAt: earliest, hasTranslation };
+  return {
+    title: res.title,
+    sourceLanguage: res.sourceLanguage,
+    translationStatus: res.translationStatus,
+    blocks,
+    toc,
+    assetExpiresAt: earliest,
+    hasTranslation,
+  };
 }
 
 function adaptBlock(b: PaperContentBlockDto, res: PaperContentResponse): PaperBlock {
