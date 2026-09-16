@@ -8,8 +8,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.ymc.support.IntegrationTest;
-import com.ymc.paper.domain.CompileStatus;
-import com.ymc.paper.domain.Document;
 
 class DocumentPersistenceIntegrationTest extends IntegrationTest {
 
