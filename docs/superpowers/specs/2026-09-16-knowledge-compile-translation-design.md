@@ -107,14 +107,14 @@ null을 PENDING으로 두는 이유: 파싱이 COMPLETED이면 컴파일 요청�
   1. `document.status == COMPLETED`이고 본문이 적재돼 있을 때만 진행.
   2. `markCompileRequested` CAS로 이긴 호출만 발행. 이미 REQUESTED 이상이면 반환.
   3. 발행은 트랜잭션 밖. 실패하면 `revertCompileRequested` 후 예외를 던져 파싱 결과 메시지가 재전달되게 한다(`DocumentParsingStarter`와 같은 패턴). 재전달 때는 적재 여부 검사가 건너뛰고 발행만 다시 시도한다.
-  4. REQUESTED 커밋 뒤 SendMessage 전에 프로세스가 죽으면 재전달이 "이미 REQUESTED"로 보고 건너뛰어 PENDING에 머문다. 파싱 발행의 PROCESSING 정체와 같은 창이다. 이번에 스윕을 만들지 않고, 정체 정리 스윕 티켓에 REQUESTED 정체(`updated_at`이 아니라 별도 기준이 필요하므로 그때 `compile_requested_at` 추가)를 포함한다.
+  4. REQUESTED 커밋 뒤 SendMessage 전에 프로세스가 죽으면 재전달이 "이미 REQUESTED"로 보고 건너뛰어 PENDING에 머문다. 파싱 발행의 PROCESSING 정체와 같은 창이다. 이번에는 다루지 않고, 기존 `StalePaperCleanup`에 REQUESTED 정체 처리를 더하는 후속으로 둔다(`updated_at`은 파싱 시각이라 그때 `compile_requested_at` 컬럼이 필요하다).
 - 언어와 무관하게 발행한다. 한국어 논문도 선행지식·viz 산출물은 필요하다. 번역 상태만 NOT_APPLICABLE로 계산된다.
 - 파싱 결과가 이미 terminal이라 전이하지 못한 재전달에서도, COMPLETED이고 적재돼 있고 `compile_status`가 null이면 발행한다.
 
 ### 4.5 컴파일 결과 수신
 
 - `KnowledgeCompileResultListener`(infra/messaging): `@SqsListener("${aws.sqs.knowledge-compile-result-queue}")`, 원문 String 수신. 역직렬화 실패·계약 위반은 WARN 후 반환(ack). 그 뒤 예외는 전파(재전달).
-- `KnowledgeCompileResultMessage`: `ParseResultMessage`와 같은 관대한 역직렬화·`contractViolation()`. 실패 코드 enum은 `messaging.yml`의 `KnowledgeCompileError.code` 5개.
+- `KnowledgeCompileResultMessage`: `ParseResultMessage`와 같은 관대한 역직렬화·`contractViolation()`. 실패 코드는 `messaging.yml`의 `KnowledgeCompileError.code` 5개지만 해석하지 않고 저장만 한다. 계약에 없는 코드가 와도 위반으로 폐기하지 않는다 — 새 코드가 늘었다고 결과를 잃는 편이 더 나쁘다(파싱 결과와 같은 규칙).
 - `KnowledgeCompileResultService.apply(requestPaperId, status, errorCode, manifestKey)`:
   - `findByRequestPaperId`로 `document` 역조회. 없으면 WARN 후 반환.
   - `compile_status`가 이미 COMPLETED이거나 FAILED이면 중복 전달로 보고 INFO 후 반환. 파싱 `status`가 COMPLETED가 아니면 WARN 후 반환(파싱 실패 문서에 결과가 올 수는 없지만 방어).
@@ -158,7 +158,7 @@ null을 PENDING으로 두는 이유: 파싱이 COMPLETED이면 컴파일 요청�
 단위
 
 - `Document.translationStatus()` 계산 표(언어 null/en/ko × compile_status null/REQUESTED/COMPLETED/FAILED).
-- `KnowledgeCompileResultMessage.contractViolation()`: 필수 필드 누락, 모르는 status, 모르는 error code, completed에 manifest_key 없음.
+- `KnowledgeCompileResultMessage.contractViolation()`: 필수 필드 누락, 모르는 status, completed에 manifest_key 없음, failed에 error.code 없음. 모르는 error code는 위반이 아니라 그대로 저장.
 - `S3PaperPackageReaderTest.readTranslations`: 정상, manifest에 항목 없음, schema_version 불일치, `translated`인데 `text_kor` 없음.
 
 통합(LocalStack, `IntegrationTest`)
@@ -193,7 +193,7 @@ FE
 
 | 지적 | 결정 |
 |---|---|
-| REQUESTED 커밋 뒤 발행 전 크래시로 PENDING 정체 | 파싱 발행과 같은 창으로 받아들이고 정체 스윕 티켓에 포함(§4.4) |
+| REQUESTED 커밋 뒤 발행 전 크래시로 PENDING 정체 | 파싱 발행과 같은 창으로 받아들이고 `StalePaperCleanup` 확장 후속으로 둠(§4.4) |
 | 사이드카 없음·깨짐이 READY로 노출 | COMPLETED 유지. FE가 READY라도 번역 블록이 없으면 비활성·폴링 없음(§4.5, §5) |
 | null → FAILED 규칙이 재시도 창에서 FE 폴링을 멈춤 | null → PENDING으로 변경. dev SQL이 legacy를 COMPLETED/FAILED로 명시(§4.1, §4.2) |
 | 병합 대상이 text 블록인지 검증 없음 | `content.format == text`만 병합(§4.5) |
