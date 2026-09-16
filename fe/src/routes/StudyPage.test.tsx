@@ -6,7 +6,7 @@ import StudyPage, { splitPctForChatWidth } from './StudyPage';
 import { getStatus, fetchPaperContent } from '../api/papers';
 import { getMyPlan } from '../api/plan';
 import { useTextSelection, type TextSelection } from './study/useTextSelection';
-import type { PaperContentResponse } from '../api/types';
+import type { PaperContentResponse, TranslationStatus } from '../api/types';
 
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), fetchPaperContent: vi.fn() }));
 vi.mock('../api/plan', () => ({ getMyPlan: vi.fn() }));
@@ -25,11 +25,16 @@ vi.stubGlobal('localStorage', {
   clear: () => store.clear(),
 });
 
-function contentResponse(translated: boolean, sourceLanguage: string | null = 'en'): PaperContentResponse {
+function contentResponse(
+  translated: boolean,
+  sourceLanguage: string | null = 'en',
+  translationStatus: TranslationStatus = translated ? 'READY' : 'FAILED',
+): PaperContentResponse {
   return {
     paperId: 'p1',
     title: '제목',
     sourceLanguage,
+    translationStatus,
     schemaVersion: 1,
     blocks: [
       {
@@ -45,6 +50,10 @@ function contentResponse(translated: boolean, sourceLanguage: string | null = 'e
     ],
     assets: {},
   };
+}
+
+function statusResponse(translationStatus: TranslationStatus = 'READY') {
+  return { paperId: 'p1', status: 'COMPLETED' as const, translationStatus, updatedAt: '2026-09-09T00:00:00Z' };
 }
 
 function selection(): TextSelection {
@@ -82,7 +91,7 @@ function renderStudy() {
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(useTextSelection).mockReturnValue(null);
-  vi.mocked(getStatus).mockResolvedValue({ paperId: 'p1', status: 'COMPLETED', updatedAt: '2026-09-09T00:00:00Z' });
+  vi.mocked(getStatus).mockResolvedValue(statusResponse());
   vi.mocked(getMyPlan).mockResolvedValue({
     plan: 'FREE',
     planExpiresAt: null,
@@ -133,6 +142,7 @@ describe('StudyPage — 전체 번역 순환', () => {
   });
 
   it('번역이 없는 논문은 버튼이 비활성이고 저장값을 지우지 않은 채 off로 적용된다', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('NOT_APPLICABLE'));
     localStorage.setItem(STORAGE_KEY, 'side');
     vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false, 'ko'));
     vi.mocked(useTextSelection).mockReturnValue(selection());
@@ -149,13 +159,6 @@ describe('StudyPage — 전체 번역 순환', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('side');
   });
 
-  it('번역 없는 논문의 툴팁은 언어가 ko가 아니면 준비 안 됨 문구다', async () => {
-    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false, null));
-    renderStudy();
-    await waitFor(() => expect(modeButton()).toBeTruthy());
-    expect(modeButton().title).toBe('이 논문은 번역이 준비되지 않았습니다');
-  });
-
   it('전체 번역이 켜지면 선택 팝업에서 번역 버튼이 사라진다', async () => {
     vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
     vi.mocked(useTextSelection).mockReturnValue(selection());
@@ -166,6 +169,58 @@ describe('StudyPage — 전체 번역 순환', () => {
     fireEvent.click(modeButton());
     expect(popupTranslateButton()).toBeNull();
     expect(screen.getByRole('button', { name: /질문하기/ })).toBeTruthy();
+  });
+});
+
+describe('StudyPage — 번역 상태', () => {
+  it('PENDING이면 버튼이 비활성이고 준비 중 툴팁이다', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('PENDING'));
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false, 'en', 'PENDING'));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(modeButton().disabled).toBe(true);
+    expect(modeButton().title).toBe('번역을 준비하고 있습니다');
+  });
+
+  it('FAILED이면 버튼이 비활성이고 실패 툴팁이다', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('FAILED'));
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false, 'en', 'FAILED'));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(modeButton().disabled).toBe(true);
+    expect(modeButton().title).toBe('번역 생성에 실패했습니다');
+  });
+
+  it('READY인데 번역 블록이 없으면 준비 안 됨 툴팁이다', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('READY'));
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false, 'en', 'READY'));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(modeButton().disabled).toBe(true);
+    expect(modeButton().title).toBe('이 논문은 번역이 준비되지 않았습니다');
+  });
+
+  it('PENDING → READY가 되면 본문을 다시 받아 번역 버튼이 활성된다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(getStatus)
+        .mockResolvedValueOnce(statusResponse('PENDING'))
+        .mockResolvedValue(statusResponse('READY'));
+      vi.mocked(fetchPaperContent)
+        .mockResolvedValueOnce(contentResponse(false, 'en', 'PENDING'))
+        .mockResolvedValue(contentResponse(true, 'en', 'READY'));
+      renderStudy();
+      await waitFor(() => expect(modeButton()).toBeTruthy());
+      expect(modeButton().disabled).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await waitFor(() => expect(fetchPaperContent).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(modeButton().disabled).toBe(false));
+      expect(getStatus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
