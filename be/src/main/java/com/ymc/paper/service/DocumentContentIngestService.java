@@ -12,6 +12,7 @@ import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlock;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.service.port.PaperPackageReader;
 import com.ymc.paper.service.port.ParsedPaperPackage;
 
@@ -32,6 +33,7 @@ public class DocumentContentIngestService {
     private final DocumentContentRepository contentRepository;
     private final DocumentContentBlockRepository blockRepository;
     private final DocumentContentAssetRepository assetRepository;
+    private final DocumentRepository documentRepository;
 
     @Transactional
     public void ingest(UUID documentId, String manifestKey) {
@@ -40,6 +42,9 @@ public class DocumentContentIngestService {
         blockRepository.deleteByDocumentId(documentId);
         assetRepository.deleteByDocumentId(documentId);
         contentRepository.deleteByDocumentId(documentId);
+
+        // 상태 폴링이 조인 없이 번역 상태를 계산하도록 document에도 언어를 복제한다.
+        documentRepository.findById(documentId).ifPresent(d -> d.recordSourceLanguage(pkg.sourceLanguage()));
 
         contentRepository.save(DocumentContent.of(
                 documentId, pkg.title(), pkg.schemaVersion(), pkg.sourceLanguage(), Instant.now()));

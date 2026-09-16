@@ -16,7 +16,9 @@ import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlock;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
+import com.ymc.paper.domain.TranslationStatus;
 import com.ymc.support.IntegrationTest;
 
 class DocumentContentIngestIntegrationTest extends IntegrationTest {
@@ -32,6 +34,9 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
 
     @Autowired
     DocumentContentAssetRepository assetRepository;
+
+    @Autowired
+    DocumentRepository documentRepository;
 
     @Autowired
     AwsProperties awsProperties;
@@ -70,6 +75,19 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
         List<DocumentContentBlock> blocks = blockRepository.findAllByDocumentIdOrderByGlobalOrderAsc(documentId);
         assertThat(blocks.get(1).getContent().get("textKor").asText()).contains("새로운 구조");
         assertThat(blocks.get(3).getContent().has("textKor")).isFalse();
+    }
+
+    @Test
+    void 적재하면_document에도_source_language가_복제된다() {
+        Paper paper = givenProcessingPaper("lang-copy.pdf");
+        UUID documentId = paper.getDocumentId();
+        String manifestKey = givenTranslatedPackageOnS3(paper.getId());
+
+        ingestService.ingest(documentId, manifestKey);
+
+        assertThat(documentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
+        assertThat(documentRepository.findById(documentId).orElseThrow().translationStatus())
+                .isEqualTo(TranslationStatus.PENDING);
     }
 
     @Test

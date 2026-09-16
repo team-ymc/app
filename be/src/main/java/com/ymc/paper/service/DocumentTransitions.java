@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.PaperRepository;
@@ -63,5 +64,26 @@ public class DocumentTransitions {
             usageService.releaseAll(UsageType.PAPER_REGISTRATION, paperIds);
         }
         return true;
+    }
+
+    /** 컴파일 요청 선점을 즉시 커밋한다. true면 이 호출만 발행 권한을 갖는다. */
+    @Transactional
+    public boolean markCompileRequested(UUID documentId) {
+        return documentRepository.markCompileRequested(documentId) == 1;
+    }
+
+    /** 발행 실패 시 선점 반납. */
+    @Transactional
+    public boolean revertCompileRequested(UUID documentId) {
+        return documentRepository.revertCompileRequested(documentId) == 1;
+    }
+
+    /** 컴파일 결과 종결. 호출자가 트랜잭션 안이면 거기에 참여한다. */
+    @Transactional
+    public boolean markCompiled(UUID documentId, CompileStatus status, String errorCode) {
+        if (status == null || status == CompileStatus.REQUESTED) {
+            throw new IllegalArgumentException("컴파일 종결 상태만 허용됩니다: " + status);
+        }
+        return documentRepository.markCompiled(documentId, status, errorCode) == 1;
     }
 }
