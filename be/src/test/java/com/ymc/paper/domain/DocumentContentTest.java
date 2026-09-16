@@ -52,6 +52,29 @@ class DocumentContentTest {
     }
 
     @Test
+    void 텍스트_블록에_번역을_병합하면_textKor가_붙고_원문은_그대로다() {
+        DocumentContentBlock block = DocumentContentBlock.of(DOCUMENT_ID, "b0", 0, "text", null,
+                List.of(), MAPPER.createObjectNode().put("format", "text").put("text", "Body"));
+
+        assertThat(block.mergeTranslation("본문")).isTrue();
+        assertThat(block.getContent().get("text").asText()).isEqualTo("Body");
+        assertThat(block.getContent().get("textKor").asText()).isEqualTo("본문");
+
+        // 같은 값을 다시 병합해도 결과가 같다 (재전달 멱등)
+        assertThat(block.mergeTranslation("본문")).isTrue();
+        assertThat(block.getContent().get("textKor").asText()).isEqualTo("본문");
+    }
+
+    @Test
+    void 텍스트가_아닌_블록에는_병합하지_않는다() {
+        DocumentContentBlock formula = DocumentContentBlock.of(DOCUMENT_ID, "f0", 0, "display_formula", null,
+                List.of(), MAPPER.createObjectNode().put("format", "formula").put("tex", "E=mc^2"));
+
+        assertThat(formula.mergeTranslation("번역")).isFalse();
+        assertThat(formula.getContent().has("textKor")).isFalse();
+    }
+
+    @Test
     void asset은_key와_s3Key가_필수다() {
         DocumentContentAsset asset = DocumentContentAsset.of(DOCUMENT_ID, "image_0",
                 "papers/x/assets/images/image_0.jpg", "image/jpeg");

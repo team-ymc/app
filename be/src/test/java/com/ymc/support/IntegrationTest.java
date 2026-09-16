@@ -305,6 +305,7 @@ public abstract class IntegrationTest {
         return givenPackageOnS3(paperId, "paper-package-translated", List.of(
                 "manifest.json",
                 "frontend/document.json",
+                "frontend/translation-ko.json",
                 "structure/document.json"));
     }
 
