@@ -94,6 +94,8 @@ aws:
   sqs:
     parse-request-queue: ${PARSE_REQUEST_QUEUE_NAME:parse-requests}
     parse-result-queue: ${PARSE_RESULT_QUEUE_NAME:parse-results}
+    knowledge-compile-request-queue: ${KNOWLEDGE_COMPILE_REQUEST_QUEUE_NAME:knowledge-compile-requests}
+    knowledge-compile-result-queue: ${KNOWLEDGE_COMPILE_RESULT_QUEUE_NAME:knowledge-compile-results}
 
 ---
 # ================= observability (배포 환경에서 Collector 사용 시) =================
