@@ -49,6 +49,19 @@ public class Document {
     @Column(name = "error_code")
     private String errorCode;
 
+    /** 본문 적재 때 document_content와 같은 값을 복제한다. 상태 폴링이 조인 없이 번역 상태를 계산하기 위해서다. */
+    @Column(name = "source_language", length = 8)
+    private String sourceLanguage;
+
+    /** 지식 컴파일 상태. null = 아직 요청 전. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "compile_status", length = 32)
+    private CompileStatus compileStatus;
+
+    /** 컴파일 실패 코드 원문. 내부 기록용. */
+    @Column(name = "compile_error_code")
+    private String compileErrorCode;
+
     /**
      * AI 작업 상관키 = 이 Document를 만든 최초 paperId. FK가 아니다 — 대표 Paper가 삭제돼도
      * 발행·결과 역조회는 이 값만 본다.
@@ -85,5 +98,13 @@ public class Document {
         Objects.requireNonNull(requestPaperId, "requestPaperId");
         Objects.requireNonNull(now, "now");
         return new Document(id, checksumSha256, fileKey, requestPaperId, now);
+    }
+
+    public void recordSourceLanguage(String sourceLanguage) {
+        this.sourceLanguage = sourceLanguage;
+    }
+
+    public TranslationStatus translationStatus() {
+        return TranslationStatus.of(sourceLanguage, compileStatus);
     }
 }
