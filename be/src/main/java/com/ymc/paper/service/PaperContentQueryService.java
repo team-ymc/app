@@ -74,6 +74,6 @@ public class PaperContentQueryService {
         });
 
         return new PaperContentView(paper.getId(), content.getTitle(), content.getSourceLanguage(),
-                content.getSchemaVersion(), blocks, assets);
+                document.translationStatus(), content.getSchemaVersion(), blocks, assets);
     }
 }

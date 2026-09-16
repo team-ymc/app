@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ymc.paper.domain.TranslationStatus;
 import com.ymc.paper.service.PaperContentView;
 
 /** 계약 `PaperContentResponse`. */
@@ -13,6 +14,7 @@ public record PaperContentResponse(
         UUID paperId,
         String title,
         String sourceLanguage,
+        TranslationStatus translationStatus,
         int schemaVersion,
         List<Block> blocks,
         Map<String, Asset> assets) {
@@ -22,6 +24,7 @@ public record PaperContentResponse(
                 view.paperId(),
                 view.title(),
                 view.sourceLanguage(),
+                view.translationStatus(),
                 view.schemaVersion(),
                 view.blocks().stream()
                         .map(b -> new Block(b.blockId(), b.globalOrder(), b.label(),

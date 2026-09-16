@@ -14,6 +14,7 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
+import com.ymc.paper.domain.TranslationStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,7 +37,9 @@ public class PaperDocumentViews {
 
     public PaperStatusView statusView(Paper paper) {
         Document document = documentOf(paper).orElse(null);
-        return new PaperStatusView(paper.getId(), derivedStatus(paper, document),
+        TranslationStatus translationStatus = document == null
+                ? TranslationStatus.NOT_APPLICABLE : document.translationStatus();
+        return new PaperStatusView(paper.getId(), derivedStatus(paper, document), translationStatus,
                 derivedUpdatedAt(paper, document));
     }
 

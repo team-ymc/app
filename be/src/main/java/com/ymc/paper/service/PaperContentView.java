@@ -6,12 +6,14 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ymc.paper.domain.TranslationStatus;
 
 /** 계약 PaperContentResponse에 대응하는 서비스 뷰. 트랜잭션 안에서 완성한다 (OSIV off). */
 public record PaperContentView(
         UUID paperId,
         String title,
         String sourceLanguage,
+        TranslationStatus translationStatus,
         int schemaVersion,
         List<Block> blocks,
         Map<String, Asset> assets) {

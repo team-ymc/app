@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
@@ -37,6 +38,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
         String manifestKey = givenTranslatedPackageOnS3(paper.getId());
         documentContentIngestService.ingest(paper.getDocumentId(), manifestKey);
         mergeService.merge(paper.getDocumentId(), manifestKey);
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null);
         return reload(paper.getId());
     }
 
@@ -47,6 +49,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sourceLanguage").value("en"))
+                .andExpect(jsonPath("$.translationStatus").value("READY"))
                 .andExpect(jsonPath("$.blocks[1].content.textKor").value(org.hamcrest.Matchers.containsString("새로운 구조")))
                 .andExpect(jsonPath("$.blocks[3].content.textKor").doesNotExist())
                 .andExpect(jsonPath("$.blocks[4].content.textKor").doesNotExist());
@@ -61,6 +64,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(body).contains("\"sourceLanguage\":null");
+        assertThat(body).contains("\"translationStatus\":\"NOT_APPLICABLE\"");
     }
 
     @Test
