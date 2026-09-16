@@ -26,6 +26,7 @@ import com.ymc.paper.service.port.ParsedPaperPackage;
 import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @ExtendWith(OutputCaptureExtension.class)
 class S3PaperPackageReaderTest {
@@ -353,6 +354,51 @@ class S3PaperPackageReaderTest {
 
         assertThat(reader.readTranslations("papers/broken/manifest.json")).isEmpty();
         assertThat(output.getOut()).contains("translation-ko.json");
+    }
+
+    @Test
+    void 사이드카_S3_일시_장애는_전파한다() {
+        Map<String, String> files = sidecarPackage("s3err", "");
+        String sidecarKey = "papers/s3err/frontend/translation-ko.json";
+        FileStorage flaky = new FileStorage() {
+            @Override
+            public String readUtf8(String fileKey) {
+                if (fileKey.equals(sidecarKey)) {
+                    throw S3Exception.builder().statusCode(500).message("boom").build();
+                }
+                return mapStorage(files).readUtf8(fileKey);
+            }
+
+            @Override
+            public PresignedUpload presignUpload(
+                    String fileKey, String contentType, long contentLength, String checksumSha256) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignDownload(String fileKey, String filename) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignAssetGet(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<UploadedObjectMetadata> head(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void delete(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        S3PaperPackageReader reader = new S3PaperPackageReader(flaky, new ObjectMapper());
+
+        assertThatThrownBy(() -> reader.readTranslations("papers/s3err/manifest.json"))
+                .isInstanceOf(S3Exception.class);
     }
 
     /** manifest에 사이드카 항목이 있고 본문은 최소인 패키지. */

@@ -22,6 +22,7 @@ import com.ymc.paper.service.port.ParsedPaperPackage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 /**
  * 파서 산출물(snake_case, ai repo S3_BUCKET_STRUCTURE) → 계약형(camelCase) 변환.
@@ -92,10 +93,11 @@ public class S3PaperPackageReader implements PaperPackageReader {
             return Map.of();
         }
         String sidecarKey = prefix + sidecar.path();
+        // 파일 없음·형식 오류만 번역 없이 진행하고, S3 일시 장애는 전파해 결과 메시지가 재전달되게 한다.
         TranslationSidecar doc;
         try {
             doc = parse(fileStorage.readUtf8(sidecarKey), TranslationSidecar.class, sidecarKey);
-        } catch (RuntimeException e) {
+        } catch (NoSuchKeyException | IllegalStateException e) {
             log.warn("번역 사이드카를 읽지 못했습니다, 번역 없이 진행: key={}", sidecarKey, e);
             return Map.of();
         }
