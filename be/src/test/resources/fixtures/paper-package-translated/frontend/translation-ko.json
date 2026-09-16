@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture-translated",
+  "source_language": "en",
+  "target_language": "ko",
+  "blocks": [
+    {"block_id": "p0000-b0000", "translation_status": "not_translated", "translated_block_content": null},
+    {"block_id": "p0000-b0001", "translation_status": "translated", "translated_block_content": {"format": "text", "text_kor": "우리는 새로운 구조를 제안한다."}},
+    {"block_id": "p0000-b0002", "translation_status": "translated", "translated_block_content": {"format": "text", "text_kor": "영어로 된 본문 단락."}},
+    {"block_id": "p0000-b0003", "translation_status": "not_translated", "translated_block_content": null},
+    {"block_id": "p0000-b0004", "translation_status": "not_translated", "translated_block_content": null}
+  ]
+}

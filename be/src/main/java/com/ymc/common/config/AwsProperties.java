@@ -23,7 +23,11 @@ public record AwsProperties(
     /** presignExpiry: presigned PUT URL의 유효 기간. 업로드 권한을 짧게만 위임한다 (ADR-001). */
     public record S3(String bucket, Duration presignExpiry) {}
 
-    public record Sqs(String parseRequestQueue, String parseResultQueue) {}
+    public record Sqs(
+            String parseRequestQueue,
+            String parseResultQueue,
+            String knowledgeCompileRequestQueue,
+            String knowledgeCompileResultQueue) {}
 
     public boolean hasEndpointOverride() {
         return endpoint != null && !endpoint.isBlank();

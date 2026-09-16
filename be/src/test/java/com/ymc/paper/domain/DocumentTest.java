@@ -31,4 +31,24 @@ class DocumentTest {
         assertThat(DocumentStatus.UPLOADED.isTerminal()).isFalse();
         assertThat(DocumentStatus.PROCESSING.isTerminal()).isFalse();
     }
+
+    @Test
+    void 새_document는_언어와_컴파일_상태가_없고_번역_상태는_NOT_APPLICABLE이다() {
+        Document doc = Document.create(UUID.randomUUID(), "A".repeat(43) + "=",
+                "uploads/x/original.pdf", UUID.randomUUID(), Instant.now());
+        assertThat(doc.getSourceLanguage()).isNull();
+        assertThat(doc.getCompileStatus()).isNull();
+        assertThat(doc.getCompileErrorCode()).isNull();
+        assertThat(doc.translationStatus()).isEqualTo(TranslationStatus.NOT_APPLICABLE);
+    }
+
+    @Test
+    void 언어를_기록하면_영어는_PENDING이_된다() {
+        Document doc = Document.create(UUID.randomUUID(), "A".repeat(43) + "=",
+                "uploads/x/original.pdf", UUID.randomUUID(), Instant.now());
+        doc.recordSourceLanguage("en");
+        assertThat(doc.translationStatus()).isEqualTo(TranslationStatus.PENDING);
+        doc.recordSourceLanguage("ko");
+        assertThat(doc.translationStatus()).isEqualTo(TranslationStatus.NOT_APPLICABLE);
+    }
 }

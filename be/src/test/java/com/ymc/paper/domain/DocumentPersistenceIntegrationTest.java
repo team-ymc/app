@@ -84,4 +84,35 @@ class DocumentPersistenceIntegrationTest extends IntegrationTest {
         assertThat(linked.getDocumentId()).isEqualTo(docId);
         assertThat(linked.getUpdatedAt()).isAfterOrEqualTo(before);
     }
+
+    @Test
+    void 컴파일_요청_선점은_null에서만_1row고_반납은_REQUESTED에서만_1row다() {
+        UUID id = insert(randomChecksum(), UUID.randomUUID());
+
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompileRequested(id))).isEqualTo(1);
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompileRequested(id))).isEqualTo(0);
+        assertThat(documentRepository.findById(id).orElseThrow().getCompileStatus())
+                .isEqualTo(CompileStatus.REQUESTED);
+
+        assertThat(tx.<Integer>execute(s -> documentRepository.revertCompileRequested(id))).isEqualTo(1);
+        assertThat(tx.<Integer>execute(s -> documentRepository.revertCompileRequested(id))).isEqualTo(0);
+        assertThat(documentRepository.findById(id).orElseThrow().getCompileStatus()).isNull();
+    }
+
+    @Test
+    void 컴파일_종결은_null이나_REQUESTED에서만_1row고_updatedAt을_바꾸지_않는다() {
+        UUID id = insert(randomChecksum(), UUID.randomUUID());
+        Instant before = documentRepository.findById(id).orElseThrow().getUpdatedAt();
+
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID")))
+                .isEqualTo(1);
+        Document failed = documentRepository.findById(id).orElseThrow();
+        assertThat(failed.getCompileStatus()).isEqualTo(CompileStatus.FAILED);
+        assertThat(failed.getCompileErrorCode()).isEqualTo("PARSED_DOCUMENT_INVALID");
+        assertThat(failed.getUpdatedAt()).isEqualTo(before);
+
+        // 이미 종결됐으면 중복 결과는 아무것도 바꾸지 않는다
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null))).isEqualTo(0);
+        assertThat(documentRepository.findById(id).orElseThrow().getCompileStatus()).isEqualTo(CompileStatus.FAILED);
+    }
 }

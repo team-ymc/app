@@ -8,6 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -89,5 +90,20 @@ public class DocumentContentBlock {
         Objects.requireNonNull(sectionPath, "sectionPath");
         Objects.requireNonNull(content, "content");
         return new DocumentContentBlock(documentId, blockId, globalOrder, label, headingLevel, sectionPath, content);
+    }
+
+    /**
+     * 사이드카 번역을 content에 붙인다. text 블록만 대상이다 — 수식·표·이미지에 온 번역은 워커 오류로 보고 거절한다.
+     * 새 노드로 바꿔 넣어 JPA 변경 감지가 확실히 잡히게 한다.
+     */
+    public boolean mergeTranslation(String textKor) {
+        Objects.requireNonNull(textKor, "textKor");
+        if (!"text".equals(content.path("format").asText())) {
+            return false;
+        }
+        ObjectNode merged = (ObjectNode) content.deepCopy();
+        merged.put("textKor", textKor);
+        this.content = merged;
+        return true;
     }
 }

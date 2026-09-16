@@ -26,6 +26,7 @@ import com.ymc.paper.service.port.ParsedPaperPackage;
 import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @ExtendWith(OutputCaptureExtension.class)
 class S3PaperPackageReaderTest {
@@ -194,21 +195,11 @@ class S3PaperPackageReaderTest {
     }
 
     @Test
-    void 번역이_있는_패키지는_sourceLanguage와_textKor를_담고_WARN이_없다(CapturedOutput output) {
+    void read는_사이드카가_있어도_본문에_textKor를_넣지_않는다(CapturedOutput output) {
         ParsedPaperPackage pkg = reader.read("papers/translated/manifest.json");
 
         assertThat(pkg.sourceLanguage()).isEqualTo("en");
-
-        ParsedPaperPackage.Block abstractBlock = blockById(pkg, "p0000-b0001");
-        assertThat(abstractBlock.content().get("textKor").asText()).contains("새로운 구조");
-        ParsedPaperPackage.Block textBlock = blockById(pkg, "p0000-b0002");
-        assertThat(textBlock.content().get("textKor").asText()).contains("영어로 된 본문");
-
-        ParsedPaperPackage.Block reference = blockById(pkg, "p0000-b0003");
-        assertThat(reference.content().has("textKor")).isFalse();
-        ParsedPaperPackage.Block image = blockById(pkg, "p0000-b0004");
-        assertThat(image.content().has("textKor")).isFalse();
-
+        assertThat(pkg.blocks()).allSatisfy(b -> assertThat(b.content().has("textKor")).isFalse());
         assertThat(output.getOut()).doesNotContain("WARN");
     }
 
@@ -222,14 +213,11 @@ class S3PaperPackageReaderTest {
     }
 
     @Test
-    void frontend만_형식이_어긋나면_manifest값으로_폴백하고_정합성_A와_C_WARN을_남긴다(CapturedOutput output) {
+    void frontend만_형식이_어긋나면_manifest값으로_폴백하고_형식_WARN만_남긴다(CapturedOutput output) {
         ParsedPaperPackage pkg = reader.read("papers/badlang/manifest.json");
 
         assertThat(pkg.sourceLanguage()).isEqualTo("en");
         assertThat(output.getOut()).contains("unknown");
-        assertThat(output.getOut()).contains("번역이 없는 블록");
-        assertThat(output.getOut()).contains("참고문헌");
-        // 한쪽만 유효하므로(정규화 후 비교) 불일치 WARN은 뜨지 않는다.
         assertThat(output.getOut()).doesNotContain("불일치");
     }
 
@@ -250,7 +238,7 @@ class S3PaperPackageReaderTest {
         files.put("papers/langmismatch/frontend/document.json", """
                 {"schema_version":1,"source_language":"en","blocks":[
                   {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
-                   "block_content":{"format":"text","text":"본문","text_kor":"번역"}}
+                   "block_content":{"format":"text","text":"본문"}}
                 ]}
                 """);
         files.put("papers/langmismatch/structure/document.json", """
@@ -288,23 +276,6 @@ class S3PaperPackageReaderTest {
         assertThat(output.getOut()).doesNotContain("WARN");
     }
 
-    @Test
-    void en이_아닌데_text_kor가_있으면_정합성_B_WARN을_남긴다(CapturedOutput output) {
-        Map<String, String> files = sourceLanguageOnlyPackage("z3", "ko");
-        files.put("papers/z3/frontend/document.json", """
-                {"schema_version":1,"source_language":"ko","blocks":[
-                  {"block_id":"b0","global_block_order":0,"block_label":"text","heading_level":null,"section_path":[],
-                   "block_content":{"format":"text","text":"본문","text_kor":"번역되면 안 되는 값"}}
-                ]}
-                """);
-        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
-
-        ParsedPaperPackage pkg = reader.read("papers/z3/manifest.json");
-
-        assertThat(pkg.sourceLanguage()).isEqualTo("ko");
-        assertThat(output.getOut()).contains("en이 아닌데");
-    }
-
     /** manifest·frontend 모두 source_language만 다르고 나머지는 최소인 패키지. */
     private static Map<String, String> sourceLanguageOnlyPackage(String paperId, String frontendSourceLanguage) {
         Map<String, String> files = new HashMap<>();
@@ -327,6 +298,124 @@ class S3PaperPackageReaderTest {
         files.put("papers/" + paperId + "/structure/document.json", """
                 {"assets": {}}
                 """);
+        return files;
+    }
+
+    @Test
+    void 사이드카의_translated_블록만_blockId와_textKor로_돌려준다(CapturedOutput output) {
+        Map<String, String> translations = reader.readTranslations("papers/translated/manifest.json");
+
+        assertThat(translations).containsOnly(
+                Map.entry("p0000-b0001", "우리는 새로운 구조를 제안한다."),
+                Map.entry("p0000-b0002", "영어로 된 본문 단락."));
+        assertThat(output.getOut()).doesNotContain("WARN");
+    }
+
+    @Test
+    void manifest에_frontend_translation_ko가_없으면_빈_Map과_WARN이다(CapturedOutput output) {
+        Map<String, String> translations = reader.readTranslations("papers/p1/manifest.json");
+
+        assertThat(translations).isEmpty();
+        assertThat(output.getOut()).contains("frontend_translation_ko");
+    }
+
+    @Test
+    void 사이드카_schema_version이_1이_아니면_빈_Map과_WARN이다(CapturedOutput output) {
+        Map<String, String> files = sidecarPackage("sv2", """
+                {"schema_version":2,"blocks":[
+                  {"block_id":"b0","translation_status":"translated","translated_block_content":{"format":"text","text_kor":"번역"}}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readTranslations("papers/sv2/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("schema_version");
+    }
+
+    @Test
+    void translated인데_text_kor가_비어_있으면_그_블록만_건너뛰고_WARN이다(CapturedOutput output) {
+        Map<String, String> files = sidecarPackage("empty", """
+                {"schema_version":1,"blocks":[
+                  {"block_id":"b0","translation_status":"translated","translated_block_content":{"format":"text","text_kor":""}},
+                  {"block_id":"b1","translation_status":"translated","translated_block_content":null},
+                  {"block_id":"b2","translation_status":"translated","translated_block_content":{"format":"text","text_kor":"정상"}}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readTranslations("papers/empty/manifest.json")).containsOnly(Map.entry("b2", "정상"));
+        assertThat(output.getOut()).contains("b0").contains("b1");
+    }
+
+    @Test
+    void 사이드카가_JSON이_아니면_빈_Map과_WARN이다(CapturedOutput output) {
+        Map<String, String> files = sidecarPackage("broken", "{ not json");
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readTranslations("papers/broken/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("translation-ko.json");
+    }
+
+    @Test
+    void 사이드카_S3_일시_장애는_전파한다() {
+        Map<String, String> files = sidecarPackage("s3err", "");
+        String sidecarKey = "papers/s3err/frontend/translation-ko.json";
+        FileStorage flaky = new FileStorage() {
+            @Override
+            public String readUtf8(String fileKey) {
+                if (fileKey.equals(sidecarKey)) {
+                    throw S3Exception.builder().statusCode(500).message("boom").build();
+                }
+                return mapStorage(files).readUtf8(fileKey);
+            }
+
+            @Override
+            public PresignedUpload presignUpload(
+                    String fileKey, String contentType, long contentLength, String checksumSha256) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignDownload(String fileKey, String filename) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignAssetGet(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<UploadedObjectMetadata> head(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void delete(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        S3PaperPackageReader reader = new S3PaperPackageReader(flaky, new ObjectMapper());
+
+        assertThatThrownBy(() -> reader.readTranslations("papers/s3err/manifest.json"))
+                .isInstanceOf(S3Exception.class);
+    }
+
+    /** manifest에 사이드카 항목이 있고 본문은 최소인 패키지. */
+    private static Map<String, String> sidecarPackage(String paperId, String sidecarJson) {
+        Map<String, String> files = new HashMap<>();
+        files.put("papers/" + paperId + "/manifest.json", """
+                {
+                  "manifest_version": 3,
+                  "document_id": "%s",
+                  "artifacts": {
+                    "frontend_document": {"path": "frontend/document.json"},
+                    "structure_document": {"path": "structure/document.json"},
+                    "frontend_translation_ko": {"path": "frontend/translation-ko.json"}
+                  }
+                }
+                """.formatted(paperId));
+        files.put("papers/" + paperId + "/frontend/translation-ko.json", sidecarJson);
         return files;
     }
 

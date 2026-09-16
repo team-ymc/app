@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
@@ -94,6 +95,57 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{paperId}/status", "not-a-uuid").with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("번역 상태: 적재 전 NOT_APPLICABLE → 영어 적재 뒤 PENDING → 컴파일 완료 READY → 실패 FAILED")
+    void reportsTranslationStatus() throws Exception {
+        Paper paper = givenProcessingPaper("translation-status.pdf");
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"));
+
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.translationStatus").value("PENDING"));
+
+        documentTransitions.markCompileRequested(paper.getDocumentId());
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.translationStatus").value("PENDING"));
+
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null);
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.translationStatus").value("READY"));
+    }
+
+    @Test
+    @DisplayName("번역 상태: 컴파일 실패는 FAILED, 파싱 상태는 COMPLETED 유지")
+    void reportsFailedTranslation() throws Exception {
+        Paper paper = givenProcessingPaper("translation-failed.pdf");
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID");
+
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.translationStatus").value("FAILED"))
+                .andExpect(jsonPath("$.compileErrorCode").doesNotExist());
+
+        // 컴파일 실패가 본문 조회 가능 여부에 영향을 주면 안 된다
+        mockMvc.perform(get("/api/papers/{paperId}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.translationStatus").value("FAILED"));
+    }
+
+    @Test
+    @DisplayName("업로드 대기 논문의 번역 상태는 NOT_APPLICABLE")
+    void pendingUploadIsNotApplicable() throws Exception {
+        Paper paper = givenPendingPaper("upload-pending.pdf");
+
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.status").value("UPLOAD_PENDING"))
+                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"));
     }
 
     @Test

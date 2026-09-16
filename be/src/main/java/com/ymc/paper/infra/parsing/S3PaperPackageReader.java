@@ -1,6 +1,7 @@
 package com.ymc.paper.infra.parsing;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +22,7 @@ import com.ymc.paper.service.port.ParsedPaperPackage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 /**
  * 파서 산출물(snake_case, ai repo S3_BUCKET_STRUCTURE) → 계약형(camelCase) 변환.
@@ -30,6 +32,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>asset 경로의 SSOT는 structure/document.json의 assets 레지스트리다
  * (manifest.assets.registry = "structure_document"). frontend 문서의 assets 맵에는 경로가 없다.
+ *
+ * <p>번역은 이 파일이 아니라 컴파일 사이드카({@link #readTranslations})로만 들어온다.
  */
 @Slf4j
 @Component
@@ -37,7 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 public class S3PaperPackageReader implements PaperPackageReader {
 
     private static final Set<String> ISO_LANGUAGES = Set.of(Locale.getISOLanguages());
-    private static final Set<String> TRANSLATION_EXCLUDED_LABELS = Set.of("reference", "reference_content");
 
     private final FileStorage fileStorage;
     private final ObjectMapper objectMapper;
@@ -61,9 +64,6 @@ public class S3PaperPackageReader implements PaperPackageReader {
         List<ParsedPaperPackage.Block> blocks = new ArrayList<>();
         List<ParsedPaperPackage.Asset> assets = new ArrayList<>();
         String title = null;
-        int missingTranslationCount = 0;
-        boolean nonEnTranslatedFound = false;
-        boolean ineligibleTranslatedFound = false;
 
         for (FrontendBlock block : frontend.blocks()) {
             JsonNode content = resolveContent(block, structure.assets(), prefix, assets);
@@ -77,36 +77,48 @@ public class S3PaperPackageReader implements PaperPackageReader {
                     block.headingLevel(),
                     block.sectionPath() == null ? List.of() : block.sectionPath(),
                     content));
-
-            boolean isTextFormat = "text".equals(block.blockContent().path("format").asText());
-            boolean isEligible = isTextFormat && !TRANSLATION_EXCLUDED_LABELS.contains(block.blockLabel());
-            boolean hasTextKor = hasTextKor(block);
-            if (isEligible) {
-                if ("en".equals(sourceLanguage)) {
-                    if (!hasTextKor) {
-                        missingTranslationCount++;
-                    }
-                } else if (hasTextKor) {
-                    nonEnTranslatedFound = true;
-                }
-            } else if (hasTextKor) {
-                ineligibleTranslatedFound = true;
-            }
-        }
-
-        if ("en".equals(sourceLanguage) && missingTranslationCount > 0) {
-            log.warn("source_language=en인데 번역이 없는 블록이 있습니다: 개수={}, manifestKey={}",
-                    missingTranslationCount, manifestKey);
-        }
-        if (nonEnTranslatedFound) {
-            log.warn("source_language가 en이 아닌데 text_kor가 있는 블록이 있습니다: manifestKey={}", manifestKey);
-        }
-        if (ineligibleTranslatedFound) {
-            log.warn("참고문헌 또는 텍스트가 아닌 블록에 text_kor가 있습니다: manifestKey={}", manifestKey);
         }
 
         return new ParsedPaperPackage(
                 title, frontend.schemaVersion(), sourceLanguage, List.copyOf(blocks), List.copyOf(assets));
+    }
+
+    @Override
+    public Map<String, String> readTranslations(String manifestKey) {
+        String prefix = packagePrefix(manifestKey);
+        Manifest manifest = parse(fileStorage.readUtf8(manifestKey), Manifest.class, manifestKey);
+        Manifest.Artifact sidecar = manifest.artifacts() == null ? null : manifest.artifacts().frontendTranslationKo();
+        if (sidecar == null || sidecar.path() == null) {
+            log.warn("manifest에 frontend_translation_ko가 없습니다, 번역 없이 진행: manifestKey={}", manifestKey);
+            return Map.of();
+        }
+        String sidecarKey = prefix + sidecar.path();
+        // 파일 없음·형식 오류만 번역 없이 진행하고, S3 일시 장애는 전파해 결과 메시지가 재전달되게 한다.
+        TranslationSidecar doc;
+        try {
+            doc = parse(fileStorage.readUtf8(sidecarKey), TranslationSidecar.class, sidecarKey);
+        } catch (NoSuchKeyException | IllegalStateException e) {
+            log.warn("번역 사이드카를 읽지 못했습니다, 번역 없이 진행: key={}", sidecarKey, e);
+            return Map.of();
+        }
+        if (doc.schemaVersion() == null || doc.schemaVersion() != 1 || doc.blocks() == null) {
+            log.warn("번역 사이드카 schema_version 불일치 또는 blocks 없음, 번역 없이 진행: key={}, schema_version={}",
+                    sidecarKey, doc.schemaVersion());
+            return Map.of();
+        }
+        Map<String, String> translations = new LinkedHashMap<>();
+        for (TranslationSidecarBlock block : doc.blocks()) {
+            if (!"translated".equals(block.translationStatus())) {
+                continue;
+            }
+            String textKor = block.translatedBlockContent() == null ? null : block.translatedBlockContent().textKor();
+            if (block.blockId() == null || textKor == null || textKor.isEmpty()) {
+                log.warn("translated인데 text_kor가 없는 블록, 건너뜀: blockId={}, key={}", block.blockId(), sidecarKey);
+                continue;
+            }
+            translations.put(block.blockId(), textKor);
+        }
+        return translations;
     }
 
     /** manifest·frontend의 source_language를 정규화 후 병합한다. 둘 다 유효하고 다르면 WARN 후 frontend 값을 쓴다. */
@@ -135,11 +147,6 @@ public class S3PaperPackageReader implements PaperPackageReader {
         return null;
     }
 
-    private boolean hasTextKor(FrontendBlock block) {
-        JsonNode textKor = block.blockContent().path("text_kor");
-        return textKor.isTextual() && !textKor.asText().isEmpty();
-    }
-
     /** block_content.format 기준으로 계약 content를 만든다. label이 아니라 format이다 — chart도 format은 image. */
     private JsonNode resolveContent(FrontendBlock block, Map<String, RegisteredAsset> registry,
             String prefix, List<ParsedPaperPackage.Asset> assets) {
@@ -162,11 +169,7 @@ public class S3PaperPackageReader implements PaperPackageReader {
         if (text == null) {
             throw new IllegalStateException("text 블록에 text가 없습니다: blockId=" + block.blockId());
         }
-        ObjectNode content = objectMapper.createObjectNode().put("format", "text").put("text", text);
-        if (hasTextKor(block)) {
-            content.put("textKor", block.blockContent().path("text_kor").asText());
-        }
-        return content;
+        return objectMapper.createObjectNode().put("format", "text").put("text", text);
     }
 
     private JsonNode inlined(FrontendBlock block, Map<String, RegisteredAsset> registry,
@@ -225,7 +228,8 @@ public class S3PaperPackageReader implements PaperPackageReader {
         @JsonIgnoreProperties(ignoreUnknown = true)
         record Artifacts(
                 @JsonProperty("frontend_document") Artifact frontendDocument,
-                @JsonProperty("structure_document") Artifact structureDocument) {
+                @JsonProperty("structure_document") Artifact structureDocument,
+                @JsonProperty("frontend_translation_ko") Artifact frontendTranslationKo) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
@@ -256,5 +260,22 @@ public class S3PaperPackageReader implements PaperPackageReader {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record RegisteredAsset(String path, @JsonProperty("media_type") String mediaType) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslationSidecar(
+            @JsonProperty("schema_version") Integer schemaVersion,
+            List<TranslationSidecarBlock> blocks) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslationSidecarBlock(
+            @JsonProperty("block_id") String blockId,
+            @JsonProperty("translation_status") String translationStatus,
+            @JsonProperty("translated_block_content") TranslatedBlockContent translatedBlockContent) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TranslatedBlockContent(@JsonProperty("text_kor") String textKor) {
     }
 }

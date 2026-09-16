@@ -26,6 +26,7 @@ public class ParseResultService {
     private final DocumentTransitions transitions;
     private final DocumentRepository documentRepository;
     private final DocumentContentIngestService ingestService;
+    private final KnowledgeCompileStarter compileStarter;
 
     public void apply(UUID requestPaperId, DocumentStatus terminal, String errorCode,
             String manifestKey) {
@@ -51,9 +52,14 @@ public class ParseResultService {
         boolean completed = transitioned || documentRepository.findById(documentId)
                 .map(d -> d.getStatus() == DocumentStatus.COMPLETED)
                 .orElse(false);
-        if (completed && !ingestService.isIngested(documentId)) {
+        if (!completed) {
+            return;
+        }
+        if (!ingestService.isIngested(documentId)) {
             ingestService.ingest(documentId, manifestKey);
             log.info("본문 적재 완료: requestPaperId={}, documentId={}", requestPaperId, documentId);
         }
+        // 본문·채팅은 적재 직후 열리고, 번역은 컴파일 결과를 받은 뒤 붙는다. 발행 실패는 예외로 올려 재전달을 받는다.
+        compileStarter.startIfCompleted(documentId, manifestKey);
     }
 }

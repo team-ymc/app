@@ -79,6 +79,15 @@ public class LocalStackTestConfiguration {
                     .attributesWithStrings(Map.of(
                             QueueAttributeName.VISIBILITY_TIMEOUT.toString(), "2"))
                     .build());
+            sqs.createQueue(CreateQueueRequest.builder()
+                    .queueName(props.sqs().knowledgeCompileRequestQueue())
+                    .build());
+            // 결과 큐는 parse-results와 같은 이유로 visibility를 2초로 둔다.
+            sqs.createQueue(CreateQueueRequest.builder()
+                    .queueName(props.sqs().knowledgeCompileResultQueue())
+                    .attributesWithStrings(Map.of(
+                            QueueAttributeName.VISIBILITY_TIMEOUT.toString(), "2"))
+                    .build());
         };
     }
 }

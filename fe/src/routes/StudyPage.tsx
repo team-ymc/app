@@ -8,13 +8,14 @@
 // (report에 기록) — 목업에 없는 요소이므로 기존 변환표 밖 판단.
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from '@phosphor-icons/react';
 import { PaperStackMark } from '../design/components/PaperStackMark';
 import { IconButton } from '../design/components/IconButton';
 import { getStatus } from '../api/papers';
-import { ApiError } from '../api/types';
+import { ApiError, type TranslationStatus } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
+import { translationRefetchInterval, translationDisabledReason } from './study/translationStatus';
 import { PaperViewer, type TranslationMode } from './study/PaperViewer';
 import { TranslationModeButton } from './study/TranslationModeButton';
 import { SelectionLayer } from './study/SelectionLayer';
@@ -51,6 +52,8 @@ export default function StudyPage() {
     queryKey: ['paper-status', paperId],
     queryFn: () => getStatus(paperId as string),
     enabled: !!paperId,
+    // 번역이 준비 중일 때만 폴링한다. 서재 폴링과 달리 파싱 상태는 이미 COMPLETED다.
+    refetchInterval: (query) => translationRefetchInterval(query.state.data?.translationStatus),
   });
 
   if (!paperId) {
@@ -77,14 +80,25 @@ export default function StudyPage() {
     return <Navigate to="/library" replace state={{ toast }} />;
   }
 
-  return <StudyPageContent paperId={paperId} />;
+  return <StudyPageContent paperId={paperId} translationStatus={statusQuery.data.translationStatus} />;
 }
 
-function StudyPageContent({ paperId }: { paperId: string }) {
+function StudyPageContent({ paperId, translationStatus }: { paperId: string; translationStatus: TranslationStatus }) {
+  const queryClient = useQueryClient();
   const contentQuery = useQuery({
     queryKey: ['paper-content', paperId],
     queryFn: () => getPaperContent(paperId),
   });
+
+  // READY로 바뀌는 순간 본문을 다시 받는다. 기존 데이터를 보여주다 새 데이터로 바뀌므로 화면이 비지 않는다.
+  const prevTranslationStatus = useRef(translationStatus);
+  useEffect(() => {
+    if (prevTranslationStatus.current !== 'READY' && translationStatus === 'READY') {
+      queryClient.invalidateQueries({ queryKey: ['paper-content', paperId] });
+    }
+    prevTranslationStatus.current = translationStatus;
+  }, [translationStatus, paperId, queryClient]);
+
   const planQuery = usePlanQuery();
   const aiUsage = planQuery.data?.usage.aiQuery;
 
@@ -232,8 +246,9 @@ function StudyPageContent({ paperId }: { paperId: string }) {
   }
 
   const hasTranslation = contentQuery.data?.hasTranslation ?? false;
-  // 저장된 선호값은 그대로 두고, 번역이 없는 논문에서는 off로만 적용한다.
-  const effectiveMode: TranslationMode = hasTranslation ? translationMode : 'off';
+  const translationEnabled = translationStatus === 'READY' && hasTranslation;
+  // 저장된 선호값은 그대로 두고, 번역을 쓸 수 없는 논문에서는 off로만 적용한다.
+  const effectiveMode: TranslationMode = translationEnabled ? translationMode : 'off';
 
   const titleText =
     contentQuery.data?.title
@@ -324,12 +339,8 @@ function StudyPageContent({ paperId }: { paperId: string }) {
         >
           <TranslationModeButton
             mode={effectiveMode}
-            disabled={!hasTranslation}
-            disabledReason={
-              contentQuery.data?.sourceLanguage === 'ko'
-                ? '한국어 논문은 번역하지 않습니다'
-                : '이 논문은 번역이 준비되지 않았습니다'
-            }
+            disabled={!translationEnabled}
+            disabledReason={translationDisabledReason(translationStatus, hasTranslation)}
             onCycle={handleCycleTranslation}
           />
           <IconButton

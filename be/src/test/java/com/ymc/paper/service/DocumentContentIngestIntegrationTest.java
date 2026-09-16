@@ -12,11 +12,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.ymc.common.config.AwsProperties;
 
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlock;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
+import com.ymc.paper.domain.TranslationStatus;
 import com.ymc.support.IntegrationTest;
 
 class DocumentContentIngestIntegrationTest extends IntegrationTest {
@@ -32,6 +35,9 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
 
     @Autowired
     DocumentContentAssetRepository assetRepository;
+
+    @Autowired
+    DocumentRepository documentRepository;
 
     @Autowired
     AwsProperties awsProperties;
@@ -58,7 +64,7 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void source_language와_textKor가_있는_패키지는_그대로_적재된다() {
+    void source_language는_적재되고_번역은_적재_시점에_비어_있다() {
         Paper paper = givenProcessingPaper("translated.pdf");
         UUID documentId = paper.getDocumentId();
         String manifestKey = givenTranslatedPackageOnS3(paper.getId());
@@ -66,10 +72,35 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
         ingestService.ingest(documentId, manifestKey);
 
         assertThat(contentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
-
         List<DocumentContentBlock> blocks = blockRepository.findAllByDocumentIdOrderByGlobalOrderAsc(documentId);
-        assertThat(blocks.get(1).getContent().get("textKor").asText()).contains("새로운 구조");
-        assertThat(blocks.get(3).getContent().has("textKor")).isFalse();
+        assertThat(blocks).allSatisfy(b -> assertThat(b.getContent().has("textKor")).isFalse());
+    }
+
+    @Test
+    void 적재하면_document에도_source_language가_복제된다() {
+        Paper paper = givenProcessingPaper("lang-copy.pdf");
+        UUID documentId = paper.getDocumentId();
+        String manifestKey = givenTranslatedPackageOnS3(paper.getId());
+
+        ingestService.ingest(documentId, manifestKey);
+
+        assertThat(documentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
+        assertThat(documentRepository.findById(documentId).orElseThrow().translationStatus())
+                .isEqualTo(TranslationStatus.PENDING);
+    }
+
+    @Test
+    void 적재는_document의_다른_컬럼을_덮어쓰지_않는다() {
+        Paper paper = givenProcessingPaper("lang-copy-cas.pdf");
+        UUID documentId = paper.getDocumentId();
+        String manifestKey = givenTranslatedPackageOnS3(paper.getId());
+        documentTransitions.markCompileRequested(documentId);
+
+        ingestService.ingest(documentId, manifestKey);
+
+        assertThat(documentRepository.findById(documentId).orElseThrow().getCompileStatus())
+                .isEqualTo(CompileStatus.REQUESTED);
+        assertThat(documentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
     }
 
     @Test

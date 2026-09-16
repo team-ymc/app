@@ -44,6 +44,7 @@ import com.ymc.paper.service.DocumentContentIngestService;
 import com.ymc.paper.service.DocumentParsingStarter;
 import com.ymc.paper.service.DocumentTransitions;
 import com.ymc.paper.service.port.FileStorage;
+import com.ymc.paper.service.port.KnowledgeCompileRequestPublisher;
 import com.ymc.paper.service.port.ParseRequestPublisher;
 import com.ymc.user.domain.RefreshTokenRepository;
 import com.ymc.user.domain.UserRepository;
@@ -159,6 +160,9 @@ public abstract class IntegrationTest {
     protected ParseRequestPublisher parseRequestPublisher;
 
     @MockitoSpyBean
+    protected KnowledgeCompileRequestPublisher knowledgeCompileRequestPublisher;
+
+    @MockitoSpyBean
     protected DocumentTransitions documentTransitions;
 
     @MockitoSpyBean
@@ -190,6 +194,8 @@ public abstract class IntegrationTest {
         documentRepository.deleteAll();
         drain(parseRequestQueueUrl());
         drain(parseResultQueueUrl());
+        drain(compileRequestQueueUrl());
+        drain(compileResultQueueUrl());
     }
 
     /** MockMvc 요청에 인증 principal 주입. 디코더를 거치지 않는 테스트 전용 JWT다. */
@@ -294,11 +300,12 @@ public abstract class IntegrationTest {
                 "assets/tables/table_0.html"));
     }
 
-    /** source_language·text_kor가 채워진 fixtures/paper-package-translated/를 올린다. */
+    /** source_language=en이고 컴파일 사이드카가 있는 fixtures/paper-package-translated/를 올린다. */
     protected String givenTranslatedPackageOnS3(UUID paperId) {
         return givenPackageOnS3(paperId, "paper-package-translated", List.of(
                 "manifest.json",
                 "frontend/document.json",
+                "frontend/translation-ko.json",
                 "structure/document.json"));
     }
 
@@ -336,6 +343,22 @@ public abstract class IntegrationTest {
 
     protected String parseResultQueueUrl() {
         return queueUrl(awsProperties.sqs().parseResultQueue());
+    }
+
+    protected String compileRequestQueueUrl() {
+        return queueUrl(awsProperties.sqs().knowledgeCompileRequestQueue());
+    }
+
+    protected String compileResultQueueUrl() {
+        return queueUrl(awsProperties.sqs().knowledgeCompileResultQueue());
+    }
+
+    /** knowledge-compile-results에 컴파일 워커인 척 원문 그대로 발행한다. */
+    protected void publishCompileResult(String rawJson) {
+        sqs.sendMessage(SendMessageRequest.builder()
+                .queueUrl(compileResultQueueUrl())
+                .messageBody(rawJson)
+                .build());
     }
 
     protected String queueUrl(String queueName) {

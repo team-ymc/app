@@ -93,6 +93,46 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("errorCode") String errorCode,
             @Param("now") Instant now);
 
+    /** 컴파일 요청 선점. 승자만 발행한다. updated_at은 파싱 상태 시각이라 건드리지 않는다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+               set d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED
+             where d.id = :id
+               and d.compileStatus is null
+            """)
+    int markCompileRequested(@Param("id") UUID id);
+
+    /** 발행 실패 시 선점 반납 — 파싱 결과 재전달이 다시 선점한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+               set d.compileStatus = null
+             where d.id = :id
+               and d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED
+            """)
+    int revertCompileRequested(@Param("id") UUID id);
+
+    /** 컴파일 결과 수신 종결. null 포함 — 선점 커밋 전에 결과가 도착하는 경합을 흡수한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+               set d.compileStatus = :status,
+                   d.compileErrorCode = :errorCode
+             where d.id = :id
+               and (d.compileStatus is null
+                    or d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED)
+            """)
+    int markCompiled(
+            @Param("id") UUID id,
+            @Param("status") CompileStatus status,
+            @Param("errorCode") String errorCode);
+
+    /** 적재 시 언어 복제. 엔티티 dirty-write는 전체 row를 덮어 동시 REQUESTED 선점을 지울 수 있어 대상 컬럼만 갱신한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Document d set d.sourceLanguage = :sourceLanguage where d.id = :id")
+    int recordSourceLanguage(@Param("id") UUID id, @Param("sourceLanguage") String sourceLanguage);
+
     /** 정리 스케줄러의 정체 UPLOADED·PROCESSING 스캔. */
     @Query("select d.id from Document d where d.status in :statuses and d.updatedAt < :cutoff")
     List<UUID> findStaleIds(@Param("statuses") Collection<DocumentStatus> statuses,

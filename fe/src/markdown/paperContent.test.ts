@@ -3,7 +3,7 @@ import { adaptPaperContent } from './paperContent';
 import type { PaperContentResponse } from '../api/types';
 
 function res(partial: Partial<PaperContentResponse>): PaperContentResponse {
-  return { paperId: 'p1', title: null, sourceLanguage: null, schemaVersion: 1, blocks: [], assets: {}, ...partial };
+  return { paperId: 'p1', title: null, sourceLanguage: null, translationStatus: 'READY', schemaVersion: 1, blocks: [], assets: {}, ...partial };
 }
 
 describe('adaptPaperContent', () => {
@@ -161,5 +161,9 @@ describe('adaptPaperContent', () => {
   it('sourceLanguage는 응답값 그대로 전달된다', () => {
     expect(adaptPaperContent(res({ sourceLanguage: 'en' })).sourceLanguage).toBe('en');
     expect(adaptPaperContent(res({ sourceLanguage: null })).sourceLanguage).toBeNull();
+  });
+
+  it('translationStatus를 그대로 넘긴다', () => {
+    expect(adaptPaperContent(res({ translationStatus: 'PENDING' })).translationStatus).toBe('PENDING');
   });
 });
