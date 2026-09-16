@@ -43,8 +43,8 @@ public class DocumentContentIngestService {
         assetRepository.deleteByDocumentId(documentId);
         contentRepository.deleteByDocumentId(documentId);
 
-        // 상태 폴링이 조인 없이 번역 상태를 계산하도록 document에도 언어를 복제한다.
-        documentRepository.findById(documentId).ifPresent(d -> d.recordSourceLanguage(pkg.sourceLanguage()));
+        // 상태 폴링이 조인 없이 번역 상태를 계산하도록 document에도 언어를 복제한다 (컬럼만 갱신 — 전체 row 덮어쓰기 금지).
+        documentRepository.recordSourceLanguage(documentId, pkg.sourceLanguage());
 
         contentRepository.save(DocumentContent.of(
                 documentId, pkg.title(), pkg.schemaVersion(), pkg.sourceLanguage(), Instant.now()));

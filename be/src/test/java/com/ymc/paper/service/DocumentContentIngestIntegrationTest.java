@@ -12,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.ymc.common.config.AwsProperties;
 
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlock;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
@@ -86,6 +87,20 @@ class DocumentContentIngestIntegrationTest extends IntegrationTest {
         assertThat(documentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
         assertThat(documentRepository.findById(documentId).orElseThrow().translationStatus())
                 .isEqualTo(TranslationStatus.PENDING);
+    }
+
+    @Test
+    void 적재는_document의_다른_컬럼을_덮어쓰지_않는다() {
+        Paper paper = givenProcessingPaper("lang-copy-cas.pdf");
+        UUID documentId = paper.getDocumentId();
+        String manifestKey = givenTranslatedPackageOnS3(paper.getId());
+        documentTransitions.markCompileRequested(documentId);
+
+        ingestService.ingest(documentId, manifestKey);
+
+        assertThat(documentRepository.findById(documentId).orElseThrow().getCompileStatus())
+                .isEqualTo(CompileStatus.REQUESTED);
+        assertThat(documentRepository.findById(documentId).orElseThrow().getSourceLanguage()).isEqualTo("en");
     }
 
     @Test

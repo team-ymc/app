@@ -131,6 +131,11 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.translationStatus").value("FAILED"))
                 .andExpect(jsonPath("$.compileErrorCode").doesNotExist());
+
+        // 컴파일 실패가 본문 조회 가능 여부에 영향을 주면 안 된다
+        mockMvc.perform(get("/api/papers/{paperId}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.translationStatus").value("FAILED"));
     }
 
     @Test

@@ -48,6 +48,15 @@ class KnowledgeCompileResultMessageTest {
     }
 
     @Test
+    void 모르는_error_code도_위반이_아니라_그대로_보존한다() throws Exception {
+        KnowledgeCompileResultMessage m = parse("""
+                {"paper_id":"%s","status":"failed","error":{"code":"SOMETHING_NEW","message":"x"}}
+                """.formatted(PAPER_ID));
+        assertThat(m.contractViolation()).isEmpty();
+        assertThat(m.errorCode()).isEqualTo("SOMETHING_NEW");
+    }
+
+    @Test
     void paper_id_status_누락과_모르는_status는_위반이다() throws Exception {
         assertThat(parse("{\"status\":\"completed\",\"manifest_key\":\"k\"}").contractViolation().orElseThrow())
                 .contains("paper_id");

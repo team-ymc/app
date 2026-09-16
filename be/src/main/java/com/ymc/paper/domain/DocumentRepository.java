@@ -128,6 +128,11 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("status") CompileStatus status,
             @Param("errorCode") String errorCode);
 
+    /** 적재 시 언어 복제. 엔티티 dirty-write는 전체 row를 덮어 동시 REQUESTED 선점을 지울 수 있어 대상 컬럼만 갱신한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Document d set d.sourceLanguage = :sourceLanguage where d.id = :id")
+    int recordSourceLanguage(@Param("id") UUID id, @Param("sourceLanguage") String sourceLanguage);
+
     /** 정리 스케줄러의 정체 UPLOADED·PROCESSING 스캔. */
     @Query("select d.id from Document d where d.status in :statuses and d.updatedAt < :cutoff")
     List<UUID> findStaleIds(@Param("statuses") Collection<DocumentStatus> statuses,
