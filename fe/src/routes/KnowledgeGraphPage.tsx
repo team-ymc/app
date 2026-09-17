@@ -44,12 +44,12 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
     queryFn: () => getPaperContent(paperId),
   });
   const ready = knowledgeGraphStatus === 'READY';
-  // 진입할 때마다 새 URL을 받는다. 만료(10분)는 로드가 끝난 문서에 영향이 없다.
+  // 진입할 때마다 새 URL을 받는다(gcTime 0). 떠 있는 동안은 포커스·재접속에도 다시 받지 않는다 — URL이 바뀌면 iframe이 통째로 다시 로드된다.
   const viewQuery = useQuery({
     queryKey: ['knowledge-graph-view', paperId],
     queryFn: () => getKnowledgeGraphView(paperId),
     enabled: ready,
-    staleTime: 0,
+    staleTime: Infinity,
     gcTime: 0,
     retry: false,
   });
@@ -78,14 +78,7 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
             {knowledgeGraphDisabledReason(knowledgeGraphStatus)}{' '}
             <Link to={`/papers/${paperId}`} style={{ marginLeft: 8 }}>본문으로</Link>
           </Centered>
-        ) : viewQuery.isPending ? (
-          <Centered>지식 그래프를 불러오는 중…</Centered>
-        ) : viewQuery.isError ? (
-          <Centered>
-            지식 그래프를 불러오지 못했습니다{' '}
-            <button type="button" onClick={() => viewQuery.refetch()} style={{ marginLeft: 8 }}>다시 시도</button>
-          </Centered>
-        ) : (
+        ) : viewQuery.data ? (
           // S3 오리진 문서라 앱 오리진과 격리된다. allow-same-origin은 viz.html의 localStorage(번역 모드 기억)용이다.
           // iframe 안 로드 실패는 cross-origin이라 감지할 수 없다 — 다시 시도는 URL 발급 실패에만 붙는다.
           <iframe
@@ -94,7 +87,14 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
             sandbox="allow-scripts allow-same-origin"
             style={{ flex: 1, width: '100%', border: 'none', background: 'var(--color-bg-canvas)' }}
           />
-        )}
+        ) : viewQuery.isPending ? (
+          <Centered>지식 그래프를 불러오는 중…</Centered>
+        ) : viewQuery.isError ? (
+          <Centered>
+            지식 그래프를 불러오지 못했습니다{' '}
+            <button type="button" onClick={() => viewQuery.refetch()} style={{ marginLeft: 8 }}>다시 시도</button>
+          </Centered>
+        ) : null}
       </div>
     </div>
   );

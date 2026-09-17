@@ -77,6 +77,22 @@ describe('KnowledgeGraphPage', () => {
     expect(getKnowledgeGraphView).not.toHaveBeenCalled();
   });
 
+  it('창 포커스가 돌아와도 URL을 다시 받지 않는다', async () => {
+    renderGraph();
+    await waitFor(() => expect(iframe()).toBeTruthy());
+    const src = iframe()!.getAttribute('src');
+    expect(getKnowledgeGraphView).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    window.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getKnowledgeGraphView).toHaveBeenCalledTimes(1);
+    expect(iframe()).toBeTruthy();
+    expect(iframe()!.getAttribute('src')).toBe(src);
+  });
+
   it('URL 발급 실패면 문구와 다시 시도 버튼이고 누르면 재요청한다', async () => {
     vi.mocked(getKnowledgeGraphView)
       .mockRejectedValueOnce(new ApiError('conflict', 'KNOWLEDGE_GRAPH_NOT_READY', 409))

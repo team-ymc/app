@@ -49,6 +49,7 @@ describe('StudyTopBar — 본문 | 지식 그래프 쌍', () => {
     renderBar({ knowledgeGraphStatus: 'PENDING' });
     expect(graphLink().getAttribute('aria-disabled')).toBe('true');
     expect(graphLink().title).toBe('지식 그래프를 준비하고 있습니다');
+    expect(graphLink().tabIndex).toBe(-1);
     fireEvent.click(graphLink());
     expect(screen.queryByText('GRAPH-ROUTE')).toBeNull();
   });
@@ -65,6 +66,7 @@ describe('StudyTopBar — 본문 | 지식 그래프 쌍', () => {
     renderBar();
     expect(graphLink().getAttribute('aria-disabled')).toBeNull();
     expect(graphLink().title).toBe('지식 그래프');
+    expect(graphLink().tabIndex).toBe(0);
     fireEvent.click(graphLink());
     expect(screen.getByText('GRAPH-ROUTE')).toBeTruthy();
   });

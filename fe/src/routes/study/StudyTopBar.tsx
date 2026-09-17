@@ -144,6 +144,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
             to={`/papers/${paperId}/graph`}
             aria-current={current === 'graph' ? 'page' : undefined}
             aria-disabled={graphDisabled ? 'true' : undefined}
+            tabIndex={graphDisabled ? -1 : undefined}
             title={graphDisabled ? graphReason : '지식 그래프'}
             onClick={blockIfDisabled}
             style={pairLinkStyle(current === 'graph', graphDisabled)}
