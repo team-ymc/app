@@ -61,7 +61,7 @@ TBD 틀을 채운다. Summary·Status(In Progress)·Tracking(YMC-394)·Depends o
   - `지식 그래프`는 `knowledgeGraphStatus`가 READY일 때만 활성이다. PENDING 툴팁 "지식 그래프를 준비하고 있습니다", FAILED 툴팁 "지식 그래프를 준비하지 못했습니다".
   - 지식 그래프 화면은 상단 바 아래 전체를 viz.html iframe으로 채운다. 준비되지 않은 상태로 URL 진입하면 같은 문구와 `본문으로` 링크를 보여준다. URL 발급에 실패하면 "지식 그래프를 불러오지 못했습니다"와 `다시 시도`.
 - Story 2(SYSTEM, MVP). 시스템은 컴파일이 만든 viz.html을 소유자에게만 제공한다.
-  - 컴파일 COMPLETED 반영 시 manifest `artifacts.knowledge_bundle_viz.key`를 저장한다. 없으면 저장하지 않고 WARN.
+  - 컴파일 COMPLETED 반영 시 manifest `artifacts.knowledge_bundle_viz.path`를 패키지 prefix에 붙인 키를 저장한다. 없으면 저장하지 않고 WARN.
   - `/status`가 `knowledgeGraphStatus`를 계산해 준다.
   - `GET /api/papers/{paperId}/knowledge-graph`는 소유자·READY일 때만 presigned GET URL을 발급한다.
 - Done Criteria: 위 AC + BE·FE 테스트 green + dev에서 실논문으로 버튼 활성 전환과 iframe 렌더 확인.
@@ -109,7 +109,7 @@ TBD 틀을 채운다. Summary·Status(In Progress)·Tracking(YMC-394)·Depends o
 - `routes/study/translationStatus.ts` 옆에 `knowledgeGraphStatus.ts`: `knowledgeGraphDisabledReason(status)`와 두 문구(null·그 외는 FAILED 문구). 폴링 판정은 `statusRefetchInterval(data)`로 합쳐 번역·그래프 중 하나라도 `'PENDING'`이면 5초, 아니면 false. null은 자연히 제외된다.
 - `routes/study/usePaperStatusQuery.ts`: `['paper-status', paperId]` 키와 `refetchInterval: statusRefetchInterval`을 고정한 훅. StudyPage와 KnowledgeGraphPage가 모두 이 훅을 쓴다. 두 화면은 다른 라우트라 동시에 마운트되지 않지만 옵션이 어긋나지 않게 한 곳에 둔다.
 - `routes/study/StudyTopBar.tsx`: 학습 화면 R1 상단 바를 추출한다. props는 `paperId`, `title`, `current: 'content' | 'graph'`, `knowledgeGraphStatus`, `rightSlot?`(학습 화면이 번역·야간 버튼을 넘긴다). `본문`은 `/papers/:paperId`, `지식 그래프`는 `/papers/:paperId/graph` 링크. 현재 화면은 `aria-current="page"`와 눌린 배경. `지식 그래프`는 READY가 아니면 비활성(`aria-disabled`, 클릭 무시)과 `title` 툴팁.
-- `routes/KnowledgeGraphPage.tsx`: `useParams`로 paperId. `usePaperStatusQuery`로 상태를 읽는다(캐시 공유). 파싱 status가 COMPLETED가 아니면 StudyPage와 같은 규칙으로 `/library`로 돌려보낸다. `knowledgeGraphStatus`가 READY일 때만 `['knowledge-graph-view', paperId]` 쿼리(`staleTime: 0`, `gcTime: 0` — 진입마다 새 URL)를 켜고 iframe을 렌더한다. READY가 아니면 캔버스 영역 가운데에 문구와 `본문으로` 링크. URL 발급 실패는 문구와 `다시 시도`(refetch). iframe 자체의 로드 실패는 cross-origin이라 감지하지 못하므로 `다시 시도`는 발급 실패에만 붙는다.
+- `routes/KnowledgeGraphPage.tsx`: `useParams`로 paperId. `usePaperStatusQuery`로 상태를 읽는다(캐시 공유). 파싱 status가 COMPLETED가 아니면 StudyPage와 같은 규칙으로 `/library`로 돌려보낸다. `knowledgeGraphStatus`가 READY일 때만 `['knowledge-graph-view', paperId]` 쿼리(`staleTime: Infinity`, `gcTime: 0` — 진입마다 새 URL을 받되 떠 있는 동안 포커스·재접속에는 다시 받지 않는다. URL이 바뀌면 iframe이 다시 로드되기 때문이다)를 켜고 iframe을 렌더한다. READY가 아니면 캔버스 영역 가운데에 문구와 `본문으로` 링크. URL 발급 실패는 문구와 `다시 시도`(refetch). iframe 자체의 로드 실패는 cross-origin이라 감지하지 못하므로 `다시 시도`는 발급 실패에만 붙는다.
 - iframe: `title="지식 그래프"`, `sandbox="allow-scripts allow-same-origin"`, 상단 바 아래 전체(`flex:1`, border 없음, 배경 `--color-bg-canvas`).
 - `main.tsx`: `RequireAuth` 자식에 `{ path: '/papers/:paperId/graph', element: <KnowledgeGraphPage /> }`.
 - 아이콘: `본문`은 Phosphor `BookOpen`을 StudyPage의 `ArrowLeft`처럼 직접 import한다(`icons.ts`는 IconButton 전용 레지스트리라 건드리지 않는다). `지식 그래프`는 아트보드가 쓰는 인라인 SVG(노드 여섯 개와 연결선)를 `StudyTopBar` 안에 그대로 옮긴다.
@@ -130,7 +130,7 @@ FE(vitest):
 - `StudyTopBar`: current 표시, READY 아닐 때 비활성·툴팁, 링크 경로.
 - `KnowledgeGraphPage`: READY → URL 요청 후 iframe src 설정, PENDING·FAILED → 문구와 링크, 발급 실패 → 문구와 다시 시도.
 - `StudyPage` 기존 테스트: 상단 바 추출 뒤에도 제목 말줄임, 야간 모드 `data-theme`, 계정 메뉴, 번역 버튼, 번역 READY 전환 시 본문 재조회가 유지.
-- `KnowledgeGraphPage`: 발급 403·404·409 각각의 처리(404는 서재로, 409는 준비 문구).
+- `KnowledgeGraphPage`: URL 발급 실패(403·404·409 포함)는 모두 "불러오지 못했습니다"와 다시 시도. 논문 삭제로 인한 404는 status 조회가 먼저 서재로 보낸다.
 
 ## 7. 배포 순서
 
