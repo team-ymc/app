@@ -112,6 +112,7 @@ public class PaperController {
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {
-        return new PaperStatusResponse(view.paperId(), view.status(), view.translationStatus(), view.updatedAt());
+        return new PaperStatusResponse(view.paperId(), view.status(), view.translationStatus(),
+                view.knowledgeGraphStatus(), view.updatedAt());
     }
 }

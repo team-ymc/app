@@ -1,6 +1,7 @@
 package com.ymc.paper.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -102,22 +103,26 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
     void reportsTranslationStatus() throws Exception {
         Paper paper = givenProcessingPaper("translation-status.pdf");
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
-                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"));
+                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("PENDING"));
 
         documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.translationStatus").value("PENDING"));
+                .andExpect(jsonPath("$.translationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("PENDING"));
 
         documentTransitions.markCompileRequested(paper.getDocumentId());
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
-                .andExpect(jsonPath("$.translationStatus").value("PENDING"));
+                .andExpect(jsonPath("$.translationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("PENDING"));
 
         documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null,
                 "papers/" + paper.getId() + "/knowledge-bundle/viz.html");
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
-                .andExpect(jsonPath("$.translationStatus").value("READY"));
+                .andExpect(jsonPath("$.translationStatus").value("READY"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("READY"));
     }
 
     @Test
@@ -131,6 +136,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.translationStatus").value("FAILED"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("FAILED"))
                 .andExpect(jsonPath("$.compileErrorCode").doesNotExist());
 
         // 컴파일 실패가 본문 조회 가능 여부에 영향을 주면 안 된다
@@ -146,7 +152,8 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
 
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.status").value("UPLOAD_PENDING"))
-                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"));
+                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value(nullValue()));
     }
 
     @Test
@@ -162,5 +169,32 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{id}/status", paper.getId()).with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    @DisplayName("지식 그래프 상태: 컴파일 COMPLETED인데 키가 없으면 번역 READY라도 FAILED")
+    void reportsFailedGraphWhenCompletedWithoutKey() throws Exception {
+        Paper paper = givenProcessingPaper("graph-no-key.pdf");
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null, null);
+
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.translationStatus").value("READY"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("FAILED"));
+    }
+
+    @Test
+    @DisplayName("지식 그래프 상태: 언어 없는 문서는 번역 NOT_APPLICABLE이어도 그래프는 READY")
+    void reportsReadyGraphForNonEnglishPaper() throws Exception {
+        Paper paper = givenProcessingPaper("graph-ko.pdf");
+        documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
+        documentContentIngestService.ingest(paper.getDocumentId(), givenPackageOnS3(paper.getId()));   // 언어 null
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null,
+                "papers/" + paper.getId() + "/knowledge-bundle/viz.html");
+
+        mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
+                .andExpect(jsonPath("$.translationStatus").value("NOT_APPLICABLE"))
+                .andExpect(jsonPath("$.knowledgeGraphStatus").value("READY"));
     }
 }

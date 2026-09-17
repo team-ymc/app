@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
+import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.domain.TranslationStatus;
@@ -39,8 +40,10 @@ public class PaperDocumentViews {
         Document document = documentOf(paper).orElse(null);
         TranslationStatus translationStatus = document == null
                 ? TranslationStatus.NOT_APPLICABLE : document.translationStatus();
+        // 연결 전에는 컴파일 상태를 판단할 근거가 없다 — PENDING으로 뭉개지 않고 null로 드러낸다.
+        KnowledgeGraphStatus knowledgeGraphStatus = document == null ? null : document.knowledgeGraphStatus();
         return new PaperStatusView(paper.getId(), derivedStatus(paper, document), translationStatus,
-                derivedUpdatedAt(paper, document));
+                knowledgeGraphStatus, derivedUpdatedAt(paper, document));
     }
 
     public List<PaperListView> listViews(List<Paper> papers) {
