@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.stereotype.Component;
@@ -121,6 +122,18 @@ public class S3PaperPackageReader implements PaperPackageReader {
         return translations;
     }
 
+    @Override
+    public Optional<String> readKnowledgeGraphKey(String manifestKey) {
+        String prefix = packagePrefix(manifestKey);
+        Manifest manifest = parse(fileStorage.readUtf8(manifestKey), Manifest.class, manifestKey);
+        Manifest.Artifact viz = manifest.artifacts() == null ? null : manifest.artifacts().knowledgeBundleViz();
+        if (viz == null || viz.path() == null || viz.path().isBlank()) {
+            log.warn("manifest에 knowledge_bundle_viz가 없습니다, 지식 그래프 없이 진행: manifestKey={}", manifestKey);
+            return Optional.empty();
+        }
+        return Optional.of(prefix + viz.path());
+    }
+
     /** manifest·frontend의 source_language를 정규화 후 병합한다. 둘 다 유효하고 다르면 WARN 후 frontend 값을 쓴다. */
     private String resolveSourceLanguage(Manifest manifest, FrontendDocument frontend, String manifestKey) {
         String manifestNormalized = normalizeLanguage(manifest.sourceLanguage(), "manifest.json", manifestKey);
@@ -229,7 +242,8 @@ public class S3PaperPackageReader implements PaperPackageReader {
         record Artifacts(
                 @JsonProperty("frontend_document") Artifact frontendDocument,
                 @JsonProperty("structure_document") Artifact structureDocument,
-                @JsonProperty("frontend_translation_ko") Artifact frontendTranslationKo) {
+                @JsonProperty("frontend_translation_ko") Artifact frontendTranslationKo,
+                @JsonProperty("knowledge_bundle_viz") Artifact knowledgeBundleViz) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
