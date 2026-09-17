@@ -7,15 +7,12 @@
 // toggle"로 언급). brief Step 3가 명시적으로 요구하는 기능이라 R1 우측 존에 아이콘 버튼을 새로 추가했다
 // (report에 기록) — 목업에 없는 요소이므로 기존 변환표 밖 판단.
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft } from '@phosphor-icons/react';
-import { PaperStackMark } from '../design/components/PaperStackMark';
 import { IconButton } from '../design/components/IconButton';
-import { getStatus } from '../api/papers';
-import { ApiError, type TranslationStatus } from '../api/types';
+import { ApiError, type TranslationStatus, type KnowledgeGraphStatus } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
-import { translationRefetchInterval, translationDisabledReason } from './study/translationStatus';
+import { translationDisabledReason } from './study/translationStatus';
 import { PaperViewer, type TranslationMode } from './study/PaperViewer';
 import { TranslationModeButton } from './study/TranslationModeButton';
 import { SelectionLayer } from './study/SelectionLayer';
@@ -23,11 +20,12 @@ import { ContentAskLayer } from './study/ContentAskLayer';
 import { TocRail } from './study/TocRail';
 import { TutorPanel, type TutorPanelAttachEvent } from './study/TutorPanel';
 import { attachSelection, MAX_ATTACHMENTS, type SelectionAttachment } from '../chat/selectionAttachments';
-import { AccountMenu } from '../account/AccountMenu';
 import { useScrollSpy } from './study/useScrollSpy';
 import type { SelectionAnchors } from './study/selectionAnchors';
 import { usePlanQuery } from '../plan/usePlanQuery';
 import { isExhausted, exhaustedPlaceholder } from '../plan/planLabels';
+import { StudyTopBar } from './study/StudyTopBar';
+import { usePaperStatusQuery } from './study/usePaperStatusQuery';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
@@ -48,13 +46,7 @@ export function splitPctForChatWidth(regionWidth: number): number | null {
 export default function StudyPage() {
   const { paperId } = useParams<{ paperId: string }>();
 
-  const statusQuery = useQuery({
-    queryKey: ['paper-status', paperId],
-    queryFn: () => getStatus(paperId as string),
-    enabled: !!paperId,
-    // 번역이 준비 중일 때만 폴링한다. 서재 폴링과 달리 파싱 상태는 이미 COMPLETED다.
-    refetchInterval: (query) => translationRefetchInterval(query.state.data?.translationStatus),
-  });
+  const statusQuery = usePaperStatusQuery(paperId);
 
   if (!paperId) {
     return <Navigate to="/library" replace state={{ toast: '잘못된 접근입니다' }} />;
@@ -80,10 +72,18 @@ export default function StudyPage() {
     return <Navigate to="/library" replace state={{ toast }} />;
   }
 
-  return <StudyPageContent paperId={paperId} translationStatus={statusQuery.data.translationStatus} />;
+  return (
+    <StudyPageContent
+      paperId={paperId}
+      translationStatus={statusQuery.data.translationStatus}
+      knowledgeGraphStatus={statusQuery.data.knowledgeGraphStatus}
+    />
+  );
 }
 
-function StudyPageContent({ paperId, translationStatus }: { paperId: string; translationStatus: TranslationStatus }) {
+function StudyPageContent({
+  paperId, translationStatus, knowledgeGraphStatus,
+}: { paperId: string; translationStatus: TranslationStatus; knowledgeGraphStatus: KnowledgeGraphStatus | null }) {
   const queryClient = useQueryClient();
   const contentQuery = useQuery({
     queryKey: ['paper-content', paperId],
@@ -269,91 +269,29 @@ function StudyPageContent({ paperId, translationStatus }: { paperId: string; tra
       }}
     >
       {/* R1 Global top bar */}
-      <div
-        style={{
-          height: '64px',
-          flexShrink: 0,
-          background: 'var(--color-bg-walnut)',
-          color: 'var(--color-on-dark)',
-          display: 'flex',
-          alignItems: 'stretch',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: '0 20px 0 16px', gap: '16px' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
-            <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', letterSpacing: '-0.005em', whiteSpace: 'nowrap' }}>
-              Paper Teacher
-            </span>
-          </Link>
-          <div style={{ width: '1px', height: '18px', background: 'rgba(255,253,247,0.18)', flexShrink: 0 }} />
-          <Link
-            to="/library"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'transparent',
-              border: 'none',
-              padding: '7px 10px',
-              borderRadius: '9999px',
-              color: 'var(--color-on-dark)',
-              fontFamily: 'var(--font-sans)',
-              fontSize: '13px',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              textDecoration: 'none',
-            }}
-          >
-            <ArrowLeft size={14} />
-            서재로
-          </Link>
-          <div style={{ width: '1px', height: '18px', background: 'rgba(255,253,247,0.18)', flexShrink: 0 }} />
-          <div
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: '15px',
-              fontWeight: 600,
-              color: 'var(--color-on-dark)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: 1,
-              minWidth: 0,
-              opacity: 0.92,
-            }}
-          >
-            {titleText}
-          </div>
-        </div>
-        <div
-          style={{
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            padding: '0 20px',
-            borderLeft: '1px solid rgba(255,253,247,0.14)',
-          }}
-        >
-          <TranslationModeButton
-            mode={effectiveMode}
-            disabled={!translationEnabled}
-            disabledReason={translationDisabledReason(translationStatus, hasTranslation)}
-            onCycle={handleCycleTranslation}
-          />
-          <IconButton
-            icon={nightMode ? 'sun' : 'moon'}
-            label={nightMode ? '주간 모드로 전환' : 'Night Study Mode 켜기'}
-            size={32}
-            onClick={() => setNightMode((v) => !v)}
-            style={{ color: 'var(--color-on-dark)' }}
-          />
-          <div style={{ width: '1px', height: '18px', background: 'rgba(255,253,247,0.18)', flexShrink: 0 }} />
-          <AccountMenu />
-        </div>
-      </div>
+      <StudyTopBar
+        paperId={paperId}
+        title={titleText}
+        current="content"
+        knowledgeGraphStatus={knowledgeGraphStatus}
+        rightSlot={
+          <>
+            <TranslationModeButton
+              mode={effectiveMode}
+              disabled={!translationEnabled}
+              disabledReason={translationDisabledReason(translationStatus, hasTranslation)}
+              onCycle={handleCycleTranslation}
+            />
+            <IconButton
+              icon={nightMode ? 'sun' : 'moon'}
+              label={nightMode ? '주간 모드로 전환' : 'Night Study Mode 켜기'}
+              size={32}
+              onClick={() => setNightMode((v) => !v)}
+              style={{ color: 'var(--color-on-dark)' }}
+            />
+          </>
+        }
+      />
 
       {/* R2 Study work area */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>

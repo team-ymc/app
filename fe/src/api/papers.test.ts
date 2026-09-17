@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createPaper, completeUpload, getStatus, getDownloadUrl, uploadToS3, listPapers, fetchPaperContent,
-  renamePaper, deletePaper,
+  renamePaper, deletePaper, getKnowledgeGraphView,
 } from './papers';
 
 function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; status?: number; body?: unknown }) {
@@ -44,6 +44,13 @@ describe('api.js — fetch 계열', () => {
     const res = await getDownloadUrl('p1');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1/download', expect.objectContaining({}));
     expect(res.downloadUrl).toBe('https://s3/get');
+  });
+
+  it('getKnowledgeGraphView: GET /knowledge-graph → {url, expiresAt}', async () => {
+    mockFetch({ body: { url: 'https://s3/viz.html', expiresAt: '2026-09-17T00:10:00Z' } });
+    const res = await getKnowledgeGraphView('p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1/knowledge-graph', expect.objectContaining({}));
+    expect(res.url).toBe('https://s3/viz.html');
   });
 
   it('listPapers: GET /api/papers → {papers}', async () => {

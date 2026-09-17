@@ -15,6 +15,8 @@ create table document (
     compile_status     varchar(32)
         check (compile_status in ('REQUESTED', 'COMPLETED', 'FAILED')),
     compile_error_code varchar(255),
+    -- 컴파일이 만든 지식 그래프(viz.html)의 S3 키. COMPLETED인데 null이면 산출물 없음.
+    knowledge_graph_key varchar(255),
     request_paper_id uuid                        not null,
     created_at       timestamp(6) with time zone not null,
     updated_at       timestamp(6) with time zone not null,
@@ -33,6 +35,7 @@ create unique index ux_document_request_paper on document (request_paper_id);
 -- alter table document add column if not exists compile_status varchar(32)
 --     check (compile_status in ('REQUESTED', 'COMPLETED', 'FAILED'));
 -- alter table document add column if not exists compile_error_code varchar(255);
+-- alter table document add column if not exists knowledge_graph_key varchar(255);
 
 -- dev 1회 SQL (배포 뒤). 파서 시절 번역이 이미 블록에 있는 문서는 COMPLETED, 영어인데 번역이 없는
 -- 문서는 FAILED로 채운다. null로 두면 PENDING으로 보여 화면이 폴링을 계속한다.

@@ -8,6 +8,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import LandingPage from './routes/LandingPage';
 import BookshelfPage from './routes/BookshelfPage';
 import StudyPage from './routes/StudyPage';
+import KnowledgeGraphPage from './routes/KnowledgeGraphPage';
 import ComingSoonPage from './routes/ComingSoonPage';
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/library', element: <BookshelfPage /> },
       { path: '/papers/:paperId', element: <StudyPage /> },
+      { path: '/papers/:paperId/graph', element: <KnowledgeGraphPage /> },
     ],
   },
 ]);

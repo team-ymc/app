@@ -8,7 +8,8 @@
     "structure_document": {"path": "structure/document.json", "media_type": "application/json", "schema_version": 2},
     "frontend_document": {"path": "frontend/document.json", "media_type": "application/json", "schema_version": 1},
     "structure_translation_ko": {"path": "structure/translation-ko.json", "media_type": "application/json", "schema_version": 1},
-    "frontend_translation_ko": {"path": "frontend/translation-ko.json", "media_type": "application/json", "schema_version": 1}
+    "frontend_translation_ko": {"path": "frontend/translation-ko.json", "media_type": "application/json", "schema_version": 1},
+    "knowledge_bundle_viz": {"path": "knowledge-bundle/viz.html", "media_type": "text/html; charset=utf-8"}
   },
   "assets": {"path": "assets", "registry": "structure_document"}
 }

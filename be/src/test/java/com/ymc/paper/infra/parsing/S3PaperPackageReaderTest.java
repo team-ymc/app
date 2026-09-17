@@ -401,6 +401,80 @@ class S3PaperPackageReaderTest {
                 .isInstanceOf(S3Exception.class);
     }
 
+    @Test
+    void manifest의_knowledge_bundle_viz_path를_패키지_prefix에_붙여_돌려준다(CapturedOutput output) {
+        Optional<String> key = reader.readKnowledgeGraphKey("papers/translated/manifest.json");
+
+        assertThat(key).contains("papers/translated/knowledge-bundle/viz.html");
+        assertThat(output.getOut()).doesNotContain("knowledge_bundle_viz");
+    }
+
+    @Test
+    void manifest에_knowledge_bundle_viz가_없으면_empty와_WARN이다(CapturedOutput output) {
+        assertThat(reader.readKnowledgeGraphKey("papers/p1/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("knowledge_bundle_viz");
+    }
+
+    @Test
+    void knowledge_bundle_viz의_path가_비어_있으면_empty와_WARN이다(CapturedOutput output) {
+        Map<String, String> files = new HashMap<>();
+        files.put("papers/blank/manifest.json", """
+                {
+                  "manifest_version": 3,
+                  "document_id": "blank",
+                  "artifacts": {
+                    "frontend_document": {"path": "frontend/document.json"},
+                    "structure_document": {"path": "structure/document.json"},
+                    "knowledge_bundle_viz": {"path": ""}
+                  }
+                }
+                """);
+        S3PaperPackageReader blankReader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(blankReader.readKnowledgeGraphKey("papers/blank/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("knowledge_bundle_viz");
+    }
+
+    @Test
+    void manifest_S3_일시_장애는_지식_그래프_키_읽기에서도_전파한다() {
+        FileStorage failing = new FileStorage() {
+            @Override
+            public String readUtf8(String fileKey) {
+                throw S3Exception.builder().statusCode(503).message("Slow Down").build();
+            }
+
+            @Override
+            public PresignedUpload presignUpload(
+                    String fileKey, String contentType, long contentLength, String checksumSha256) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignDownload(String fileKey, String filename) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public PresignedDownload presignAssetGet(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<UploadedObjectMetadata> head(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void delete(String fileKey) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        S3PaperPackageReader failingReader = new S3PaperPackageReader(failing, new ObjectMapper());
+
+        assertThatThrownBy(() -> failingReader.readKnowledgeGraphKey("papers/s3err/manifest.json"))
+                .isInstanceOf(S3Exception.class);
+    }
+
     /** manifest에 사이드카 항목이 있고 본문은 최소인 패키지. */
     private static Map<String, String> sidecarPackage(String paperId, String sidecarJson) {
         Map<String, String> files = new HashMap<>();

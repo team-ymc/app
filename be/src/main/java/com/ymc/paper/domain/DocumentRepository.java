@@ -113,12 +113,13 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             """)
     int revertCompileRequested(@Param("id") UUID id);
 
-    /** 컴파일 결과 수신 종결. null 포함 — 선점 커밋 전에 결과가 도착하는 경합을 흡수한다. */
+    /** 컴파일 결과 수신 종결. null 포함 — 선점 커밋 전에 결과가 도착하는 경합을 흡수한다. 종결 뒤에는 키도 바꾸지 않는다. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Document d
                set d.compileStatus = :status,
-                   d.compileErrorCode = :errorCode
+                   d.compileErrorCode = :errorCode,
+                   d.knowledgeGraphKey = :knowledgeGraphKey
              where d.id = :id
                and (d.compileStatus is null
                     or d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED)
@@ -126,7 +127,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     int markCompiled(
             @Param("id") UUID id,
             @Param("status") CompileStatus status,
-            @Param("errorCode") String errorCode);
+            @Param("errorCode") String errorCode,
+            @Param("knowledgeGraphKey") String knowledgeGraphKey);
 
     /** 적재 시 언어 복제. 엔티티 dirty-write는 전체 row를 덮어 동시 REQUESTED 선점을 지울 수 있어 대상 컬럼만 갱신한다. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)

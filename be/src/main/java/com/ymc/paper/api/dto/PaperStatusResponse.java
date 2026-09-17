@@ -3,6 +3,7 @@ package com.ymc.paper.api.dto;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.domain.TranslationStatus;
 
@@ -13,5 +14,6 @@ import com.ymc.paper.domain.TranslationStatus;
  * errorCode는 싣지 않는다 — MVP는 실패 코드를 사용자에게 노출하지 않는다.
  */
 public record PaperStatusResponse(
-        UUID paperId, PaperStatus status, TranslationStatus translationStatus, Instant updatedAt) {
+        UUID paperId, PaperStatus status, TranslationStatus translationStatus,
+        KnowledgeGraphStatus knowledgeGraphStatus, Instant updatedAt) {
 }

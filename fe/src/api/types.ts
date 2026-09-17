@@ -5,6 +5,9 @@ export type PaperStatus =
 // 전체 번역 준비 상태. 파싱 status와 별개다 — 파싱이 COMPLETED인 채로 번역만 뒤따라 바뀐다.
 export type TranslationStatus = 'NOT_APPLICABLE' | 'PENDING' | 'READY' | 'FAILED';
 
+// 지식 그래프(viz.html) 준비 상태. 컴파일이 만드는 산출물이라 파싱 status와 별개다. Document 연결 전에는 null.
+export type KnowledgeGraphStatus = 'PENDING' | 'READY' | 'FAILED';
+
 export const TERMINAL_STATUSES: ReadonlySet<PaperStatus> = new Set(['COMPLETED', 'FAILED', 'EXPIRED']);
 
 export interface Paper {
@@ -37,6 +40,7 @@ export interface PaperStatusResponse {
   paperId: string;
   status: PaperStatus;
   translationStatus: TranslationStatus;
+  knowledgeGraphStatus: KnowledgeGraphStatus | null;
   updatedAt: string;
 }
 
@@ -67,6 +71,9 @@ export interface PaperContentBlockDto {
 }
 
 export interface PaperContentAssetDto { url: string; mediaType: string; expiresAt: string; }
+
+// GET /api/papers/{paperId}/knowledge-graph. viz.html을 여는 presigned GET URL — iframe src로 쓴다.
+export interface KnowledgeGraphView { url: string; expiresAt: string; }
 
 export interface PaperContentResponse {
   paperId: string;

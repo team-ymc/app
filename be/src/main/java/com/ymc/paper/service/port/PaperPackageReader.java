@@ -1,6 +1,7 @@
 package com.ymc.paper.service.port;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * S3의 파서 산출물 패키지를 읽어 계약형으로 변환한다.
@@ -23,4 +24,12 @@ public interface PaperPackageReader {
      *         manifest 자체를 못 읽으면 예외 — 파싱 때 읽은 같은 파일이라 일시 장애로 본다.
      */
     Map<String, String> readTranslations(String manifestKey);
+
+    /**
+     * 컴파일 산출물 지식 그래프(knowledge-bundle/viz.html)의 S3 키. manifest의 knowledge_bundle_viz.path를
+     * 다른 artifact와 같은 규칙으로 패키지 prefix에 붙인다.
+     *
+     * @return artifact가 없거나 path가 비어 있으면 WARN 후 empty. manifest 자체를 못 읽으면 예외.
+     */
+    Optional<String> readKnowledgeGraphKey(String manifestKey);
 }

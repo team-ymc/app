@@ -12,6 +12,7 @@ import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.DocumentStatus;
+import com.ymc.paper.service.port.PaperPackageReader;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +29,7 @@ public class KnowledgeCompileResultService {
     private final DocumentRepository documentRepository;
     private final DocumentTransitions transitions;
     private final DocumentTranslationMergeService mergeService;
+    private final PaperPackageReader packageReader;
 
     @Transactional
     public void apply(UUID requestPaperId, CompileStatus terminal, String errorCode, String manifestKey) {
@@ -56,12 +58,14 @@ public class KnowledgeCompileResultService {
                 log.warn("영어 문서인데 병합된 번역이 없습니다, READY로 응답되지만 번역 블록 없음: requestPaperId={}, "
                         + "documentId={}, manifestKey={}", requestPaperId, documentId, manifestKey);
             }
-            transitions.markCompiled(documentId, CompileStatus.COMPLETED, null);
-            log.info("컴파일 완료 반영: requestPaperId={}, documentId={}, mergedBlocks={}",
-                    requestPaperId, documentId, merged);
+            // manifest를 한 번 더 읽는다. 재파싱 경로가 없어 두 읽기 사이에 manifest가 바뀌지 않는다.
+            String knowledgeGraphKey = packageReader.readKnowledgeGraphKey(manifestKey).orElse(null);
+            transitions.markCompiled(documentId, CompileStatus.COMPLETED, null, knowledgeGraphKey);
+            log.info("컴파일 완료 반영: requestPaperId={}, documentId={}, mergedBlocks={}, knowledgeGraphKey={}",
+                    requestPaperId, documentId, merged, knowledgeGraphKey);
             return;
         }
-        transitions.markCompiled(documentId, CompileStatus.FAILED, errorCode);
+        transitions.markCompiled(documentId, CompileStatus.FAILED, errorCode, null);
         log.error("컴파일 실패 기록: requestPaperId={}, documentId={}, code={}", requestPaperId, documentId, errorCode);
     }
 }

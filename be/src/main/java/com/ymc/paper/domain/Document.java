@@ -62,6 +62,10 @@ public class Document {
     @Column(name = "compile_error_code")
     private String compileErrorCode;
 
+    /** 컴파일이 만든 지식 그래프(viz.html)의 S3 키. COMPLETED인데 null이면 산출물이 없다. */
+    @Column(name = "knowledge_graph_key")
+    private String knowledgeGraphKey;
+
     /**
      * AI 작업 상관키 = 이 Document를 만든 최초 paperId. FK가 아니다 — 대표 Paper가 삭제돼도
      * 발행·결과 역조회는 이 값만 본다.
@@ -106,5 +110,9 @@ public class Document {
 
     public TranslationStatus translationStatus() {
         return TranslationStatus.of(sourceLanguage, compileStatus);
+    }
+
+    public KnowledgeGraphStatus knowledgeGraphStatus() {
+        return KnowledgeGraphStatus.of(compileStatus, knowledgeGraphKey);
     }
 }
