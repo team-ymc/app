@@ -16,12 +16,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ymc.paper.api.dto.CreatePaperRequest;
+import com.ymc.paper.api.dto.KnowledgeGraphViewResponse;
 import com.ymc.paper.api.dto.PaperContentResponse;
 import com.ymc.paper.api.dto.PaperCreated;
 import com.ymc.paper.api.dto.PaperDownloadResponse;
 import com.ymc.paper.api.dto.PaperListResponse;
 import com.ymc.paper.api.dto.PaperStatusResponse;
 import com.ymc.paper.api.dto.RenamePaperRequest;
+import com.ymc.paper.service.KnowledgeGraphViewService;
 import com.ymc.paper.service.PaperContentQueryService;
 import com.ymc.paper.service.PaperDownloadService;
 import com.ymc.paper.service.PaperListService;
@@ -44,6 +46,7 @@ public class PaperController {
     private final PaperUploadCompletionService uploadCompletionService;
     private final PaperStatusService statusService;
     private final PaperDownloadService downloadService;
+    private final KnowledgeGraphViewService knowledgeGraphViewService;
     private final PaperListService listService;
     private final PaperContentQueryService contentQueryService;
     private final PaperManagementService managementService;
@@ -79,6 +82,13 @@ public class PaperController {
     public PaperDownloadResponse download(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         return PaperDownloadResponse.from(downloadService.download(paperId, ownerId));
+    }
+
+    /** 지식 그래프 viz.html을 여는 presigned GET URL 발급. */
+    @GetMapping("/{paperId}/knowledge-graph")
+    public KnowledgeGraphViewResponse knowledgeGraph(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return KnowledgeGraphViewResponse.from(knowledgeGraphViewService.view(paperId, ownerId));
     }
 
     /** 서재 목록 조회. 인증 주체 소유 논문만 반환한다 (YMC-215). */
