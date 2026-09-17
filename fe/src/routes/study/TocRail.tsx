@@ -37,7 +37,7 @@ export function TocRail({ toc, activeId, tocOpen, onToggle, onJump }: TocRailPro
         onClick={onToggle}
       />
       {tocOpen && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflowY: 'auto', flexDirection: 'column', gap: '2px', width: '100%', paddingRight: '4px' }}>
           {toc.map((item) => {
             const active = item.blockId === activeId;
             const sub = item.level >= 3;
