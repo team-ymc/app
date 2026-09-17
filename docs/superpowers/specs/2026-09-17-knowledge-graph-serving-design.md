@@ -41,7 +41,7 @@ viz.html의 성질(조사 결과):
 
 ### 3.1 `contracts/frontend-backend/openapi.yaml` 0.7.0
 
-- 0.7.0은 #62(0.6.0, `translationStatus`) 위에 얹는다. project-docs 브랜치는 #62 브랜치를 기반으로 만든다.
+- 0.7.0은 #62(0.6.0, `translationStatus`, 2026-09-17 머지됨) 위에 얹는다. project-docs 브랜치는 origin/main 기준으로 만든다.
 - 새 스키마 `KnowledgeGraphStatus`: `PENDING` / `READY` / `FAILED`. 설명에 다음을 적는다.
   - 파싱 `status`·`translationStatus`와 별개다. 컴파일이 만드는 지식 그래프(viz.html)의 준비 상태다.
   - PENDING: 컴파일 전이거나 진행 중. READY: viz.html을 열 수 있음. FAILED: 컴파일 실패 또는 산출물 없음, 자동 재시도 없음.
@@ -90,8 +90,8 @@ TBD 틀을 채운다. Summary·Status(In Progress)·Tracking(YMC-394)·Depends o
 
 ### 4.3 컴파일 결과 수신
 
-- `PaperPackageReader`에 `Optional<String> readKnowledgeGraphKey(String manifestKey)` 추가. manifest `artifacts.knowledge_bundle_viz.key`를 읽는다. artifact가 없거나 key가 null·빈 문자열이면 WARN 후 empty. manifest 자체를 못 읽으면 예외(기존 `readTranslations`와 같은 기준 — 일시 장애는 재전달).
-- `S3PaperPackageReader.Manifest.Artifacts`에 `@JsonProperty("knowledge_bundle_viz") Artifact knowledgeBundleViz` 추가. `Artifact` record에 `key` 필드 추가.
+- `PaperPackageReader`에 `Optional<String> readKnowledgeGraphKey(String manifestKey)` 추가. manifest `artifacts.knowledge_bundle_viz.path`를 패키지 prefix에 붙여 키를 만든다(다른 artifact와 같은 규칙, manifest의 `key` 필드는 쓰지 않는다 — 테스트 픽스처가 paperId별 절대 키를 가질 수 없다). artifact가 없거나 path가 null·빈 문자열이면 WARN 후 empty. manifest 자체를 못 읽으면 예외(기존 `readTranslations`와 같은 기준 — 일시 장애는 재전달).
+- `S3PaperPackageReader.Manifest.Artifacts`에 `@JsonProperty("knowledge_bundle_viz") Artifact knowledgeBundleViz` 추가. `Artifact` record는 그대로(`path`만).
 - `KnowledgeCompileResultService.apply`: COMPLETED 분기에서 `merge` 뒤 `readKnowledgeGraphKey`를 호출하고 `markCompiled(documentId, COMPLETED, null, key)`. manifest는 `merge`가 이미 한 번 읽지만 호출 하나를 더 하는 것으로 두고 리더 안에서 캐시하지 않는다(논문당 한 번 오는 이벤트, 결정 표 "manifest 두 번 읽기"). 이미 종결된 문서는 기존대로 처음에 return하므로 키 보정 경로가 없다.
 - 로그: 완료 INFO에 `knowledgeGraphKey` 유무를 함께 남긴다.
 
@@ -112,7 +112,7 @@ TBD 틀을 채운다. Summary·Status(In Progress)·Tracking(YMC-394)·Depends o
 - `routes/KnowledgeGraphPage.tsx`: `useParams`로 paperId. `usePaperStatusQuery`로 상태를 읽는다(캐시 공유). 파싱 status가 COMPLETED가 아니면 StudyPage와 같은 규칙으로 `/library`로 돌려보낸다. `knowledgeGraphStatus`가 READY일 때만 `['knowledge-graph-view', paperId]` 쿼리(`staleTime: 0`, `gcTime: 0` — 진입마다 새 URL)를 켜고 iframe을 렌더한다. READY가 아니면 캔버스 영역 가운데에 문구와 `본문으로` 링크. URL 발급 실패는 문구와 `다시 시도`(refetch). iframe 자체의 로드 실패는 cross-origin이라 감지하지 못하므로 `다시 시도`는 발급 실패에만 붙는다.
 - iframe: `title="지식 그래프"`, `sandbox="allow-scripts allow-same-origin"`, 상단 바 아래 전체(`flex:1`, border 없음, 배경 `--color-bg-canvas`).
 - `main.tsx`: `RequireAuth` 자식에 `{ path: '/papers/:paperId/graph', element: <KnowledgeGraphPage /> }`.
-- 아이콘: `본문`은 Phosphor `book-open`을 `design/components/icons.ts`에 등록한다(현재 없음). `지식 그래프`는 아트보드가 쓰는 인라인 SVG(노드 세 개와 연결선)를 `StudyTopBar` 안에 그대로 옮긴다.
+- 아이콘: `본문`은 Phosphor `BookOpen`을 StudyPage의 `ArrowLeft`처럼 직접 import한다(`icons.ts`는 IconButton 전용 레지스트리라 건드리지 않는다). `지식 그래프`는 아트보드가 쓰는 인라인 SVG(노드 여섯 개와 연결선)를 `StudyTopBar` 안에 그대로 옮긴다.
 
 ## 6. 테스트
 
