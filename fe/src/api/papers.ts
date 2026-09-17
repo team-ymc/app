@@ -5,7 +5,7 @@ import { authFetch } from './auth';
 import {
   ApiError,
   type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse,
-  type PaperUploadHeaders,
+  type PaperUploadHeaders, type KnowledgeGraphView,
 } from './types';
 
 // size는 presigned PUT 서명에 박히는 정확한 바이트 수다 — 업로드가 이 값과 다르면 S3가 403으로 거절한다.
@@ -63,6 +63,13 @@ export async function getDownloadUrl(paperId: string): Promise<{ downloadUrl: st
   const res = await authFetch(`/api/papers/${paperId}/download`);
   if (!res.ok) throw await apiError(res);
   return res.json(); // { downloadUrl, expiresAt }
+}
+
+// 지식 그래프 viz.html을 여는 presigned GET URL 발급 (계약 0.7.0). READY가 아니면 409 KNOWLEDGE_GRAPH_NOT_READY.
+export async function getKnowledgeGraphView(paperId: string): Promise<KnowledgeGraphView> {
+  const res = await authFetch(`/api/papers/${paperId}/knowledge-graph`);
+  if (!res.ok) throw await apiError(res);
+  return res.json(); // { url, expiresAt }
 }
 
 // 서재 목록 (FT-002, BE는 YMC-223). D3 폐기 — 실제 목록을 받는다.
