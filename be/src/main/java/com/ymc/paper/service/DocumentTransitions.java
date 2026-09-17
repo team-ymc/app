@@ -78,12 +78,12 @@ public class DocumentTransitions {
         return documentRepository.revertCompileRequested(documentId) == 1;
     }
 
-    /** 컴파일 결과 종결. 호출자가 트랜잭션 안이면 거기에 참여한다. */
+    /** 컴파일 결과 종결. 호출자가 트랜잭션 안이면 거기에 참여한다. FAILED는 knowledgeGraphKey에 null을 넘긴다. */
     @Transactional
-    public boolean markCompiled(UUID documentId, CompileStatus status, String errorCode) {
+    public boolean markCompiled(UUID documentId, CompileStatus status, String errorCode, String knowledgeGraphKey) {
         if (status == null || status == CompileStatus.REQUESTED) {
             throw new IllegalArgumentException("컴파일 종결 상태만 허용됩니다: " + status);
         }
-        return documentRepository.markCompiled(documentId, status, errorCode) == 1;
+        return documentRepository.markCompiled(documentId, status, errorCode, knowledgeGraphKey) == 1;
     }
 }

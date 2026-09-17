@@ -114,7 +114,8 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.translationStatus").value("PENDING"));
 
-        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null);
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null,
+                "papers/" + paper.getId() + "/knowledge-bundle/viz.html");
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.translationStatus").value("READY"));
     }
@@ -125,7 +126,7 @@ class PaperStatusPollingIntegrationTest extends IntegrationTest {
         Paper paper = givenProcessingPaper("translation-failed.pdf");
         documentTransitions.markParsedAndSettle(paper.getDocumentId(), DocumentStatus.COMPLETED, null);
         documentContentIngestService.ingest(paper.getDocumentId(), givenTranslatedPackageOnS3(paper.getId()));
-        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID");
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID", null);
 
         mockMvc.perform(get("/api/papers/{paperId}/status", paper.getId()).with(userJwt()))
                 .andExpect(jsonPath("$.status").value("COMPLETED"))

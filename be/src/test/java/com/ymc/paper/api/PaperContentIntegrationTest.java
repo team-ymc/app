@@ -38,7 +38,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
         String manifestKey = givenTranslatedPackageOnS3(paper.getId());
         documentContentIngestService.ingest(paper.getDocumentId(), manifestKey);
         mergeService.merge(paper.getDocumentId(), manifestKey);
-        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null);
+        documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null, null);
         return reload(paper.getId());
     }
 

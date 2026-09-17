@@ -56,12 +56,12 @@ public class KnowledgeCompileResultService {
                 log.warn("영어 문서인데 병합된 번역이 없습니다, READY로 응답되지만 번역 블록 없음: requestPaperId={}, "
                         + "documentId={}, manifestKey={}", requestPaperId, documentId, manifestKey);
             }
-            transitions.markCompiled(documentId, CompileStatus.COMPLETED, null);
+            transitions.markCompiled(documentId, CompileStatus.COMPLETED, null, null);
             log.info("컴파일 완료 반영: requestPaperId={}, documentId={}, mergedBlocks={}",
                     requestPaperId, documentId, merged);
             return;
         }
-        transitions.markCompiled(documentId, CompileStatus.FAILED, errorCode);
+        transitions.markCompiled(documentId, CompileStatus.FAILED, errorCode, null);
         log.error("컴파일 실패 기록: requestPaperId={}, documentId={}, code={}", requestPaperId, documentId, errorCode);
     }
 }

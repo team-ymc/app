@@ -104,7 +104,7 @@ class DocumentPersistenceIntegrationTest extends IntegrationTest {
         UUID id = insert(randomChecksum(), UUID.randomUUID());
         Instant before = documentRepository.findById(id).orElseThrow().getUpdatedAt();
 
-        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID")))
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.FAILED, "PARSED_DOCUMENT_INVALID", null)))
                 .isEqualTo(1);
         Document failed = documentRepository.findById(id).orElseThrow();
         assertThat(failed.getCompileStatus()).isEqualTo(CompileStatus.FAILED);
@@ -112,7 +112,33 @@ class DocumentPersistenceIntegrationTest extends IntegrationTest {
         assertThat(failed.getUpdatedAt()).isEqualTo(before);
 
         // 이미 종결됐으면 중복 결과는 아무것도 바꾸지 않는다
-        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null))).isEqualTo(0);
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null, null))).isEqualTo(0);
         assertThat(documentRepository.findById(id).orElseThrow().getCompileStatus()).isEqualTo(CompileStatus.FAILED);
+    }
+
+    @Test
+    void 컴파일_완료는_지식_그래프_키를_함께_저장하고_종결_뒤에는_키를_바꾸지_않는다() {
+        UUID id = insert(randomChecksum(), UUID.randomUUID());
+        String key = "papers/" + id + "/knowledge-bundle/viz.html";
+
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null, key)))
+                .isEqualTo(1);
+        Document completed = documentRepository.findById(id).orElseThrow();
+        assertThat(completed.getKnowledgeGraphKey()).isEqualTo(key);
+        assertThat(completed.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.READY);
+
+        // 종결 뒤 재전달: 키도 상태도 그대로
+        assertThat(tx.<Integer>execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null, "other")))
+                .isEqualTo(0);
+        assertThat(documentRepository.findById(id).orElseThrow().getKnowledgeGraphKey()).isEqualTo(key);
+    }
+
+    @Test
+    void 컴파일_완료인데_키가_없으면_READY가_아니라_FAILED다() {
+        UUID id = insert(randomChecksum(), UUID.randomUUID());
+        tx.execute(s -> documentRepository.markCompiled(id, CompileStatus.COMPLETED, null, null));
+        Document document = documentRepository.findById(id).orElseThrow();
+        assertThat(document.getCompileStatus()).isEqualTo(CompileStatus.COMPLETED);
+        assertThat(document.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.FAILED);
     }
 }
