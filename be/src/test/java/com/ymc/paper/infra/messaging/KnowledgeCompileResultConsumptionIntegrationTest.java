@@ -16,6 +16,7 @@ import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentBlock;
 import com.ymc.paper.domain.DocumentStatus;
+import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.TranslationStatus;
 import com.ymc.support.IntegrationTest;
@@ -63,6 +64,9 @@ class KnowledgeCompileResultConsumptionIntegrationTest extends IntegrationTest {
         Document document = documentOf(paper);
         assertThat(document.getCompileErrorCode()).isNull();
         assertThat(document.translationStatus()).isEqualTo(TranslationStatus.READY);
+        assertThat(document.getKnowledgeGraphKey())
+                .isEqualTo("papers/" + paper.getId() + "/knowledge-bundle/viz.html");
+        assertThat(document.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.READY);
         assertThat(blocksOf(paper).get(1).getContent().get("textKor").asText()).contains("새로운 구조");
         assertThat(blocksOf(paper).get(3).getContent().has("textKor")).isFalse();
     }
@@ -81,6 +85,8 @@ class KnowledgeCompileResultConsumptionIntegrationTest extends IntegrationTest {
         assertThat(document.getCompileErrorCode()).isEqualTo("PARSED_DOCUMENT_INVALID");
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.COMPLETED);
         assertThat(document.translationStatus()).isEqualTo(TranslationStatus.FAILED);
+        assertThat(document.getKnowledgeGraphKey()).isNull();
+        assertThat(document.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.FAILED);
         assertThat(blocksOf(paper)).allSatisfy(b -> assertThat(b.getContent().has("textKor")).isFalse());
     }
 
@@ -99,6 +105,10 @@ class KnowledgeCompileResultConsumptionIntegrationTest extends IntegrationTest {
 
         awaitCompileStatus(paper.getId(), CompileStatus.COMPLETED);
         assertThat(blocksOf(paper)).allSatisfy(b -> assertThat(b.getContent().has("textKor")).isFalse());
+        Document document = documentOf(paper);
+        assertThat(document.getCompileStatus()).isEqualTo(CompileStatus.COMPLETED);
+        assertThat(document.getKnowledgeGraphKey()).isNull();
+        assertThat(document.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.FAILED);
     }
 
     @Test
@@ -118,6 +128,8 @@ class KnowledgeCompileResultConsumptionIntegrationTest extends IntegrationTest {
 
         assertThat(documentOf(paper).getCompileStatus()).isEqualTo(CompileStatus.COMPLETED);
         assertThat(documentOf(paper).getCompileErrorCode()).isNull();
+        assertThat(documentOf(paper).getKnowledgeGraphKey())
+                .isEqualTo("papers/" + paper.getId() + "/knowledge-bundle/viz.html");
     }
 
     @Test
