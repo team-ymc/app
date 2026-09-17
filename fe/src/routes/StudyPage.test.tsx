@@ -6,7 +6,7 @@ import StudyPage, { splitPctForChatWidth } from './StudyPage';
 import { getStatus, fetchPaperContent } from '../api/papers';
 import { getMyPlan } from '../api/plan';
 import { useTextSelection, type TextSelection } from './study/useTextSelection';
-import type { PaperContentResponse, TranslationStatus } from '../api/types';
+import type { KnowledgeGraphStatus, PaperContentResponse, TranslationStatus } from '../api/types';
 
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), fetchPaperContent: vi.fn() }));
 vi.mock('../api/plan', () => ({ getMyPlan: vi.fn() }));
@@ -52,8 +52,8 @@ function contentResponse(
   };
 }
 
-function statusResponse(translationStatus: TranslationStatus = 'READY') {
-  return { paperId: 'p1', status: 'COMPLETED' as const, translationStatus, updatedAt: '2026-09-09T00:00:00Z' };
+function statusResponse(translationStatus: TranslationStatus = 'READY', knowledgeGraphStatus: KnowledgeGraphStatus | null = 'READY') {
+  return { paperId: 'p1', status: 'COMPLETED' as const, translationStatus, knowledgeGraphStatus, updatedAt: '2026-09-09T00:00:00Z' };
 }
 
 function selection(): TextSelection {
@@ -236,5 +236,55 @@ describe('splitPctForChatWidth — side 진입 시 채팅 320px', () => {
 
   it('폭을 못 재면 null이라 기존 비율을 건드리지 않는다', () => {
     expect(splitPctForChatWidth(0)).toBeNull();
+  });
+});
+
+describe('StudyPage — 상단 바 본문 | 지식 그래프', () => {
+  function graphLink(): HTMLAnchorElement {
+    return screen.getByRole('link', { name: '지식 그래프' }) as HTMLAnchorElement;
+  }
+
+  it('본문이 현재 화면으로 눌려 있고 READY면 지식 그래프가 활성이다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(screen.getByRole('link', { name: '본문' }).getAttribute('aria-current')).toBe('page');
+    expect(graphLink().getAttribute('href')).toBe('/papers/p1/graph');
+    expect(graphLink().getAttribute('aria-disabled')).toBeNull();
+    // 상단 바 추출 뒤에도 제목·야간 모드·번역 버튼이 그대로다
+    expect(screen.getByText('제목')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Night Study Mode 켜기' })).toBeTruthy();
+    expect(modeButton().disabled).toBe(false);
+  });
+
+  it('지식 그래프 PENDING이면 비활성이고 번역 READY라도 폴링해 READY가 되면 켜진다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(getStatus)
+        .mockResolvedValueOnce(statusResponse('READY', 'PENDING'))
+        .mockResolvedValue(statusResponse('READY', 'READY'));
+      vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+      renderStudy();
+      await waitFor(() => expect(modeButton()).toBeTruthy());
+      expect(graphLink().getAttribute('aria-disabled')).toBe('true');
+      expect(graphLink().title).toBe('지식 그래프를 준비하고 있습니다');
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await waitFor(() => expect(graphLink().getAttribute('aria-disabled')).toBeNull());
+      expect(getStatus).toHaveBeenCalledTimes(2);
+      // 번역은 처음부터 READY였으니 본문을 다시 받지 않는다
+      expect(fetchPaperContent).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('지식 그래프 FAILED면 실패 툴팁이다', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('READY', 'FAILED'));
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(graphLink().title).toBe('지식 그래프를 준비하지 못했습니다');
   });
 });
