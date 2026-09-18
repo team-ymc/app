@@ -31,6 +31,9 @@ public enum ErrorCode {
     /** 만료 처리된 논문의 complete — 재등록 필요 (FT-011) */
     UPLOAD_EXPIRED(HttpStatus.CONFLICT),
 
+    /** 같은 사용자의 서재에 동일 파일의 논문이 이미 있음 (complete) */
+    DUPLICATE_PAPER(HttpStatus.CONFLICT),
+
     /** access token 없음·만료 (FT-001) */
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
 

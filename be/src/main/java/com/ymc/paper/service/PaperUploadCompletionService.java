@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
  * paper 조회·소유 확인
  * → 이미 연결됨: 발행 규칙(정체 구제 창구) 후 파생 상태 반환 (HEAD 없음)
  * → 미연결: HEAD(checksum 포함) 검증 → [Tx] Document 생성/연결 → 중복 객체 삭제(best-effort)
- *          → 발행 규칙 → 파생 상태 반환
+ *          → 같은 소유자의 동일 파일이면 DUPLICATE_PAPER → 발행 규칙 → 파생 상태 반환
  * </pre>
  *
  * <p><b>이 클래스에 {@code @Transactional}을 걸지 말 것.</b> 연결 커밋·선점 커밋·큐 발행은
@@ -77,7 +77,7 @@ public class PaperUploadCompletionService {
         }
 
         LinkOutcome outcome = linkService.linkOrCreate(
-                paperId, paper.getFileKey(), uploadedObject.checksumSha256());
+                paperId, ownerId, paper.getFileKey(), uploadedObject.checksumSha256());
         log.info("document {}: paperId={}, documentId={}",
                 outcome.linkedToExisting() ? "연결" : "생성", paperId, outcome.document().getId());
 
@@ -86,6 +86,10 @@ public class PaperUploadCompletionService {
         if (outcome.linkedToExisting()
                 && !paper.getFileKey().equals(outcome.document().getFileKey())) {
             deleteBestEffort(paperId, outcome.document().getId(), paper.getFileKey());
+        }
+
+        if (outcome.duplicateOfPaperId() != null) {
+            throw new DuplicatePaperException(outcome.duplicateOfPaperId());
         }
 
         parsingStarter.startIfUploaded(outcome.document().getId());
