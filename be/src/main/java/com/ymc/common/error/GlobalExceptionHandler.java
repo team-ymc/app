@@ -16,6 +16,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.ymc.chat.api.dto.ChatDuplicateMessageResponse;
 import com.ymc.chat.service.DuplicateChatMessageException;
+import com.ymc.paper.api.dto.DuplicatePaperResponse;
+import com.ymc.paper.service.DuplicatePaperException;
 
 /**
  * 계약(openapi.yaml)의 `Error` 스키마로 응답을 통일한다 (design D8).
@@ -71,6 +73,14 @@ public class GlobalExceptionHandler {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ChatDuplicateMessageResponse.of(
                         e.getMessage(), e.getSessionId(), e.getMessageId(), e.getStatus()));
+    }
+
+    /** 같은 사용자의 동일 파일 재등록 — 기존 paperId를 담아 409 (계약 DuplicatePaperError). */
+    @ExceptionHandler(DuplicatePaperException.class)
+    public ResponseEntity<DuplicatePaperResponse> handleDuplicatePaper(DuplicatePaperException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(DuplicatePaperResponse.of(e.getMessage(), e.getExistingPaperId()));
     }
 
     private static String defaultMessage(FieldError fieldError) {

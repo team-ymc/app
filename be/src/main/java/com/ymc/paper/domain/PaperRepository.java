@@ -68,6 +68,18 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
             """)
     int markExpired(@Param("paperId") UUID paperId, @Param("now") Instant now);
 
+    /** 같은 소유자가 같은 Document에 이미 연결해 둔 살아 있는 다른 Paper — 오래된 순. */
+    @Query("""
+            select p.id from Paper p
+             where p.ownerId = :ownerId
+               and p.documentId = :documentId
+               and p.deletedAt is null
+               and p.id <> :paperId
+             order by p.createdAt
+            """)
+    List<UUID> findSameOwnerActiveIds(@Param("ownerId") UUID ownerId,
+            @Param("documentId") UUID documentId, @Param("paperId") UUID paperId);
+
     @Query("select p.id from Paper p where p.documentId = :documentId")
     List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
 
