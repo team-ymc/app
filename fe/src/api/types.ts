@@ -12,6 +12,9 @@ export const TERMINAL_STATUSES: ReadonlySet<PaperStatus> = new Set(['COMPLETED',
 
 export interface Paper {
   paperId: string;
+  /** 서재 표시 제목: 사용자 override → AI 파싱 제목 → filename. */
+  title: string;
+  /** 업로드한 원본 파일명. 다운로드 저장 파일명으로 쓴다. */
   filename: string;
   status: PaperStatus;
   createdAt: string;

@@ -76,15 +76,15 @@ export async function getKnowledgeGraphView(paperId: string): Promise<KnowledgeG
 export async function listPapers(): Promise<{ papers: Paper[] }> {
   const res = await authFetch('/api/papers');
   if (!res.ok) throw await apiError(res);
-  return res.json(); // { papers: [{ paperId, filename, status, createdAt, updatedAt }] }
+  return res.json(); // { papers: [{ paperId, title, filename, status, createdAt, updatedAt }] }
 }
 
-// 이름 변경 (계약 0.4.0). 바뀐 행을 돌려주므로 호출 측이 캐시의 해당 항목만 교체한다.
-export async function renamePaper(paperId: string, filename: string): Promise<Paper> {
+// 서재 표시 제목 변경. 원본 filename과 다운로드 저장 파일명은 바뀌지 않는다.
+export async function renamePaper(paperId: string, title: string): Promise<Paper> {
   const res = await authFetch(`/api/papers/${paperId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename }),
+    body: JSON.stringify({ title }),
   });
   if (!res.ok) throw await apiError(res);
   return res.json();

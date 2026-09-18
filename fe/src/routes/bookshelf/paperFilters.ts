@@ -3,7 +3,8 @@ import type { Paper } from '../../api/types';
 export function filterPapers(papers: Paper[], keyword: string): Paper[] {
   const k = keyword.trim().toLowerCase();
   if (!k) return papers;
-  return papers.filter((p) => p.filename.toLowerCase().includes(k));
+  return papers.filter((p) =>
+    p.title.toLowerCase().includes(k) || p.filename.toLowerCase().includes(k));
 }
 
 export function paginate<T>(items: T[], page: number, pageSize: number): { items: T[]; totalPages: number } {

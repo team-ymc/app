@@ -3,12 +3,18 @@ import { filterPapers, paginate } from './paperFilters';
 import type { Paper } from '../../api/types';
 
 const p = (filename: string): Paper =>
-  ({ paperId: filename, filename, status: 'COMPLETED', createdAt: '', updatedAt: '', lastAccessedAt: null });
+  ({ paperId: filename, title: filename, filename, status: 'COMPLETED', createdAt: '', updatedAt: '', lastAccessedAt: null });
 
 test('filterPapers는 파일명 부분일치·대소문자 무시', () => {
   const papers = [p('Attention.pdf'), p('BERT.pdf')];
   expect(filterPapers(papers, 'atten')).toEqual([papers[0]]);
   expect(filterPapers(papers, '')).toEqual(papers);
+});
+
+test('AI 제목과 원본 파일명 모두 검색한다', () => {
+  const paper = { ...p('uploaded.pdf'), title: 'Attention Is All You Need' };
+  expect(filterPapers([paper], 'attention')).toEqual([paper]);
+  expect(filterPapers([paper], 'uploaded')).toEqual([paper]);
 });
 
 test('paginate는 페이지를 자르고 전체 페이지 수를 준다', () => {

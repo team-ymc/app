@@ -4,13 +4,13 @@ import PaperTitleEditor from './PaperTitleEditor';
 
 afterEach(cleanup);
 
-function renderEditing(filename = 'attention.pdf') {
+function renderEditing(title = 'Attention Is All You Need') {
   const onSave = vi.fn();
   const onCancel = vi.fn();
   const rowKey = vi.fn();
   render(
     <div role="button" onKeyDown={rowKey}>
-      <PaperTitleEditor filename={filename} editing titleStyle={{}} onSave={onSave} onCancel={onCancel} />
+      <PaperTitleEditor title={title} editing titleStyle={{}} onSave={onSave} onCancel={onCancel} />
     </div>,
   );
   const input = screen.getByRole('textbox', { name: '새 이름' }) as HTMLInputElement;
@@ -19,25 +19,24 @@ function renderEditing(filename = 'attention.pdf') {
 
 describe('PaperTitleEditor', () => {
   it('editing이 아니면 제목만 보인다', () => {
-    render(<PaperTitleEditor filename="attention.pdf" editing={false} titleStyle={{}} onSave={() => {}} onCancel={() => {}} />);
-    expect(screen.getByText('attention.pdf')).toBeTruthy();
+    render(<PaperTitleEditor title="Attention Is All You Need" editing={false} titleStyle={{}} onSave={() => {}} onCancel={() => {}} />);
+    expect(screen.getByText('Attention Is All You Need')).toBeTruthy();
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
-  it('편집 모드는 stem만 입력창에 두고 .pdf를 고정 표시하며 포커스·선택된다', () => {
+  it('편집 모드는 현재 표시 제목 전체를 포커스·선택한다', () => {
     const { input } = renderEditing();
-    expect(input.value).toBe('attention');
-    expect(screen.getByText('.pdf')).toBeTruthy();
+    expect(input.value).toBe('Attention Is All You Need');
     expect(document.activeElement).toBe(input);
     expect(input.selectionStart).toBe(0);
-    expect(input.selectionEnd).toBe('attention'.length);
+    expect(input.selectionEnd).toBe('Attention Is All You Need'.length);
   });
 
-  it('Enter로 저장하면 .pdf를 붙인 이름으로 onSave가 불리고 행 키 핸들러는 안 불린다', () => {
+  it('Enter로 저장하면 trim한 제목으로 onSave가 불리고 행 키 핸들러는 안 불린다', () => {
     const { input, onSave, rowKey } = renderEditing();
     fireEvent.change(input, { target: { value: ' renamed ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onSave).toHaveBeenCalledWith('renamed.pdf');
+    expect(onSave).toHaveBeenCalledWith('renamed');
     expect(rowKey).not.toHaveBeenCalled();
   });
 

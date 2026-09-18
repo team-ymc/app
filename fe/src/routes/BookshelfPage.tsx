@@ -123,10 +123,10 @@ export default function BookshelfPage() {
     }
   }
 
-  async function handleRenameSave(paper: Paper, filename: string) {
+  async function handleRenameSave(paper: Paper, title: string) {
     setRenamingId(null);
     try {
-      const updated = await renamePaper(paper.paperId, filename);
+      const updated = await renamePaper(paper.paperId, title);
       patchPapersCache((papers) => papers.map((p) => (p.paperId === updated.paperId ? updated : p)));
     } catch (e) {
       showToast(e instanceof Error ? e.message : '이름을 바꾸지 못했습니다');
@@ -426,7 +426,7 @@ export default function BookshelfPage() {
         message={
           <>
             <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, color: 'var(--color-text-heading)' }}>
-              {deleteTarget?.filename}
+              {deleteTarget?.title}
             </span>
             를 서재에서 지웁니다. 이 논문의 채팅 기록도 함께 사라지며 되돌릴 수 없습니다. 등록 횟수는 복구되지 않습니다.
           </>
@@ -532,7 +532,7 @@ interface PaperItemProps {
   onSelect: (paper: Paper) => void;
   onDownload: () => void;
   onRenameStart: () => void;
-  onRenameSave: (filename: string) => void;
+  onRenameSave: (title: string) => void;
   onRenameCancel: () => void;
   onDeleteRequest: () => void;
 }
@@ -580,7 +580,7 @@ function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, on
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <PaperTitleEditor
-          filename={paper.filename}
+          title={paper.title}
           editing={renaming}
           titleStyle={{
             fontFamily: 'var(--font-serif)',
@@ -709,7 +709,7 @@ function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, o
       </div>
       <div style={{ display: 'flex', marginBottom: '4px' }}>
         <PaperTitleEditor
-          filename={paper.filename}
+          title={paper.title}
           editing={renaming}
           titleStyle={{
             fontSize: 'var(--ui-strong-size)',
