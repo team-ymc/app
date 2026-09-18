@@ -41,9 +41,13 @@ public class Paper {
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
-    /** 원본 파일명. 서재 목록의 제목이자 다운로드 저장 파일명. 소유자별 중복을 허용한다. */
-    @Column(name = "filename", nullable = false)
+    /** 업로드한 원본 파일명. 다운로드 저장 파일명으로 쓴다. */
+    @Column(name = "filename", nullable = false, updatable = false)
     private String filename;
+
+    /** 사용자가 바꾼 서재 표시 제목. null이면 파싱 제목 또는 filename으로 폴백한다. */
+    @Column(name = "title_override")
+    private String titleOverride;
 
     @Column(name = "file_key", nullable = false, updatable = false)
     private String fileKey;
@@ -103,12 +107,12 @@ public class Paper {
         this.lastAccessedAt = Objects.requireNonNull(now, "now");
     }
 
-    public void rename(String filename) {
-        Objects.requireNonNull(filename, "filename");
-        if (filename.isBlank()) {
-            throw new IllegalArgumentException("filename은 비어 있을 수 없습니다.");
+    public void renameTitle(String title) {
+        Objects.requireNonNull(title, "title");
+        if (title.isBlank()) {
+            throw new IllegalArgumentException("title은 비어 있을 수 없습니다.");
         }
-        this.filename = filename;
+        this.titleOverride = title;
     }
 
     public void markDeleted(Instant now) {

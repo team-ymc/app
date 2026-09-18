@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PaperManagementService {
 
-    private static final int FILENAME_MAX_LENGTH = 255;
+    private static final int TITLE_MAX_LENGTH = 255;
 
     private final PaperRepository paperRepository;
     private final ChatSessionRepository chatSessionRepository;
@@ -42,19 +42,19 @@ public class PaperManagementService {
     }
 
     /**
-     * 파일명 변경. trim 후 1~255자만 받는다. 상태 변경이 아니므로 updatedAt은 건드리지 않는다.
+     * 서재 표시 제목 변경. trim 후 1~255자만 받는다. 상태 변경이 아니므로 updatedAt은 건드리지 않는다.
      *
      * @throws ApiException {@code VALIDATION_ERROR} — 비었거나 255자 초과
      * @throws ApiException {@code PAPER_NOT_FOUND} / {@code FORBIDDEN}
      */
     @Transactional
-    public PaperListView rename(UUID paperId, UUID ownerId, String filename) {
-        String normalized = filename == null ? "" : filename.strip();
-        if (normalized.isEmpty() || normalized.length() > FILENAME_MAX_LENGTH) {
-            throw new ApiException(ErrorCode.VALIDATION_ERROR, "파일명은 1~255자여야 합니다.");
+    public PaperListView rename(UUID paperId, UUID ownerId, String title) {
+        String normalized = title == null ? "" : title.strip();
+        if (normalized.isEmpty() || normalized.length() > TITLE_MAX_LENGTH) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "제목은 1~255자여야 합니다.");
         }
         Paper paper = findOwned(paperId, ownerId);
-        paper.rename(normalized);
+        paper.renameTitle(normalized);
         return views.listView(paper);
     }
 

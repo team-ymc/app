@@ -105,12 +105,12 @@ public class PaperController {
         return PaperContentResponse.from(contentQueryService.getContent(paperId, ownerId));
     }
 
-    /** 논문 이름 변경. 바뀐 행을 목록 항목 형태로 돌려준다. */
+    /** 논문 표시 제목 변경. 바뀐 행을 목록 항목 형태로 돌려준다. */
     @PatchMapping("/{paperId}")
     public PaperListResponse.Item rename(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId,
             @Valid @RequestBody RenamePaperRequest request) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
-        return PaperListResponse.Item.from(managementService.rename(paperId, ownerId, request.filename()));
+        return PaperListResponse.Item.from(managementService.rename(paperId, ownerId, request.title()));
     }
 
     /** 논문 논리 삭제. */

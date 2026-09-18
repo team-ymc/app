@@ -18,6 +18,8 @@ create table paper (
     id          uuid                        not null,
     owner_id    uuid                        not null,
     filename    varchar(255)                not null,
+    -- 사용자가 바꾼 서재 표시 제목 (null이면 파싱 제목 → filename 폴백)
+    title_override varchar(255),
     file_key    varchar(255)                not null,
     document_id uuid,
     created_at  timestamp(6) with time zone not null,
@@ -38,3 +40,4 @@ create index ix_paper_document on paper (document_id);
 
 -- 기존 환경(local·dev)은 ddl-auto가 제약을 지우지 않으므로 배포 전에 수동으로 실행한다.
 -- alter table paper drop constraint if exists uk_paper_owner_filename;
+-- alter table paper add column if not exists title_override varchar(255);

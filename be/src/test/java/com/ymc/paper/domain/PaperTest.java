@@ -93,26 +93,27 @@ class PaperTest {
     }
 
     @Nested
-    @DisplayName("rename")
+    @DisplayName("renameTitle")
     class Rename {
 
         @Test
-        @DisplayName("파일명이 바뀌고 updatedAt은 그대로다")
-        void changesFilenameOnly() {
+        @DisplayName("표시 제목 override만 바뀌고 파일명·updatedAt은 그대로다")
+        void changesTitleOverrideOnly() {
             Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
 
-            paper.rename("renamed.pdf");
+            paper.renameTitle("Renamed title");
 
-            assertThat(paper.getFilename()).isEqualTo("renamed.pdf");
+            assertThat(paper.getTitleOverride()).isEqualTo("Renamed title");
+            assertThat(paper.getFilename()).isEqualTo(FILENAME);
             assertThat(paper.getUpdatedAt()).isEqualTo(NOW);
         }
 
         @Test
-        @DisplayName("빈 파일명은 거부한다")
+        @DisplayName("빈 제목은 거부한다")
         void rejectsBlank() {
             Paper paper = Paper.register(OWNER_ID, FILENAME, NOW);
 
-            assertThatIllegalArgumentException().isThrownBy(() -> paper.rename("  "));
+            assertThatIllegalArgumentException().isThrownBy(() -> paper.renameTitle("  "));
         }
     }
 
