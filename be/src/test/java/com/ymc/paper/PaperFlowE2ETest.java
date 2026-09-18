@@ -71,10 +71,7 @@ class PaperFlowE2ETest extends IntegrationTest {
 
         awaitStatus(paperId, PaperStatus.COMPLETED);
 
-        mockMvc.perform(get("/api/papers/{paperId}/content", paperId).with(userJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("Fixture Paper Title"))
-                .andExpect(jsonPath("$.blocks.length()").value(10));
+        awaitContent(paperId);
     }
 
     @Test
@@ -134,5 +131,14 @@ class PaperFlowE2ETest extends IntegrationTest {
     private void awaitStatus(UUID paperId, PaperStatus expected) {
         await().atMost(CONSUME_TIMEOUT).pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> assertStatus(paperId, expected));
+    }
+
+    private void awaitContent(UUID paperId) {
+        // COMPLETED 전이와 본문 적재는 연속된 별도 트랜잭션이라 짧은 가시성 간격이 생길 수 있다.
+        await().atMost(CONSUME_TIMEOUT).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> mockMvc.perform(get("/api/papers/{paperId}/content", paperId).with(userJwt()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.title").value("Fixture Paper Title"))
+                        .andExpect(jsonPath("$.blocks.length()").value(10)));
     }
 }
