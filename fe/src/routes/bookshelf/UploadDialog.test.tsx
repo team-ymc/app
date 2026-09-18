@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import UploadDialog from './UploadDialog';
 import { sha256Base64 } from './fileChecksum';
-import { createPaper, uploadToS3 } from '../../api/papers';
+import { createPaper, uploadToS3, completeUpload } from '../../api/papers';
 import { ApiError } from '../../api/types';
 
 afterEach(cleanup);
@@ -104,5 +104,39 @@ describe('UploadDialog — 사용량 한도', () => {
 
     await waitFor(() => expect(screen.getByText(/UNSUPPORTED_FILE_TYPE/)).toBeTruthy());
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['plan'] });
+  });
+
+  it('409 DUPLICATE_PAPER면 코드 없이 이미 등록된 논문이라고만 안내한다', async () => {
+    vi.mocked(sha256Base64).mockResolvedValue(HASH);
+    vi.mocked(createPaper).mockResolvedValue(CREATED);
+    vi.mocked(uploadToS3).mockResolvedValue(undefined);
+    vi.mocked(completeUpload).mockRejectedValue(new ApiError('이미 서재에 있는 논문입니다.', 'DUPLICATE_PAPER', 409));
+    const { container } = renderDialog();
+
+    selectPdfAndUpload(container);
+
+    await waitFor(() => expect(screen.getByText('이미 등록된 논문입니다.')).toBeTruthy());
+    expect(screen.queryByText(/DUPLICATE_PAPER/)).toBeNull();
+  });
+
+  it('DUPLICATE_PAPER 뒤에는 업로드가 막히고 파일을 다시 고르면 풀린다', async () => {
+    vi.mocked(sha256Base64).mockResolvedValue(HASH);
+    vi.mocked(createPaper).mockResolvedValue(CREATED);
+    vi.mocked(uploadToS3).mockResolvedValue(undefined);
+    vi.mocked(completeUpload).mockRejectedValue(new ApiError('이미 서재에 있는 논문입니다.', 'DUPLICATE_PAPER', 409));
+    const { container } = renderDialog();
+
+    selectPdfAndUpload(container);
+
+    await waitFor(() => expect(screen.getByText('이미 등록된 논문입니다.')).toBeTruthy());
+    const uploadButton = screen.getByRole('button', { name: '업로드' }) as HTMLButtonElement;
+    expect(uploadButton.disabled).toBe(true);
+
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [new File(['y'], 'b.pdf', { type: 'application/pdf' })] },
+    });
+
+    expect(uploadButton.disabled).toBe(false);
+    expect(screen.queryByText('이미 등록된 논문입니다.')).toBeNull();
   });
 });

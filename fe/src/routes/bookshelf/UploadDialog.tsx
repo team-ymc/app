@@ -31,6 +31,7 @@ function formatBytes(bytes: number | undefined): string {
 // ApiError면 code·message, 아니면 message만 보여준다 (presigned 만료(403) /
 // S3 PUT 실패 / complete 4xx 경로를 다이얼로그 안에 그대로 노출).
 function describeError(err: unknown): string {
+  if (err instanceof ApiError && err.code === 'DUPLICATE_PAPER') return '이미 등록된 논문입니다.';
   if (err instanceof ApiError) return err.code ? `${err.code}: ${err.message}` : err.message;
   if (err instanceof Error) return err.message;
   return '알 수 없는 오류가 발생했습니다';
@@ -121,6 +122,10 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
         queryClient.invalidateQueries({ queryKey: ['plan'] });
       }
       setError(e); // 숨기지 않는다 — 다이얼로그 안에 그대로 노출
+      if (e instanceof ApiError && e.code === 'DUPLICATE_PAPER') {
+        clearFile(); // 같은 파일 재시도는 또 거절된다 — 파일을 다시 골라야 업로드가 풀린다
+        return;
+      }
       setPhase('file-selected'); // 재시도 가능하도록 복귀
     }
   }
