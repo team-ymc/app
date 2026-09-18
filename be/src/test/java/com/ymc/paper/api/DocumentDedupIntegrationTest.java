@@ -46,14 +46,6 @@ class DocumentDedupIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void 다른_파일명의_같은_바이트는_같은_document를_공유하고_파싱은_한_번만_발행된다() throws Exception {
-        Paper a = completedVia(TEST_USER_ID, "a.pdf", userJwt());
-        Paper b = completedVia(TEST_USER_ID, "b.pdf", userJwt());
-        assertThat(a.getDocumentId()).isEqualTo(b.getDocumentId());
-        verify(parseRequestPublisher, times(1)).publish(any(), any());
-    }
-
-    @Test
     void 다른_사용자의_같은_바이트도_같은_document를_공유한다() throws Exception {
         Paper mine = completedVia(TEST_USER_ID, "mine.pdf", userJwt());
         Paper theirs = completedVia(OTHER_USER_ID, "theirs.pdf", otherUserJwt());

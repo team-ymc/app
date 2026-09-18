@@ -88,7 +88,8 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         tx.executeWithoutResult(s -> usageService.reserve(
                 OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
         tx.executeWithoutResult(s -> linkService.linkOrCreate(
-                second.getId(), second.getFileKey(), document.getChecksumSha256()));
+                second.getId(), second.getOwnerId(), second.getFileKey(),
+                document.getChecksumSha256()));
 
         assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.CONFIRMED);
     }
@@ -108,7 +109,8 @@ class PaperUsageIntegrationTest extends IntegrationTest {
         tx.executeWithoutResult(s -> usageService.reserve(
                 OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
         tx.executeWithoutResult(s -> linkService.linkOrCreate(
-                second.getId(), second.getFileKey(), document.getChecksumSha256()));
+                second.getId(), second.getOwnerId(), second.getFileKey(),
+                document.getChecksumSha256()));
 
         assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.RELEASED);
     }
@@ -196,7 +198,8 @@ class PaperUsageIntegrationTest extends IntegrationTest {
                 ready.countDown();
                 awaitLatch(start);
                 tx.executeWithoutResult(s -> linkService.linkOrCreate(
-                        second.getId(), second.getFileKey(), document.getChecksumSha256()));
+                        second.getId(), second.getOwnerId(), second.getFileKey(),
+                        document.getChecksumSha256()));
             });
             Future<?> settling = pool.submit(() -> {
                 ready.countDown();
