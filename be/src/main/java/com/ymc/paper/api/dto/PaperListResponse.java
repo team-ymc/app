@@ -15,10 +15,10 @@ public record PaperListResponse(List<Item> papers) {
     }
 
     /** 계약 `PaperListItem`. */
-    public record Item(UUID paperId, String filename, PaperStatus status,
+    public record Item(UUID paperId, String title, String filename, PaperStatus status,
                        Instant createdAt, Instant updatedAt, Instant lastAccessedAt) {
         public static Item from(PaperListView v) {
-            return new Item(v.paperId(), v.filename(), v.status(), v.createdAt(), v.updatedAt(),
+            return new Item(v.paperId(), v.title(), v.filename(), v.status(), v.createdAt(), v.updatedAt(),
                     v.lastAccessedAt());
         }
     }

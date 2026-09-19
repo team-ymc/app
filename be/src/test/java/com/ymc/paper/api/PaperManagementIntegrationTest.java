@@ -20,8 +20,8 @@ import com.ymc.support.IntegrationTest;
 
 class PaperManagementIntegrationTest extends IntegrationTest {
 
-    private static String renameJson(String filename) {
-        return "{\"filename\":\"" + filename + "\"}";
+    private static String renameJson(String title) {
+        return "{\"title\":\"" + title + "\"}";
     }
 
     // ---- DELETE ----
@@ -77,15 +77,17 @@ class PaperManagementIntegrationTest extends IntegrationTest {
 
         mockMvc.perform(patch("/api/papers/{id}", paper.getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(renameJson("  new name.pdf  "))
+                        .content(renameJson("  New paper title  "))
                         .with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paperId").value(paper.getId().toString()))
-                .andExpect(jsonPath("$.filename").value("new name.pdf"))
+                .andExpect(jsonPath("$.title").value("New paper title"))
+                .andExpect(jsonPath("$.filename").value("old.pdf"))
                 .andExpect(jsonPath("$.status").value("PROCESSING"));
 
         Paper reloaded = reload(paper.getId());
-        assertThat(reloaded.getFilename()).isEqualTo("new name.pdf");
+        assertThat(reloaded.getTitleOverride()).isEqualTo("New paper title");
+        assertThat(reloaded.getFilename()).isEqualTo("old.pdf");
         assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedBefore);
     }
 
@@ -106,6 +108,7 @@ class PaperManagementIntegrationTest extends IntegrationTest {
                         .with(userJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(reload(paper.getId()).getTitleOverride()).isNull();
         assertThat(reload(paper.getId()).getFilename()).isEqualTo("old.pdf");
     }
 
@@ -120,7 +123,7 @@ class PaperManagementIntegrationTest extends IntegrationTest {
                         .content(renameJson("  " + name + "  "))
                         .with(userJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.filename").value(name));
+                .andExpect(jsonPath("$.title").value(name));
     }
 
     @Test

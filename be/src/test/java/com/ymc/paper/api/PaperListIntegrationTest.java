@@ -26,7 +26,7 @@ class PaperListIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("등록된 논문: paperId·filename·status·createdAt·updatedAt 행 반환")
+    @DisplayName("파싱 전 논문: title은 filename으로 폴백한다")
     void returnsRegisteredPapers() throws Exception {
         Paper paper = givenProcessingPaper("attention.pdf");
 
@@ -34,10 +34,30 @@ class PaperListIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.papers.length()").value(1))
                 .andExpect(jsonPath("$.papers[0].paperId").value(paper.getId().toString()))
+                .andExpect(jsonPath("$.papers[0].title").value("attention.pdf"))
                 .andExpect(jsonPath("$.papers[0].filename").value("attention.pdf"))
                 .andExpect(jsonPath("$.papers[0].status").value("PROCESSING"))
                 .andExpect(jsonPath("$.papers[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.papers[0].updatedAt").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("파싱 후 논문: document_content의 AI 제목을 내려준다")
+    void returnsParsedTitle() throws Exception {
+        Paper paper = givenProcessingPaper("uploaded-name.pdf");
+        String manifestKey = givenPackageOnS3(paper.getId());
+        documentContentIngestService.ingest(paper.getDocumentId(), manifestKey);
+
+        mockMvc.perform(get("/api/papers").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.papers[0].title").value("Fixture Paper Title"))
+                .andExpect(jsonPath("$.papers[0].filename").value("uploaded-name.pdf"));
+
+        tx.executeWithoutResult(s -> reload(paper.getId()).renameTitle("My title"));
+        mockMvc.perform(get("/api/papers").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.papers[0].title").value("My title"))
+                .andExpect(jsonPath("$.papers[0].filename").value("uploaded-name.pdf"));
     }
 
     @Test

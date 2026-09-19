@@ -6,7 +6,7 @@ import type { Paper } from '../../api/types';
 afterEach(cleanup);
 
 const completed: Paper = {
-  paperId: 'p1', filename: 'a.pdf', status: 'COMPLETED',
+  paperId: 'p1', title: 'A paper', filename: 'a.pdf', status: 'COMPLETED',
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', lastAccessedAt: null,
 };
 

@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.ymc.paper.domain.Document;
+import com.ymc.paper.domain.DocumentContent;
+import com.ymc.paper.domain.DocumentContentRepository;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.Paper;
@@ -28,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class PaperDocumentViews {
 
     private final DocumentRepository documentRepository;
+    private final DocumentContentRepository contentRepository;
 
     public Optional<Document> documentOf(Paper paper) {
         if (paper.getDocumentId() == null) {
@@ -53,15 +56,29 @@ public class PaperDocumentViews {
                 .toList();
         Map<UUID, Document> documents = documentRepository.findAllById(documentIds).stream()
                 .collect(Collectors.toMap(Document::getId, Function.identity()));
+        Map<UUID, DocumentContent> contents = contentRepository.findAllById(documentIds).stream()
+                .collect(Collectors.toMap(DocumentContent::getDocumentId, Function.identity()));
         return papers.stream()
                 .map(p -> {
                     Document document = p.getDocumentId() == null
                             ? null : documents.get(p.getDocumentId());
-                    return new PaperListView(p.getId(), p.getFilename(),
+                    DocumentContent content = p.getDocumentId() == null
+                            ? null : contents.get(p.getDocumentId());
+                    return new PaperListView(p.getId(), resolvedTitle(p, content), p.getFilename(),
                             derivedStatus(p, document), p.getCreatedAt(),
                             derivedUpdatedAt(p, document), p.getLastAccessedAt());
                 })
                 .toList();
+    }
+
+    private static String resolvedTitle(Paper paper, DocumentContent content) {
+        if (paper.getTitleOverride() != null && !paper.getTitleOverride().isBlank()) {
+            return paper.getTitleOverride();
+        }
+        if (content != null && content.getTitle() != null && !content.getTitle().isBlank()) {
+            return content.getTitle();
+        }
+        return paper.getFilename();
     }
 
     public PaperListView listView(Paper paper) {

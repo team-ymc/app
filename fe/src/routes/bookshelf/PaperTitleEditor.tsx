@@ -1,23 +1,21 @@
-// 제목 자리에서 이름만 편집한다(확장자 고정). 진입은 부모가 editing으로 켠다 — 제목에 클릭 핸들러를 두지 않는다.
+// 서재 표시 제목을 그 자리에서 편집한다. 진입은 부모가 editing으로 켠다.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { joinPdfName, splitPdfName } from './pdfName';
 
 export interface PaperTitleEditorProps {
-  filename: string;
+  title: string;
   editing: boolean;
   titleStyle: CSSProperties;
-  onSave: (filename: string) => void;
+  onSave: (title: string) => void;
   onCancel: () => void;
 }
 
-export default function PaperTitleEditor({ filename, editing, titleStyle, onSave, onCancel }: PaperTitleEditorProps) {
-  if (!editing) return <div style={titleStyle}>{filename}</div>;
-  return <Editor filename={filename} titleStyle={titleStyle} onSave={onSave} onCancel={onCancel} />;
+export default function PaperTitleEditor({ title, editing, titleStyle, onSave, onCancel }: PaperTitleEditorProps) {
+  if (!editing) return <div style={titleStyle}>{title}</div>;
+  return <Editor title={title} titleStyle={titleStyle} onSave={onSave} onCancel={onCancel} />;
 }
 
-function Editor({ filename, titleStyle, onSave, onCancel }: Omit<PaperTitleEditorProps, 'editing'>) {
-  const { stem, ext } = splitPdfName(filename);
-  const [value, setValue] = useState(stem);
+function Editor({ title, titleStyle, onSave, onCancel }: Omit<PaperTitleEditorProps, 'editing'>) {
+  const [value, setValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
   const doneRef = useRef(false); // Enter 뒤 따라오는 blur가 두 번 저장하지 않게
 
@@ -29,8 +27,8 @@ function Editor({ filename, titleStyle, onSave, onCancel }: Omit<PaperTitleEdito
   function finish(save: boolean) {
     if (doneRef.current) return;
     doneRef.current = true;
-    const next = joinPdfName(value, ext);
-    if (!save || !value.trim() || next === filename) {
+    const next = value.trim();
+    if (!save || !next || next === title) {
       onCancel();
       return;
     }
@@ -64,7 +62,6 @@ function Editor({ filename, titleStyle, onSave, onCancel }: Omit<PaperTitleEdito
           outline: 'none',
         }}
       />
-      {ext && <span style={{ ...titleStyle, flex: 'none', color: 'var(--color-text-muted)' }}>{ext}</span>}
     </div>
   );
 }

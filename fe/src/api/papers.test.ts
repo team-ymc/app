@@ -72,15 +72,15 @@ describe('api.js — fetch 계열', () => {
     await expect(fetchPaperContent('p1')).rejects.toMatchObject({ code: 'PAPER_NOT_READY' });
   });
 
-  it('renamePaper: PATCH /api/papers/{id}에 filename을 JSON으로 보내고 행을 돌려준다', async () => {
-    mockFetch({ body: { paperId: 'p1', filename: 'b.pdf', status: 'COMPLETED' } });
-    const res = await renamePaper('p1', 'b.pdf');
+  it('renamePaper: PATCH /api/papers/{id}에 title을 JSON으로 보내고 행을 돌려준다', async () => {
+    mockFetch({ body: { paperId: 'p1', title: 'B', filename: 'b.pdf', status: 'COMPLETED' } });
+    const res = await renamePaper('p1', 'B');
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1', expect.objectContaining({
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: 'b.pdf' }),
+      body: JSON.stringify({ title: 'B' }),
     }));
-    expect(res.filename).toBe('b.pdf');
+    expect(res.title).toBe('B');
   });
 
   it('deletePaper: DELETE /api/papers/{id}, 204면 본문을 읽지 않는다', async () => {
