@@ -23,10 +23,16 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update      # prod에서 validate로 덮음
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    # 기존 local·dev DB는 0으로 baseline한 뒤 V1부터 적용한다. prod는 별도 활성화 없이 빈 DB에 V1을 적용한다.
+    baseline-version: 0
+    baseline-description: pre-flyway-schema
+    baseline-on-migrate: false
+    clean-disabled: true
   # FT-001 Google OAuth (YMC-227에서 콘솔 등록 완료 — 실값은 환경변수로).
   # redirect-uri의 baseUrl은 요청 Host 기준 → vite proxy(5173) 경유 시 5173으로 생성돼
   # 콘솔에 등록된 http://localhost:5173/api/login/oauth2/code/google 과 일치한다.
@@ -132,6 +138,9 @@ spring:
     username: ${DB_USERNAME:ymc}
     password: ${DB_PASSWORD:1234}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    # Flyway 도입 전에 Hibernate update로 만든 로컬 DB를 최초 1회 편입한다.
+    baseline-on-migrate: true
 
 aws:
   # localhost.localstack.cloud = 항상 127.0.0.1로 풀리는 LocalStack 공식 도메인.
@@ -165,26 +174,15 @@ auth:
 
 ---
 # ================= dev 전용 =================
-# 마이그레이션 도구 도입 전까지 dev만 스키마를 엔티티에서 생성한다.
 spring:
   config:
     activate:
       on-profile: dev
-  jpa:
-    hibernate:
-      ddl-auto: update
+  flyway:
+    # 기존 dev DB는 history table이 없으므로 0으로 baseline한 뒤 V1을 적용한다.
+    baseline-on-migrate: true
 
 auth:
   # 기본값을 두지 않는다 — 미설정이면 미해석 플레이스홀더 문자열이 되어
   # AuthProperties의 이메일 형식 검증에 걸려 기동이 실패한다.
   login-whitelist: ${LOGIN_WHITELIST}
-
----
-# ================= prod 전용 =================
-spring:
-  config:
-    activate:
-      on-profile: prod
-  jpa:
-    hibernate:
-      ddl-auto: validate            # 운영은 스키마 자동변경 금지
