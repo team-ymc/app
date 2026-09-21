@@ -45,7 +45,7 @@ class AiSseEventsTest {
         events.dispatch(frame("message.delta", "{\"delta\":\"안\"}"), recorder, terminalSeen);
         events.dispatch(frame("message.completed", "{\"message\":\"안녕\"}"), recorder, terminalSeen);
         assertThat(terminalSeen).isFalse();
-        events.dispatch(frame("run.completed", "{\"estimated_cost_usd\":0.5}"), recorder, terminalSeen);
+        events.dispatch(frame("run.completed", "{\"estimated_cost_usd\":\"0.50000000\"}"), recorder, terminalSeen);
 
         assertThat(calls).containsExactly("started", "delta:안", "completed:안녕", "run-completed");
         assertThat(cost.get()).isEqualByComparingTo("0.5");
@@ -53,10 +53,19 @@ class AiSseEventsTest {
     }
 
     @Test
-    @DisplayName("run.completed에 비용이 없거나 숫자가 아니면 null로 전달한다")
-    void missingCostIsNull() {
+    @DisplayName("순차 배포 호환을 위해 legacy 숫자 비용도 수용한다")
+    void legacyNumericCostAccepted() {
+        events.dispatch(frame("run.completed", "{\"estimated_cost_usd\":0.125}"), recorder, terminalSeen);
+        assertThat(cost.get()).isEqualByComparingTo("0.125");
+    }
+
+    @Test
+    @DisplayName("비용이 null·누락·잘못된 문자열이어도 성공을 유지하고 null로 전달한다")
+    void unavailableCostIsNull() {
+        events.dispatch(frame("run.completed", "{\"estimated_cost_usd\":null}"), recorder, terminalSeen);
+        events.dispatch(frame("run.completed", "{}"), recorder, terminalSeen);
         events.dispatch(frame("run.completed", "{\"estimated_cost_usd\":\"n/a\"}"), recorder, terminalSeen);
-        assertThat(calls).containsExactly("run-completed");
+        assertThat(calls).containsExactly("run-completed", "run-completed", "run-completed");
         assertThat(cost.get()).isNull();
     }
 
