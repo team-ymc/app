@@ -55,10 +55,28 @@ public class AiSseEvents {
         }
     }
 
-    /** run.completed의 선택 필드. 없거나 숫자가 아니면 null — 성공 처리를 막지 않는다. data 자체가 깨진 건 계약 위반이라 위로 던진다. */
+    /**
+     * run.completed의 관측용 비용. 현재 계약의 8자리 소수 문자열과 순차 배포 중인
+     * legacy 숫자를 수용한다. 비용 필드 문제만으로 성공 답변을 뒤집지 않는다.
+     */
     private BigDecimal optionalCost(String data) throws JsonProcessingException {
         JsonNode node = objectMapper.readTree(data).get("estimated_cost_usd");
-        return node != null && node.isNumber() ? node.decimalValue() : null;
+        if (node == null) {
+            log.warn("AI run.completed에 estimated_cost_usd가 없어 비용 없이 처리합니다.");
+            return null;
+        }
+        if (node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.decimalValue();
+        }
+        if (node.isTextual() && node.textValue().matches("^[0-9]+\\.[0-9]{8}$")) {
+            return new BigDecimal(node.textValue());
+        }
+        log.warn("AI run.completed의 estimated_cost_usd 형식이 잘못되어 비용 없이 처리합니다. nodeType={}",
+                node.getNodeType());
+        return null;
     }
 
     private String textField(String data, String fieldName) throws JsonProcessingException {
