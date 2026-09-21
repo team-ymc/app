@@ -48,6 +48,7 @@ export interface TutorPanelProps {
 }
 
 const CHIP_COLLAPSE_COUNT = 2;
+const MAX_QUESTION_CHARS = 2000;
 
 const KIND_CONFIG: Record<AttachmentKind, { label: string; color: string }> = {
   selection: { label: '인용', color: 'var(--color-text-muted)' },
@@ -562,6 +563,7 @@ export function TutorPanel({
           onFocus={() => setComposerFocused(true)}
           onBlur={() => setComposerFocused(false)}
           disabled={queryLocked}
+          maxLength={MAX_QUESTION_CHARS}
           placeholder={queryLocked ? (lockPlaceholder ?? '금월 사용량 소진') : 'AI에게 질문해보세요'}
           rows={1}
           style={{
