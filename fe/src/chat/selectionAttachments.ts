@@ -13,8 +13,8 @@ export interface SelectionAttachment {
 }
 
 export const MAX_ATTACHMENTS = 5;
-export const MAX_SELECTION_BLOCKS = 150;
-export const MAX_SELECTION_CHARS = 30000;
+export const MAX_SELECTION_BLOCKS = 10;
+export const MAX_SELECTION_CHARS = 2000;
 
 export type AttachResult =
   | { ok: true; attachments: SelectionAttachment[] }

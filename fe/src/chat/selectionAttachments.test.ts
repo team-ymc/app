@@ -84,21 +84,21 @@ describe('attachSelection', () => {
     expect(r.attachments).toBe(current);
   });
 
-  it('150 블록을 넘는 선택은 too-many-blocks로 거절한다', () => {
-    const many: PaperBlock[] = Array.from({ length: 151 }, (_, i) => para(`p${i}`));
-    const r = attachSelection([], many, { text: 't', anchors: anchors('p0', 'p150') });
+  it('10 블록을 넘는 선택은 too-many-blocks로 거절한다', () => {
+    const many: PaperBlock[] = Array.from({ length: 11 }, (_, i) => para(`p${i}`));
+    const r = attachSelection([], many, { text: 't', anchors: anchors('p0', 'p10') });
     expect(r).toMatchObject({ ok: false, reason: 'too-many-blocks' });
   });
 
-  it('렌더링 30,000자를 넘는 선택은 too-long으로 거절한다', () => {
-    const long: PaperBlock[] = [para('L0', 'a'.repeat(15001)), para('L1', 'a'.repeat(15000))];
+  it('렌더링 2,000자를 넘는 선택은 too-long으로 거절한다', () => {
+    const long: PaperBlock[] = [para('L0', 'a'.repeat(1001)), para('L1', 'a'.repeat(1000))];
     const r = attachSelection([], long, { text: 't', anchors: anchors('L0', 'L1') });
     expect(r).toMatchObject({ ok: false, reason: 'too-long' });
   });
 
-  it('경계값(150 블록·30,000자)은 허용한다', () => {
-    const many: PaperBlock[] = Array.from({ length: 150 }, (_, i) => para(`p${i}`, 'aa'));
-    const r = attachSelection([], many, { text: 't', anchors: anchors('p0', 'p149') });
+  it('경계값(10 블록·2,000자)은 허용한다', () => {
+    const many: PaperBlock[] = Array.from({ length: 10 }, (_, i) => para(`p${i}`, 'a'.repeat(200)));
+    const r = attachSelection([], many, { text: 't', anchors: anchors('p0', 'p9') });
     expect(r.ok).toBe(true);
   });
 
