@@ -15,6 +15,6 @@ import jakarta.validation.constraints.Size;
 public record ChatMessageStreamRequest(
         UUID sessionId,
         @NotNull UUID clientMessageId,
-        @NotBlank String content,
+        @NotBlank @Size(max = 2000) String content,
         @Size(min = 1, max = 5) @UniqueElements List<@NotNull @Valid ChatSelectionDto> selections) {
 }

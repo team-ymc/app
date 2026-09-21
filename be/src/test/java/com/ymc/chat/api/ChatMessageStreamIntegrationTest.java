@@ -279,6 +279,31 @@ class ChatMessageStreamIntegrationTest extends IntegrationTest {
                 "selections", selections));
     }
 
+    @Test
+    @DisplayName("질문 2,000자는 정상 수용된다")
+    void maxLengthContentAccepted() throws Exception {
+        Paper paper = givenCompletedPaper();
+        MvcResult result = startStream(paper, body(null, UUID.randomUUID(), "가".repeat(2000)));
+
+        mockMvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("질문 2,001자는 400이고 세션·메시지를 만들지 않는다")
+    void oversizedContentRejected() throws Exception {
+        Paper paper = givenCompletedPaper();
+
+        mockMvc.perform(post("/api/papers/{paperId}/chat/messages", paper.getId())
+                        .with(userJwt())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(null, UUID.randomUUID(), "가".repeat(2001))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        assertThat(chatSessionRepository.count()).isZero();
+        assertThat(chatMessageRepository.count()).isZero();
+    }
+
     private static Map<String, Object> selectionJson(String startBlock, String endBlock) {
         return Map.of(
                 "start", Map.of("blockId", startBlock),

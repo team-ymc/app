@@ -55,5 +55,6 @@ describe('TutorPanel — AI 질의 한도 잠금', () => {
     renderPanel(false);
     const textarea = screen.getByPlaceholderText('AI에게 질문해보세요') as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
+    expect(textarea.maxLength).toBe(2000);
   });
 });
