@@ -17,7 +17,8 @@ public record PaperContentResponse(
         TranslationStatus translationStatus,
         int schemaVersion,
         List<Block> blocks,
-        Map<String, Asset> assets) {
+        Map<String, Asset> assets,
+        List<Highlight> prerequisiteHighlights) {
 
     public static PaperContentResponse from(PaperContentView view) {
         return new PaperContentResponse(
@@ -36,7 +37,8 @@ public record PaperContentResponse(
                                 e -> new Asset(e.getValue().url(), e.getValue().mediaType(),
                                         e.getValue().expiresAt()),
                                 (a, b) -> a,
-                                java.util.LinkedHashMap::new)));
+                                java.util.LinkedHashMap::new)),
+                view.prerequisiteHighlights().stream().map(h -> new Highlight(h.highlightId(), h.blockId(), h.startOffset(), h.endOffset(), h.text())).toList());
     }
 
     /** 계약 `PaperContentBlock`. content는 적재 시 계약형으로 저장돼 있어 그대로 내보낸다. */
@@ -51,5 +53,9 @@ public record PaperContentResponse(
 
     /** 계약 `PaperContentAsset`. */
     public record Asset(String url, String mediaType, Instant expiresAt) {
+    }
+
+    /** 계약 `PrerequisiteHighlight`. offset은 UTF-16 code unit, start 포함·end 제외. */
+    public record Highlight(String highlightId, String blockId, int startOffset, int endOffset, String text) {
     }
 }

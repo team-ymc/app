@@ -16,6 +16,7 @@ import com.ymc.paper.domain.DocumentContent;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentPrerequisiteHighlightRepository;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -34,6 +35,7 @@ public class PaperContentQueryService {
     private final DocumentContentRepository contentRepository;
     private final DocumentContentBlockRepository blockRepository;
     private final DocumentContentAssetRepository assetRepository;
+    private final DocumentPrerequisiteHighlightRepository highlightRepository;
     private final AssetUrlCache assetUrlCache;
     private final PaperDocumentViews views;
 
@@ -73,7 +75,13 @@ public class PaperContentQueryService {
                     new PaperContentView.Asset(presigned.url(), a.getMediaType(), presigned.expiresAt()));
         });
 
+        List<PaperContentView.Highlight> highlights = highlightRepository
+                .findAllByDocumentIdOrderByIdAsc(document.getId()).stream()
+                .map(h -> new PaperContentView.Highlight(
+                        h.getHighlightId(), h.getBlockId(), h.getStartOffset(), h.getEndOffset(), h.getText()))
+                .toList();
+
         return new PaperContentView(paper.getId(), content.getTitle(), content.getSourceLanguage(),
-                document.translationStatus(), content.getSchemaVersion(), blocks, assets);
+                document.translationStatus(), content.getSchemaVersion(), blocks, assets, highlights);
     }
 }
