@@ -69,6 +69,10 @@ chat:
     max-content-length: 65536       # delta 누적 상한 (문자 수). 초과 시 AI_RESPONSE_TOO_LARGE
     emitter-timeout: 11m            # MVC async timeout — deadline보다 커야 워치독이 먼저 발화
 
+prerequisite:
+  backfill:
+    enabled: false                  # true면 기동 시 컴파일 완료 Document의 선행지식을 한 번 채운다
+
 paper:
   upload:
     # 단일 PDF 상한. 계약의 CreatePaperRequest.size 최대값, FE의 MAX_PDF_UPLOAD_BYTES와 같은 값을 둔다
