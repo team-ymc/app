@@ -140,3 +140,8 @@
 }
 .pt-translation { user-select: none; cursor: default; }
 .pt-translation .pt-markdown { color: var(--color-text-muted); }
+
+/* 선행지식 하이라이트 (Design v3). 토글이 꺼지면 .pt-prerequisite-off 아래서 스타일만 지운다. */
+.term-highlight{padding:0 2px;border-radius:3px;background:#dce8f7;color:#1e2e42;box-shadow:inset 0 -1px 0 #8299b5;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.term-highlight:hover,.term-highlight[aria-expanded="true"]{background:#cfdef0;box-shadow:inset 0 -2px 0 #637f9f}
+.pt-prerequisite-off .term-highlight{padding:0;background:transparent;color:inherit;box-shadow:none;cursor:text}

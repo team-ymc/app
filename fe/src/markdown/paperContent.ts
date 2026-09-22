@@ -2,9 +2,11 @@
 // 제목·본문·수식·이미지는 markdown 문자열로 변환해 기존 PaperMarkdown 렌더러를 재사용하고,
 // 표는 html 그대로 넘겨 렌더 측에서 정화한다.
 import { fetchPaperContent } from '../api/papers';
-import type { PaperContentBlockDto, PaperContentResponse, TranslationStatus } from '../api/types';
+import type { PaperContentBlockDto, PaperContentResponse, PrerequisiteHighlight, TranslationStatus } from '../api/types';
 
 export type BlockType = 'heading' | 'subheading' | 'para' | 'caption' | 'figure' | 'equation' | 'table' | 'other';
+
+export interface HighlightRange { id: string; start: number; end: number; }
 
 export interface PaperBlock {
   id: string;
@@ -19,6 +21,8 @@ export interface PaperBlock {
   sourceOffsetShift?: number;
   /** 한국어 번역. 제목 계열은 textKor가 와도 채우지 않는다. */
   translation?: string;
+  /** 선행지식 범위(원문 offset). atomic 블록엔 없다. */
+  highlights?: HighlightRange[];
 }
 
 export interface TocEntry { blockId: string; text: string; level: number; }
@@ -34,6 +38,7 @@ export interface PaperContent {
   assetExpiresAt: string | null;
   /** 블록 중 translation이 하나라도 있으면 true. */
   hasTranslation: boolean;
+  prerequisiteHighlights: PrerequisiteHighlight[];
 }
 
 export async function getPaperContent(paperId: string): Promise<PaperContent> {
@@ -42,6 +47,19 @@ export async function getPaperContent(paperId: string): Promise<PaperContent> {
 
 export function adaptPaperContent(res: PaperContentResponse): PaperContent {
   const blocks = res.blocks.map((b) => adaptBlock(b, res));
+
+  const byBlock = new Map<string, HighlightRange[]>();
+  for (const h of res.prerequisiteHighlights ?? []) {
+    const list = byBlock.get(h.blockId) ?? [];
+    list.push({ id: h.highlightId, start: h.startOffset, end: h.endOffset });
+    byBlock.set(h.blockId, list);
+  }
+  for (const b of blocks) {
+    const ranges = byBlock.get(b.id);
+    // sourceText가 없는 블록은 offset을 그릴 수 없다.
+    if (ranges && b.sourceText !== undefined) b.highlights = ranges;
+  }
+
   const toc = blocks
     .filter((b) => (b.type === 'heading' || b.type === 'subheading') && (b.headingLevel ?? 0) >= 2)
     .map((b) => ({ blockId: b.id, text: b.headingText!, level: b.headingLevel! }));
@@ -58,6 +76,7 @@ export function adaptPaperContent(res: PaperContentResponse): PaperContent {
     toc,
     assetExpiresAt: earliest,
     hasTranslation,
+    prerequisiteHighlights: res.prerequisiteHighlights ?? [],
   };
 }
 

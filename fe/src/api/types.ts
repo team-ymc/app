@@ -78,6 +78,22 @@ export interface PaperContentAssetDto { url: string; mediaType: string; expiresA
 // GET /api/papers/{paperId}/knowledge-graph. viz.html을 여는 presigned GET URL — iframe src로 쓴다.
 export interface KnowledgeGraphView { url: string; expiresAt: string; }
 
+// 선행지식 하이라이트. offset은 UTF-16 code unit, start 포함·end 제외. text는 해당 범위 원문.
+export interface PrerequisiteHighlight {
+  highlightId: string;
+  blockId: string;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+}
+
+// POST /api/papers/{paperId}/prerequisite-highlights/{highlightId}/definition
+export interface PrerequisiteDefinitionResponse {
+  term: string;
+  definitionEn: string;
+  definitionKo: string;
+}
+
 export interface PaperContentResponse {
   paperId: string;
   title: string | null;
@@ -87,6 +103,7 @@ export interface PaperContentResponse {
   schemaVersion: number;
   blocks: PaperContentBlockDto[];
   assets: Record<string, PaperContentAssetDto>;
+  prerequisiteHighlights: PrerequisiteHighlight[];
 }
 
 // GET /api/me/plan. UNLIMITED면 limit·used·remaining·resetAt 모두 null.

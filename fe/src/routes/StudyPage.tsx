@@ -309,7 +309,7 @@ function StudyPageContent({
               position: 'relative',
             }}
           >
-            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode={effectiveMode} onImageError={handleImageError} />
+            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode={effectiveMode} onImageError={handleImageError} prerequisiteVisible={false} />
             <SelectionLayer
               paperId={paperId}
               viewerRef={viewerRef}

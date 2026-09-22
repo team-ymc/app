@@ -49,6 +49,7 @@ function contentResponse(
       },
     ],
     assets: {},
+    prerequisiteHighlights: [],
   };
 }
 
