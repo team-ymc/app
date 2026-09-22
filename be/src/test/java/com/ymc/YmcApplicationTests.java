@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ymc.support.LocalStackTestConfiguration;
+import com.ymc.support.PrerequisitePortStubs;
 import com.ymc.support.TestcontainersConfiguration;
 
 /**
@@ -32,7 +33,7 @@ import com.ymc.support.TestcontainersConfiguration;
 })
 @AutoConfigureMockMvc
 @ActiveProfiles({"local", "observability"})
-@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class})
+@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, PrerequisitePortStubs.class})
 class YmcApplicationTests {
 
 	@Autowired

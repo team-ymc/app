@@ -66,9 +66,9 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
  * 통합 테스트 베이스 — PostgreSQL·LocalStack 컨테이너를 띄운 실제 스프링 컨텍스트.
  * 두 설정을 같은 조합으로 import 하므로 하위 테스트 클래스들이 컨텍스트(=컨테이너)를 공유한다.
  */
-@SpringBootTest(properties = "ai.fake-stream=true")
+@SpringBootTest(properties = {"ai.fake-stream=true", "prerequisite.definition.generator-version=test-v1"})
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class})
+@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, PrerequisitePortStubs.class})
 public abstract class IntegrationTest {
 
     /** 비동기 소비를 기다리는 상한. 재전달(visibility timeout 2초)까지 넉넉히 덮는다. */

@@ -71,7 +71,19 @@ public enum ErrorCode {
     PAPER_USAGE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
 
     /** 지식 그래프가 아직 준비되지 않음 — PENDING·FAILED·Document 연결 전 (FT-009) */
-    KNOWLEDGE_GRAPH_NOT_READY(HttpStatus.CONFLICT);
+    KNOWLEDGE_GRAPH_NOT_READY(HttpStatus.CONFLICT),
+
+    /** 현재 Document에 highlightId가 없음 */
+    PREREQUISITE_HIGHLIGHT_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 본문 또는 compile sidecar가 아직 준비되지 않음 */
+    PREREQUISITE_NOT_READY(HttpStatus.CONFLICT),
+
+    /** 사용자의 다른 선행지식 설명이 생성 중 */
+    PREREQUISITE_CONCURRENCY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
+
+    /** AI 설명 생성에 실패함 */
+    PREREQUISITE_DEFINITION_FAILED(HttpStatus.BAD_GATEWAY);
 
     private final HttpStatus status;
 
