@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.PaperPackageReader;
 import com.ymc.paper.service.port.ParsedPaperPackage;
+import com.ymc.paper.service.port.ParsedPrerequisiteHighlight;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -120,6 +121,44 @@ public class S3PaperPackageReader implements PaperPackageReader {
             translations.put(block.blockId(), textKor);
         }
         return translations;
+    }
+
+    @Override
+    public List<ParsedPrerequisiteHighlight> readPrerequisiteHighlights(String manifestKey) {
+        String prefix = packagePrefix(manifestKey);
+        Manifest manifest = parse(fileStorage.readUtf8(manifestKey), Manifest.class, manifestKey);
+        Manifest.Artifact sidecar = manifest.artifacts() == null
+                ? null : manifest.artifacts().frontendPrerequisiteHighlights();
+        if (sidecar == null || sidecar.path() == null) {
+            log.warn("manifest에 frontend_prerequisite_highlights가 없습니다, 선행지식 없이 진행: manifestKey={}",
+                    manifestKey);
+            return List.of();
+        }
+        String sidecarKey = prefix + sidecar.path();
+        // 번역 사이드카와 같은 규칙 — 파일 없음·형식 오류만 빈 결과로 진행하고 S3 일시 장애는 전파한다.
+        PrerequisiteHighlightSidecar doc;
+        try {
+            doc = parse(fileStorage.readUtf8(sidecarKey), PrerequisiteHighlightSidecar.class, sidecarKey);
+        } catch (NoSuchKeyException | IllegalStateException e) {
+            log.warn("선행지식 사이드카를 읽지 못했습니다, 선행지식 없이 진행: key={}", sidecarKey, e);
+            return List.of();
+        }
+        if (doc.schemaVersion() == null || doc.schemaVersion() != 1
+                || !"utf-16".equals(doc.offsetEncoding()) || doc.highlights() == null) {
+            log.warn("선행지식 사이드카 형식 불일치, 선행지식 없이 진행: key={}, schema_version={}, offset_encoding={}",
+                    sidecarKey, doc.schemaVersion(), doc.offsetEncoding());
+            return List.of();
+        }
+        List<ParsedPrerequisiteHighlight> highlights = new ArrayList<>();
+        for (PrerequisiteHighlightItem item : doc.highlights()) {
+            if (!item.valid()) {
+                log.warn("형식이 어긋난 선행지식 하이라이트, 건너뜀: highlightId={}, key={}", item.highlightId(), sidecarKey);
+                continue;
+            }
+            highlights.add(new ParsedPrerequisiteHighlight(
+                    item.highlightId(), item.blockId(), item.startOffset(), item.endOffset(), item.text()));
+        }
+        return List.copyOf(highlights);
     }
 
     @Override
@@ -243,6 +282,7 @@ public class S3PaperPackageReader implements PaperPackageReader {
                 @JsonProperty("frontend_document") Artifact frontendDocument,
                 @JsonProperty("structure_document") Artifact structureDocument,
                 @JsonProperty("frontend_translation_ko") Artifact frontendTranslationKo,
+                @JsonProperty("frontend_prerequisite_highlights") Artifact frontendPrerequisiteHighlights,
                 @JsonProperty("knowledge_bundle_viz") Artifact knowledgeBundleViz) {
         }
 
@@ -291,5 +331,29 @@ public class S3PaperPackageReader implements PaperPackageReader {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record TranslatedBlockContent(@JsonProperty("text_kor") String textKor) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record PrerequisiteHighlightSidecar(
+            @JsonProperty("schema_version") Integer schemaVersion,
+            @JsonProperty("offset_encoding") String offsetEncoding,
+            List<PrerequisiteHighlightItem> highlights) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record PrerequisiteHighlightItem(
+            @JsonProperty("highlight_id") String highlightId,
+            @JsonProperty("block_id") String blockId,
+            @JsonProperty("start_offset") Integer startOffset,
+            @JsonProperty("end_offset") Integer endOffset,
+            String text) {
+
+        boolean valid() {
+            return highlightId != null && !highlightId.isEmpty()
+                    && blockId != null && !blockId.isEmpty()
+                    && startOffset != null && endOffset != null
+                    && startOffset >= 0 && startOffset < endOffset
+                    && text != null && !text.isEmpty();
+        }
     }
 }

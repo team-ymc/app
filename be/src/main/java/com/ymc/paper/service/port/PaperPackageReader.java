@@ -1,5 +1,6 @@
 package com.ymc.paper.service.port;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,4 +33,12 @@ public interface PaperPackageReader {
      * @return artifact가 없거나 path가 비어 있으면 WARN 후 empty. manifest 자체를 못 읽으면 예외.
      */
     Optional<String> readKnowledgeGraphKey(String manifestKey);
+
+    /**
+     * 컴파일 산출물 사이드카(frontend/prerequisite-highlights.json)의 선행지식 범위를 문서 순서대로 읽는다.
+     *
+     * @return manifest에 사이드카가 없거나 형식이 어긋나면 WARN 후 빈 목록. 불량 항목은 그 항목만 건너뛴다.
+     *         manifest 자체를 못 읽으면 예외.
+     */
+    List<ParsedPrerequisiteHighlight> readPrerequisiteHighlights(String manifestKey);
 }

@@ -37,6 +37,7 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentPrerequisiteHighlightRepository;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -115,6 +116,9 @@ public abstract class IntegrationTest {
     protected DocumentContentAssetRepository documentContentAssetRepository;
 
     @Autowired
+    protected DocumentPrerequisiteHighlightRepository documentPrerequisiteHighlightRepository;
+
+    @Autowired
     protected DocumentContentIngestService documentContentIngestService;
 
     @Autowired
@@ -187,6 +191,7 @@ public abstract class IntegrationTest {
         userRepository.deleteAll();
         givenUser(TEST_USER_ID);
         givenUser(OTHER_USER_ID);
+        documentPrerequisiteHighlightRepository.deleteAll();
         documentContentBlockRepository.deleteAll();
         documentContentAssetRepository.deleteAll();
         documentContentRepository.deleteAll();
@@ -306,6 +311,7 @@ public abstract class IntegrationTest {
                 "manifest.json",
                 "frontend/document.json",
                 "frontend/translation-ko.json",
+                "frontend/prerequisite-highlights.json",
                 "structure/document.json"));
     }
 
