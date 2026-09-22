@@ -19,6 +19,12 @@ services:
     environment:
       # .env는 호스트(localhost) 기준 — 컨테이너는 ymc-local 네트워크 안 주소로 덮는다.
       DB_URL: jdbc:postgresql://ymc-postgres:5432/ymc_dev
+      # 로컬 Valkey는 infra/local에서 별도 기동한다. 로컬에서는 TLS·AUTH를 사용하지 않는다.
+      SPRING_DATA_REDIS_HOST: ymc-valkey
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_SSL_ENABLED: "false"
+      PREREQUISITE_DEFINITION_CACHE_TTL: 30d
+      PREREQUISITE_KNOWLEDGE_AGENT_ACTIVE_VARIANT: prerequisite-knowledge-agent-v1
       # ai.base-url 오버라이드 (Spring relaxed binding). AI_BASEURL도 @ConfigurationProperties
       # 바인더에는 먹지만, 이 형태는 @Value·Environment.getProperty 경로로는 해석되지 않는다.
       # AI_BASE_URL은 두 경로 모두 지원 → 나중에 소비 방식이 바뀌어도 조용히 무시되지 않는다.
