@@ -33,7 +33,7 @@ export function rehypePrerequisiteHighlight({ ranges }: RehypePrerequisiteHighli
         pieces.push({
           type: 'element',
           tagName: 'mark',
-          properties: { className: ['term-highlight'], dataHighlightId: r.id, role: 'button', tabIndex: 0 },
+          properties: { className: ['term-highlight'], dataHighlightId: r.id },
           children: [textNode(source, r.start, r.end)],
         });
         cursor = r.end;

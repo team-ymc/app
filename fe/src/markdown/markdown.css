@@ -145,6 +145,7 @@
 .term-highlight{padding:0 2px;border-radius:3px;background:#dce8f7;color:#1e2e42;box-shadow:inset 0 -1px 0 #8299b5;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .term-highlight:hover,.term-highlight[aria-expanded="true"]{background:#cfdef0;box-shadow:inset 0 -2px 0 #637f9f}
 .pt-prerequisite-off .term-highlight{padding:0;background:transparent;color:inherit;box-shadow:none;cursor:text}
+.pt-prerequisite-off .term-highlight{pointer-events:none}
 
 /* 선행지식 팝오버 — 로딩 점 3개와 말풍선 화살표. */
 .pt-prereq-dot{width:6px;height:6px;border-radius:50%;background:#8299b5;animation:pt-prereq-blink 1s infinite}

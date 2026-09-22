@@ -16,7 +16,7 @@ function setup(opts: { visible?: boolean; openSignal?: number; onOpen?: () => vo
   const utils = render(
     <div>
       <div ref={viewerRef} data-testid="viewer" style={{ position: 'relative' }}>
-        <p><mark className="term-highlight" data-highlight-id="h1" role="button" tabIndex={0}>softmax</mark> rest</p>
+        <p><mark className="term-highlight" data-highlight-id="h1">softmax</mark> rest</p>
       </div>
       <PrerequisiteLayer
         paperId="p" viewerRef={viewerRef} highlights={highlights}
@@ -116,7 +116,7 @@ describe('PrerequisiteLayer', () => {
     await waitFor(() => screen.getByRole('dialog'));
     rerender(
       <div>
-        <div ref={viewerRef} data-testid="viewer"><p><mark className="term-highlight" data-highlight-id="h1" role="button" tabIndex={0}>softmax</mark> rest</p></div>
+        <div ref={viewerRef} data-testid="viewer"><p><mark className="term-highlight" data-highlight-id="h1">softmax</mark> rest</p></div>
         <PrerequisiteLayer paperId="p" viewerRef={viewerRef} highlights={highlights} visible openSignal={1} onOpen={() => {}} />
       </div>,
     );
@@ -129,5 +129,40 @@ describe('PrerequisiteLayer', () => {
     setup({ onOpen });
     fireEvent.click(screen.getByText('softmax'));
     expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('열려 있는 중 highlights가 바뀌면 팝오버를 닫는다', async () => {
+    vi.mocked(papersApi.createPrerequisiteDefinition).mockResolvedValue({ term: 'softmax', definitionEn: 'e', definitionKo: 'k' });
+    const { rerender, viewerRef } = setup();
+    fireEvent.click(screen.getByText('softmax'));
+    await waitFor(() => screen.getByRole('dialog'));
+
+    const nextHighlights = [{ highlightId: 'h2', blockId: 'b', startOffset: 0, endOffset: 4, text: 'attn' }];
+    rerender(
+      <div>
+        <div ref={viewerRef} data-testid="viewer">
+          <p><mark className="term-highlight" data-highlight-id="h2">attn</mark></p>
+        </div>
+        <PrerequisiteLayer paperId="p" viewerRef={viewerRef} highlights={nextHighlights} visible openSignal={0} onOpen={() => {}} />
+      </div>,
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('같은 highlights 배열 인스턴스로 리렌더되면 팝오버를 유지한다', async () => {
+    vi.mocked(papersApi.createPrerequisiteDefinition).mockResolvedValue({ term: 'softmax', definitionEn: 'e', definitionKo: 'k' });
+    const { rerender, viewerRef } = setup();
+    fireEvent.click(screen.getByText('softmax'));
+    await waitFor(() => screen.getByRole('dialog'));
+
+    rerender(
+      <div>
+        <div ref={viewerRef} data-testid="viewer">
+          <p><mark className="term-highlight" data-highlight-id="h1">softmax</mark> rest</p>
+        </div>
+        <PrerequisiteLayer paperId="p" viewerRef={viewerRef} highlights={highlights} visible openSignal={0} onOpen={() => {}} />
+      </div>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeNull();
   });
 });

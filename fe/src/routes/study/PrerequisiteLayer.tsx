@@ -32,8 +32,8 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
   const baseScrollTopRef = useRef(0);
   const [scrollDelta, setScrollDelta] = useState(0);
 
-  // 본문이 바뀌면(하이라이트 배열 교체) 기억한 설명을 비운다.
-  useEffect(() => { memoRef.current.clear(); }, [highlights]);
+  // 본문이 바뀌면(하이라이트 배열 교체) 기억한 설명을 비우고, 옛 DOM을 참조 중인 팝오버도 닫는다.
+  useEffect(() => { memoRef.current.clear(); setLayer({ phase: 'idle' }); }, [highlights]);
 
   // 토글 off 또는 다른 오버레이 열림 → 닫기.
   useEffect(() => { setLayer({ phase: 'idle' }); }, [visible, openSignal]);
