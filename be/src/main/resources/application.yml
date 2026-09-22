@@ -4,6 +4,9 @@ server:
   forward-headers-strategy: framework
 
 management:
+  health:
+    redis:
+      enabled: false                # Valkey 장애가 BE health check를 떨어뜨리지 않게 한다
   endpoint:
     health:
       probes:

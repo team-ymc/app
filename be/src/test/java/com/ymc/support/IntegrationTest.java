@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -68,7 +70,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
  */
 @SpringBootTest(properties = {"ai.fake-stream=true", "prerequisite.definition.generator-version=test-v1"})
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, PrerequisitePortStubs.class})
+@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, ValkeyTestConfiguration.class})
 public abstract class IntegrationTest {
 
     /** 비동기 소비를 기다리는 상한. 재전달(visibility timeout 2초)까지 넉넉히 덮는다. */
@@ -148,6 +150,9 @@ public abstract class IntegrationTest {
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    protected StringRedisTemplate redisTemplate;
+
     /*
      * 스파이를 (쓰지 않는 테스트까지 포함해) 베이스에 모아 둔 이유: 빈 override는 스프링 컨텍스트
      * 캐시 키의 일부다. 테스트 클래스마다 다른 조합을 선언하면 컨텍스트가 갈라지고 컨테이너도 그만큼
@@ -181,6 +186,9 @@ public abstract class IntegrationTest {
      */
     @BeforeEach
     void resetState() {
+        try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection()) {
+            connection.serverCommands().flushDb();
+        }
         usageRecordRepository.deleteAll();
         usageBucketRepository.deleteAll();
         planEntitlementRepository.deleteAll();
