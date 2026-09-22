@@ -23,6 +23,10 @@ export interface SelectionLayerProps {
   onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
   /** 전체 번역이 켜져 있으면 선택 팝업의 번역 버튼을 숨긴다. */
   translationVisible: boolean;
+  /** 값이 바뀌면(다른 오버레이가 열리면) 팝업을 닫는다. */
+  closeSignal?: number;
+  /** 이 레이어가 열릴 때 호출 — 다른 오버레이를 닫는 데 쓴다. */
+  onOpen?: () => void;
 }
 
 // computeToolbarPosition의 top 계산은 popup.height를 쓰지 않는다(brief 구현 참고) — width만 정확하면
@@ -47,7 +51,7 @@ function translateBlockedMessage(check: TranslationSelectionCheck): string | und
   return check === 'ok' ? undefined : TRANSLATE_BLOCKED_MESSAGE[check];
 }
 
-export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationVisible }: SelectionLayerProps) {
+export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationVisible, closeSignal, onOpen }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
@@ -61,13 +65,38 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationV
 
   // 선택이 생기면 toolbar로, 사라지면(그리고 지금 toolbar 단계일 때만) idle로 — translating 이후
   // 단계는 캡처값으로 독립 운영되므로 브라우저 selection 변화에 영향받지 않는다.
+  // onOpen은 idle→toolbar로 실제 전이할 때만 부른다 — 드래그 중에는 sel이 계속 바뀌어도 이 effect가
+  // 매번 재실행되므로, 직전 커밋의 phase를 ref로 봐 idle이었을 때만 호출한다.
+  const prevPhaseRef = useRef<Layer['phase']>('idle');
   useEffect(() => {
+    const wasIdle = prevPhaseRef.current === 'idle';
     if (sel) {
       setLayer((prev) => (prev.phase === 'idle' || prev.phase === 'toolbar' ? { phase: 'toolbar', ...sel } : prev));
+      if (wasIdle) onOpen?.();
     } else {
       setLayer((prev) => (prev.phase === 'toolbar' ? { phase: 'idle' } : prev));
     }
-  }, [sel]);
+  }, [sel, onOpen]);
+
+  // 위 effect가 참조하는 "직전 phase"를 매 커밋마다 갱신한다 — sel effect보다 한 커밋 늦게 반영되므로
+  // sel effect 안에서는 항상 갱신 전 값을 본다.
+  useEffect(() => {
+    prevPhaseRef.current = layer.phase;
+  }, [layer]);
+
+  // 다른 오버레이가 열리면(closeSignal 변경) 이 팝업을 닫는다. 첫 렌더에서는 실행하지 않는다.
+  const prevCloseSignalRef = useRef(closeSignal);
+  useEffect(() => {
+    if (closeSignal === undefined || prevCloseSignalRef.current === closeSignal) {
+      prevCloseSignalRef.current = closeSignal;
+      return;
+    }
+    prevCloseSignalRef.current = closeSignal;
+    setLayer((prev) => {
+      if (prev.phase !== 'idle') prev.clear();
+      return { phase: 'idle' };
+    });
+  }, [closeSignal]);
 
   // 스크롤 시 툴바는 dismiss(선택이 사라지면 idle 복귀), 번역 팝업은 스크롤량을 기록해 따라간다.
   useEffect(() => {

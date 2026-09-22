@@ -11,6 +11,10 @@ export interface ContentAskLayerProps {
   viewerRef: RefObject<HTMLDivElement | null>;
   blocks: PaperBlock[];
   onAsk: (text: string, mode: 'current' | 'new', anchors: SelectionAnchors | null) => void;
+  /** 값이 바뀌면(다른 오버레이가 열리면) 팝업을 닫는다. */
+  closeSignal?: number;
+  /** 이 레이어가 열릴 때 호출 — 다른 오버레이를 닫는 데 쓴다. */
+  onOpen?: () => void;
 }
 
 const ATOMIC_TYPES = new Set(['figure', 'table', 'equation']);
@@ -19,9 +23,20 @@ type Layer =
   | { phase: 'idle' }
   | { phase: 'action'; blockId: string; rect: DOMRect };
 
-export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerProps) {
+export function ContentAskLayer({ viewerRef, blocks, onAsk, closeSignal, onOpen }: ContentAskLayerProps) {
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   const popupRef = useRef<HTMLDivElement>(null);
+
+  // 다른 오버레이가 열리면(closeSignal 변경) 이 팝업을 닫는다. 첫 렌더에서는 실행하지 않는다.
+  const prevCloseSignalRef = useRef(closeSignal);
+  useEffect(() => {
+    if (closeSignal === undefined || prevCloseSignalRef.current === closeSignal) {
+      prevCloseSignalRef.current = closeSignal;
+      return;
+    }
+    prevCloseSignalRef.current = closeSignal;
+    setLayer({ phase: 'idle' });
+  }, [closeSignal]);
 
   // 레이어가 열려 있는 동안 대상 블록에 하이라이트를 유지한다 — 목업 data-context-target 이식.
   // (호버 링은 markdown.css의 :hover가 담당한다.)
@@ -65,6 +80,7 @@ export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerPro
       // 버튼이 프레임 밖에 뜨지 않게 한다.
       const frame = section.querySelector('.pt-figure img, .katex-display, .pt-table-scroll');
       setLayer({ phase: 'action', blockId, rect: (frame ?? section).getBoundingClientRect() });
+      onOpen?.();
     }
     function handleScroll() {
       setLayer({ phase: 'idle' });
@@ -75,7 +91,7 @@ export function ContentAskLayer({ viewerRef, blocks, onAsk }: ContentAskLayerPro
       el.removeEventListener('click', handleClick);
       el.removeEventListener('scroll', handleScroll);
     };
-  }, [viewerRef, blocks]);
+  }, [viewerRef, blocks, onOpen]);
 
   if (layer.phase === 'idle') return null;
 

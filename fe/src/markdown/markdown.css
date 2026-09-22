@@ -145,3 +145,10 @@
 .term-highlight{padding:0 2px;border-radius:3px;background:#dce8f7;color:#1e2e42;box-shadow:inset 0 -1px 0 #8299b5;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .term-highlight:hover,.term-highlight[aria-expanded="true"]{background:#cfdef0;box-shadow:inset 0 -2px 0 #637f9f}
 .pt-prerequisite-off .term-highlight{padding:0;background:transparent;color:inherit;box-shadow:none;cursor:text}
+
+/* 선행지식 팝오버 — 로딩 점 3개와 말풍선 화살표. */
+.pt-prereq-dot{width:6px;height:6px;border-radius:50%;background:#8299b5;animation:pt-prereq-blink 1s infinite}
+.pt-prereq-dot:nth-child(2){animation-delay:.2s}
+.pt-prereq-dot:nth-child(3){animation-delay:.4s}
+@keyframes pt-prereq-blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.pt-prereq-popover::before{content:"";position:absolute;top:-11px;left:99px;width:20px;height:20px;background:#fffdf8;border-left:1px solid #cdbb9d;border-top:1px solid #cdbb9d;transform:rotate(45deg)}

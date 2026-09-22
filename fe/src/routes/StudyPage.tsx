@@ -6,7 +6,7 @@
 // Night mode 토글: 이 목업 파일 자체에는 스위치 UI가 없다 (디자인 시스템 readme에서만 "Night Study Mode
 // toggle"로 언급). brief Step 3가 명시적으로 요구하는 기능이라 R1 우측 존에 아이콘 버튼을 새로 추가했다
 // (report에 기록) — 목업에 없는 요소이므로 기존 변환표 밖 판단.
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconButton } from '../design/components/IconButton';
@@ -15,6 +15,9 @@ import { getPaperContent } from '../markdown/paperContent';
 import { translationDisabledReason } from './study/translationStatus';
 import { PaperViewer, type TranslationMode } from './study/PaperViewer';
 import { TranslationModeButton } from './study/TranslationModeButton';
+import { PrerequisiteToggle } from './study/PrerequisiteToggle';
+import { PrerequisiteLayer } from './study/PrerequisiteLayer';
+import { prerequisiteDisabledReason } from './study/prerequisiteStatus';
 import { SelectionLayer } from './study/SelectionLayer';
 import { ContentAskLayer } from './study/ContentAskLayer';
 import { TocRail } from './study/TocRail';
@@ -99,6 +102,15 @@ function StudyPageContent({
     prevTranslationStatus.current = translationStatus;
   }, [translationStatus, paperId, queryClient]);
 
+  // 지식 그래프 컴파일이 끝나 READY가 되는 순간에도 본문을 다시 받는다 — 선행지식 하이라이트가 이때 채워진다.
+  const prevKnowledgeGraphStatus = useRef(knowledgeGraphStatus);
+  useEffect(() => {
+    if (prevKnowledgeGraphStatus.current !== 'READY' && knowledgeGraphStatus === 'READY') {
+      queryClient.invalidateQueries({ queryKey: ['paper-content', paperId] });
+    }
+    prevKnowledgeGraphStatus.current = knowledgeGraphStatus;
+  }, [knowledgeGraphStatus, paperId, queryClient]);
+
   const planQuery = usePlanQuery();
   const aiUsage = planQuery.data?.usage.aiQuery;
 
@@ -121,6 +133,9 @@ function StudyPageContent({
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [prerequisiteOn, setPrerequisiteOn] = useState(false);
+  // 세 오버레이(선행지식·선택·질문하기)가 서로를 닫는 신호. 값이 바뀌면 해당 오버레이가 idle로 돌아간다.
+  const [overlaySignals, setOverlaySignals] = useState({ prerequisite: 0, selection: 0, ask: 0 });
   // SelectionLayer·ContentAskLayer의 "AI에게 질문" → 컴포저 인용 첨부 목록으로 누적된다 (FT-006 Story 5).
   const [attachments, setAttachments] = useState<SelectionAttachment[]>([]);
   const [attachEvent, setAttachEvent] = useState<TutorPanelAttachEvent | null>(null);
@@ -133,10 +148,25 @@ function StudyPageContent({
 
   const blocks = useMemo(() => contentQuery.data?.blocks ?? [], [contentQuery.data]);
   const toc = contentQuery.data?.toc ?? [];
+  // PrerequisiteLayer의 클릭 위임 effect가 이 배열에 의존한다 — 매 렌더 새 배열이면 effect가 계속 재등록된다.
+  const prerequisiteHighlights = useMemo(() => contentQuery.data?.prerequisiteHighlights ?? [], [contentQuery.data]);
+  const prerequisiteEnabled = prerequisiteHighlights.length > 0;
+  const prerequisiteVisible = prerequisiteOn && prerequisiteEnabled;
   // toc.map()이 렌더마다 새 배열을 만들면 useScrollSpy의 effect deps가 매번 바뀌어
   // IntersectionObserver가 불필요하게 재구축된다(스플리터 드래그 중 pointermove마다 리렌더되면 특히 심함) — 메모이즈.
   const tocOrder = useMemo(() => toc.map((t) => t.blockId), [toc]);
   const activeId = useScrollSpy(viewerRef, tocOrder);
+
+  // 오버레이 세 개(선행지식·선택·질문하기) 중 하나가 열리면 나머지를 닫는다.
+  const handlePrerequisiteOpen = useCallback(() => {
+    setOverlaySignals((s) => ({ ...s, selection: s.selection + 1, ask: s.ask + 1 }));
+  }, []);
+  const handleSelectionOpen = useCallback(() => {
+    setOverlaySignals((s) => ({ ...s, prerequisite: s.prerequisite + 1, ask: s.ask + 1 }));
+  }, []);
+  const handleAskOpen = useCallback(() => {
+    setOverlaySignals((s) => ({ ...s, prerequisite: s.prerequisite + 1, selection: s.selection + 1 }));
+  }, []);
 
   const expiredRefetched = useRef(false);
   function handleImageError() {
@@ -276,6 +306,12 @@ function StudyPageContent({
         knowledgeGraphStatus={knowledgeGraphStatus}
         rightSlot={
           <>
+            <PrerequisiteToggle
+              checked={prerequisiteOn}
+              disabled={!prerequisiteEnabled}
+              disabledReason={prerequisiteDisabledReason(prerequisiteHighlights.length)}
+              onToggle={() => setPrerequisiteOn((v) => !v)}
+            />
             <TranslationModeButton
               mode={effectiveMode}
               disabled={!translationEnabled}
@@ -309,15 +345,31 @@ function StudyPageContent({
               position: 'relative',
             }}
           >
-            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode={effectiveMode} onImageError={handleImageError} prerequisiteVisible={false} />
+            <PaperViewer blocks={blocks} containerRef={viewerRef} translationMode={effectiveMode} onImageError={handleImageError} prerequisiteVisible={prerequisiteVisible} />
             <SelectionLayer
               paperId={paperId}
               viewerRef={viewerRef}
               blocks={blocks}
               onAsk={handleAsk}
               translationVisible={effectiveMode !== 'off'}
+              closeSignal={overlaySignals.selection}
+              onOpen={handleSelectionOpen}
             />
-            <ContentAskLayer viewerRef={viewerRef} blocks={blocks} onAsk={handleAsk} />
+            <ContentAskLayer
+              viewerRef={viewerRef}
+              blocks={blocks}
+              onAsk={handleAsk}
+              closeSignal={overlaySignals.ask}
+              onOpen={handleAskOpen}
+            />
+            <PrerequisiteLayer
+              paperId={paperId}
+              viewerRef={viewerRef}
+              highlights={prerequisiteHighlights}
+              visible={prerequisiteVisible}
+              openSignal={overlaySignals.prerequisite}
+              onOpen={handlePrerequisiteOpen}
+            />
           </div>
 
           {/* Resizable splitter */}
