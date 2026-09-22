@@ -29,7 +29,8 @@ import com.ymc.support.ValkeyTestConfiguration;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"ai.fake-stream=true",
 		"management.server.port=0",
-		"management.endpoints.web.exposure.include=health,prometheus"
+		"management.endpoints.web.exposure.include=health,prometheus",
+		"prerequisite.definition.generator-version=test-v1"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles({"local", "observability"})

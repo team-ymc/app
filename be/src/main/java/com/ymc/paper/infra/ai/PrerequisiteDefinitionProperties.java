@@ -15,5 +15,9 @@ public record PrerequisiteDefinitionProperties(Duration timeout, Duration cacheT
         if (generatorVersion == null || generatorVersion.isBlank()) {
             throw new IllegalArgumentException("prerequisite.definition.generator-version은 필수다.");
         }
+        if (generatorVersion.startsWith("${")) {
+            throw new IllegalArgumentException("prerequisite.definition.generator-version이 해석되지 않았습니다. "
+                    + "PREREQUISITE_KNOWLEDGE_AGENT_ACTIVE_VARIANT를 설정하세요.");
+        }
     }
 }

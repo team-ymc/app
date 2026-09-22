@@ -64,9 +64,11 @@ public class AiPrerequisiteDefinitionAdapter implements PrerequisiteDefinitionGe
                     .bodyToMono(RunResponseBody.class)
                     .block(properties.timeout());
         } catch (WebClientResponseException e) {
-            String code = errorCode(e.getResponseBodyAsString());
+            ErrorDetail detail = errorDetail(e.getResponseBodyAsString());
+            log.warn("AI 설명 생성 실패: status={}, code={}, estimatedCostUsd={}",
+                    e.getStatusCode().value(), detail.code(), detail.estimatedCostUsd());
             throw new GenerationFailedException("AI 설명 생성 실패: status=" + e.getStatusCode().value()
-                    + ", code=" + code, e);
+                    + ", code=" + detail.code(), e);
         } catch (RuntimeException e) {
             // WebClient.block(Duration)은 타임아웃을 IllegalStateException(cause TimeoutException)으로 올린다.
             boolean timeout = e.getCause() instanceof TimeoutException;
@@ -81,12 +83,17 @@ public class AiPrerequisiteDefinitionAdapter implements PrerequisiteDefinitionGe
                 .orElseThrow(() -> new GenerationFailedException("AI 설명 형식 불일치", null));
     }
 
-    private String errorCode(String responseBody) {
+    record ErrorDetail(String code, String estimatedCostUsd) {
+    }
+
+    private ErrorDetail errorDetail(String responseBody) {
         try {
             JsonNode detail = objectMapper.readTree(responseBody).path("detail");
-            return detail.path("code").asText("UNKNOWN");
+            return new ErrorDetail(
+                    detail.path("code").asText("UNKNOWN"),
+                    detail.path("estimated_cost_usd").asText("unknown"));
         } catch (Exception e) {
-            return "UNPARSEABLE";
+            return new ErrorDetail("UNPARSEABLE", "unknown");
         }
     }
 }

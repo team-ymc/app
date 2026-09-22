@@ -9,6 +9,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +20,7 @@ import com.ymc.paper.service.port.PrerequisiteDefinitionGenerator.GenerationFail
 import com.ymc.support.FakeAiJsonServer;
 import com.ymc.support.FakeAiJsonServer.Reply;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AiPrerequisiteDefinitionAdapterTest {
 
     static FakeAiJsonServer aiServer;
@@ -69,6 +73,17 @@ class AiPrerequisiteDefinitionAdapterTest {
         assertThatThrownBy(() -> adapter(Duration.ofSeconds(5)).generate("paper-1", "b", 0, 1))
                 .isInstanceOf(GenerationFailedException.class)
                 .hasMessageContaining("PREREQUISITE_SELECTION_NOT_FOUND");
+    }
+
+    @Test
+    void AI_4xx는_estimated_cost_usd를_실패_로그에_남긴다(CapturedOutput output) {
+        aiServer.enqueue(Reply.error(400, "{\"detail\":{\"code\":\"PREREQUISITE_SELECTION_NOT_FOUND\","
+                + "\"message\":\"no\",\"estimated_cost_usd\":\"0.00042\"}}"));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(5)).generate("paper-1", "b", 0, 1))
+                .isInstanceOf(GenerationFailedException.class);
+
+        assertThat(output).contains("estimatedCostUsd=0.00042");
     }
 
     @Test
