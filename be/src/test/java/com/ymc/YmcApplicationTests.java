@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.ymc.support.LocalStackTestConfiguration;
 import com.ymc.support.TestcontainersConfiguration;
+import com.ymc.support.ValkeyTestConfiguration;
 
 /**
  * 컨텍스트 기동 스모크.
@@ -28,11 +29,12 @@ import com.ymc.support.TestcontainersConfiguration;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"ai.fake-stream=true",
 		"management.server.port=0",
-		"management.endpoints.web.exposure.include=health,prometheus"
+		"management.endpoints.web.exposure.include=health,prometheus",
+		"prerequisite.definition.generator-version=test-v1"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles({"local", "observability"})
-@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class})
+@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, ValkeyTestConfiguration.class})
 class YmcApplicationTests {
 
 	@Autowired

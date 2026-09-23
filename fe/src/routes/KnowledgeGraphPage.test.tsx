@@ -36,6 +36,7 @@ beforeEach(() => {
   vi.mocked(getStatus).mockResolvedValue(statusResponse());
   vi.mocked(fetchPaperContent).mockResolvedValue({
     paperId: 'p1', title: '제목', sourceLanguage: 'en', translationStatus: 'READY', schemaVersion: 1, blocks: [], assets: {},
+    prerequisiteHighlights: [],
   });
   vi.mocked(getKnowledgeGraphView).mockResolvedValue({ url: 'https://s3.example/viz.html?sig=1', expiresAt: '2026-09-17T00:10:00Z' });
 });

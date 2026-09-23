@@ -3,7 +3,10 @@ import { adaptPaperContent } from './paperContent';
 import type { PaperContentResponse } from '../api/types';
 
 function res(partial: Partial<PaperContentResponse>): PaperContentResponse {
-  return { paperId: 'p1', title: null, sourceLanguage: null, translationStatus: 'READY', schemaVersion: 1, blocks: [], assets: {}, ...partial };
+  return {
+    paperId: 'p1', title: null, sourceLanguage: null, translationStatus: 'READY', schemaVersion: 1,
+    blocks: [], assets: {}, prerequisiteHighlights: [], ...partial,
+  };
 }
 
 describe('adaptPaperContent', () => {
@@ -165,5 +168,46 @@ describe('adaptPaperContent', () => {
 
   it('translationStatus를 그대로 넘긴다', () => {
     expect(adaptPaperContent(res({ translationStatus: 'PENDING' })).translationStatus).toBe('PENDING');
+  });
+});
+
+describe('prerequisiteHighlights', () => {
+  it('blockId별로 블록에 원문 offset 범위를 붙인다', () => {
+    const res: PaperContentResponse = {
+      paperId: 'p', title: null, sourceLanguage: 'en', translationStatus: 'READY', schemaVersion: 1,
+      assets: {},
+      blocks: [
+        { blockId: 'b1', globalOrder: 0, label: 'paragraph_title', headingLevel: 2, sectionPath: [], content: { format: 'text', text: 'Intro' } },
+        { blockId: 'b2', globalOrder: 1, label: 'text', headingLevel: null, sectionPath: [], content: { format: 'text', text: 'softmax and dropout' } },
+      ],
+      prerequisiteHighlights: [
+        { highlightId: 'h2', blockId: 'b2', startOffset: 12, endOffset: 19, text: 'dropout' },
+        { highlightId: 'h1', blockId: 'b2', startOffset: 0, endOffset: 7, text: 'softmax' },
+        { highlightId: 'h0', blockId: 'b1', startOffset: 0, endOffset: 5, text: 'Intro' },
+      ],
+    };
+    const content = adaptPaperContent(res);
+    expect(content.blocks[0].highlights).toEqual([{ id: 'h0', start: 0, end: 5 }]);
+    expect(content.blocks[1].highlights).toEqual([
+      { id: 'h2', start: 12, end: 19 },
+      { id: 'h1', start: 0, end: 7 },
+    ]);
+    expect(content.prerequisiteHighlights).toHaveLength(3);
+  });
+
+  it('atomic 블록이나 없는 blockId의 하이라이트는 버린다', () => {
+    const res: PaperContentResponse = {
+      paperId: 'p', title: null, sourceLanguage: 'en', translationStatus: 'READY', schemaVersion: 1,
+      assets: {},
+      blocks: [
+        { blockId: 'eq', globalOrder: 0, label: 'display_formula', headingLevel: null, sectionPath: [], content: { format: 'formula', tex: 'x' } },
+      ],
+      prerequisiteHighlights: [
+        { highlightId: 'h1', blockId: 'eq', startOffset: 0, endOffset: 1, text: 'x' },
+        { highlightId: 'h2', blockId: 'nope', startOffset: 0, endOffset: 1, text: 'x' },
+      ],
+    };
+    const content = adaptPaperContent(res);
+    expect(content.blocks[0].highlights).toBeUndefined();
   });
 });

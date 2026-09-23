@@ -22,6 +22,7 @@ import com.ymc.paper.api.dto.PaperCreated;
 import com.ymc.paper.api.dto.PaperDownloadResponse;
 import com.ymc.paper.api.dto.PaperListResponse;
 import com.ymc.paper.api.dto.PaperStatusResponse;
+import com.ymc.paper.api.dto.PrerequisiteDefinitionResponse;
 import com.ymc.paper.api.dto.RenamePaperRequest;
 import com.ymc.paper.service.KnowledgeGraphViewService;
 import com.ymc.paper.service.PaperContentQueryService;
@@ -32,6 +33,7 @@ import com.ymc.paper.service.PaperRegistrationService;
 import com.ymc.paper.service.PaperStatusService;
 import com.ymc.paper.service.PaperStatusView;
 import com.ymc.paper.service.PaperUploadCompletionService;
+import com.ymc.paper.service.PrerequisiteDefinitionService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +52,7 @@ public class PaperController {
     private final PaperListService listService;
     private final PaperContentQueryService contentQueryService;
     private final PaperManagementService managementService;
+    private final PrerequisiteDefinitionService prerequisiteDefinitionService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. 소유자는 인증 주체다 (YMC-215). */
     @PostMapping
@@ -119,6 +122,15 @@ public class PaperController {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         managementService.delete(paperId, ownerId);
         return ResponseEntity.noContent().build();
+    }
+
+    /** 선행지식 설명 조회 또는 생성. body 없음, 사용량 미차감. */
+    @PostMapping("/{paperId}/prerequisite-highlights/{highlightId}/definition")
+    public PrerequisiteDefinitionResponse prerequisiteDefinition(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID paperId, @PathVariable String highlightId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return PrerequisiteDefinitionResponse.from(
+                prerequisiteDefinitionService.define(paperId, ownerId, highlightId));
     }
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {

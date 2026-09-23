@@ -5,7 +5,7 @@ import { authFetch } from './auth';
 import {
   ApiError,
   type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse,
-  type PaperUploadHeaders, type KnowledgeGraphView,
+  type PaperUploadHeaders, type KnowledgeGraphView, type PrerequisiteDefinitionResponse,
 } from './types';
 
 // size는 presigned PUT 서명에 박히는 정확한 바이트 수다 — 업로드가 이 값과 다르면 S3가 403으로 거절한다.
@@ -99,6 +99,20 @@ export async function deletePaper(paperId: string): Promise<void> {
 // 파싱된 논문 본문 조회 (blocks는 globalOrder 오름차순으로 온다).
 export async function fetchPaperContent(paperId: string): Promise<PaperContentResponse> {
   const res = await authFetch(`/api/papers/${paperId}/content`);
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
+// 선행지식 설명 조회 또는 생성. 캐시 HIT면 즉시, MISS면 AI 생성 뒤 응답한다.
+export async function createPrerequisiteDefinition(
+  paperId: string,
+  highlightId: string,
+  signal?: AbortSignal,
+): Promise<PrerequisiteDefinitionResponse> {
+  const res = await authFetch(
+    `/api/papers/${paperId}/prerequisite-highlights/${encodeURIComponent(highlightId)}/definition`,
+    { method: 'POST', signal },
+  );
   if (!res.ok) throw await apiError(res);
   return res.json();
 }

@@ -29,6 +29,7 @@ function contentResponse(
   translated: boolean,
   sourceLanguage: string | null = 'en',
   translationStatus: TranslationStatus = translated ? 'READY' : 'FAILED',
+  prerequisiteHighlights: PaperContentResponse['prerequisiteHighlights'] = [],
 ): PaperContentResponse {
   return {
     paperId: 'p1',
@@ -49,6 +50,7 @@ function contentResponse(
       },
     ],
     assets: {},
+    prerequisiteHighlights,
   };
 }
 
@@ -273,8 +275,8 @@ describe('StudyPage — 상단 바 본문 | 지식 그래프', () => {
 
       await waitFor(() => expect(graphLink().getAttribute('aria-disabled')).toBeNull());
       expect(getStatus).toHaveBeenCalledTimes(2);
-      // 번역은 처음부터 READY였으니 본문을 다시 받지 않는다
-      expect(fetchPaperContent).toHaveBeenCalledTimes(1);
+      // 지식 그래프가 READY로 바뀌면 선행지식 하이라이트를 받으러 본문을 다시 조회한다
+      await waitFor(() => expect(fetchPaperContent).toHaveBeenCalledTimes(2));
     } finally {
       vi.useRealTimers();
     }
@@ -286,5 +288,52 @@ describe('StudyPage — 상단 바 본문 | 지식 그래프', () => {
     renderStudy();
     await waitFor(() => expect(modeButton()).toBeTruthy());
     expect(graphLink().title).toBe('지식 그래프를 준비하지 못했습니다');
+  });
+});
+
+describe('StudyPage — 선행지식 토글', () => {
+  it('knowledgeGraphStatus가 READY로 바뀌면 본문을 다시 조회한다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(getStatus)
+        .mockResolvedValueOnce(statusResponse('READY', 'PENDING'))
+        .mockResolvedValue(statusResponse('READY', 'READY'));
+      vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+      renderStudy();
+      await waitFor(() => expect(modeButton()).toBeTruthy());
+      expect(fetchPaperContent).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await waitFor(() => expect(fetchPaperContent).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('하이라이트가 없으면 토글이 비활성이고 툴팁이 있다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true, 'en', 'READY', []));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    const toggle = screen.getByRole('switch', { name: '선행지식' }) as HTMLButtonElement;
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.getAttribute('title')).toBe('표시할 선행지식이 없습니다');
+  });
+
+  it('토글을 켜면 뷰어에 pt-prerequisite-off가 빠지고, 끄면 다시 붙는다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true, 'en', 'READY', [
+      { highlightId: 'h1', blockId: 'b1', startOffset: 0, endOffset: 2, text: 'An' },
+    ]));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+
+    const toggle = screen.getByRole('switch', { name: '선행지식' });
+    expect(document.querySelector('.pt-prerequisite-off')).not.toBeNull();
+
+    fireEvent.click(toggle);
+    expect(document.querySelector('.pt-prerequisite-off')).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(document.querySelector('.pt-prerequisite-off')).not.toBeNull();
   });
 });

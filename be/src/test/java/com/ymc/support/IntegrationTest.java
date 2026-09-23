@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -37,6 +39,7 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
+import com.ymc.paper.domain.DocumentPrerequisiteHighlightRepository;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
@@ -65,9 +68,9 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
  * 통합 테스트 베이스 — PostgreSQL·LocalStack 컨테이너를 띄운 실제 스프링 컨텍스트.
  * 두 설정을 같은 조합으로 import 하므로 하위 테스트 클래스들이 컨텍스트(=컨테이너)를 공유한다.
  */
-@SpringBootTest(properties = "ai.fake-stream=true")
+@SpringBootTest(properties = {"ai.fake-stream=true", "prerequisite.definition.generator-version=test-v1"})
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class})
+@Import({TestcontainersConfiguration.class, LocalStackTestConfiguration.class, ValkeyTestConfiguration.class})
 public abstract class IntegrationTest {
 
     /** 비동기 소비를 기다리는 상한. 재전달(visibility timeout 2초)까지 넉넉히 덮는다. */
@@ -115,6 +118,9 @@ public abstract class IntegrationTest {
     protected DocumentContentAssetRepository documentContentAssetRepository;
 
     @Autowired
+    protected DocumentPrerequisiteHighlightRepository documentPrerequisiteHighlightRepository;
+
+    @Autowired
     protected DocumentContentIngestService documentContentIngestService;
 
     @Autowired
@@ -143,6 +149,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    protected StringRedisTemplate redisTemplate;
 
     /*
      * 스파이를 (쓰지 않는 테스트까지 포함해) 베이스에 모아 둔 이유: 빈 override는 스프링 컨텍스트
@@ -177,6 +186,9 @@ public abstract class IntegrationTest {
      */
     @BeforeEach
     void resetState() {
+        try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection()) {
+            connection.serverCommands().flushDb();
+        }
         usageRecordRepository.deleteAll();
         usageBucketRepository.deleteAll();
         planEntitlementRepository.deleteAll();
@@ -187,6 +199,7 @@ public abstract class IntegrationTest {
         userRepository.deleteAll();
         givenUser(TEST_USER_ID);
         givenUser(OTHER_USER_ID);
+        documentPrerequisiteHighlightRepository.deleteAll();
         documentContentBlockRepository.deleteAll();
         documentContentAssetRepository.deleteAll();
         documentContentRepository.deleteAll();
@@ -306,6 +319,7 @@ public abstract class IntegrationTest {
                 "manifest.json",
                 "frontend/document.json",
                 "frontend/translation-ko.json",
+                "frontend/prerequisite-highlights.json",
                 "structure/document.json"));
     }
 

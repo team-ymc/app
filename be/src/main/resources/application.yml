@@ -4,6 +4,9 @@ server:
   forward-headers-strategy: framework
 
 management:
+  health:
+    redis:
+      enabled: false                # Valkey 장애가 BE health check를 떨어뜨리지 않게 한다
   endpoint:
     health:
       probes:
@@ -68,6 +71,14 @@ chat:
     heartbeat-interval: 15s         # FE 방향 침묵 시 heartbeat (계약 고정값 — 바꾸면 계약 위반)
     max-content-length: 65536       # delta 누적 상한 (문자 수). 초과 시 AI_RESPONSE_TOO_LARGE
     emitter-timeout: 11m            # MVC async timeout — deadline보다 커야 워치독이 먼저 발화
+
+prerequisite:
+  backfill:
+    enabled: false                  # true면 기동 시 컴파일 완료 Document의 선행지식을 한 번 채운다
+  definition:
+    timeout: 60s                    # AI non-streaming 응답 전체 상한. 잠금 만료는 여기에 5초를 더한다
+    cache-ttl: ${PREREQUISITE_DEFINITION_CACHE_TTL:30d}
+    generator-version: ${PREREQUISITE_KNOWLEDGE_AGENT_ACTIVE_VARIANT}
 
 paper:
   upload:

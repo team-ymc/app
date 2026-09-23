@@ -24,20 +24,20 @@ function selection(overrides: Partial<TextSelection> = {}): TextSelection {
   };
 }
 
-function setup(sel: TextSelection | null, translationVisible = false) {
+function setup(sel: TextSelection | null, translationVisible = false, onOpen?: () => void) {
   vi.mocked(useTextSelection).mockReturnValue(sel);
   const onAsk = vi.fn();
   const viewerRef = createRef<HTMLDivElement>();
-  render(
+  const utils = render(
     <div style={{ position: 'relative' }}>
       <div ref={viewerRef}>
         <section data-block-id="b0">An attention function</section>
         <section data-block-id="b1">can be described</section>
       </div>
-      <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} translationVisible={translationVisible} />
+      <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} translationVisible={translationVisible} closeSignal={0} onOpen={onOpen} />
     </div>,
   );
-  return { onAsk };
+  return { onAsk, rerender: utils.rerender, viewerRef };
 }
 
 type Captured = { onEvent: (e: TranslationStreamEvent) => void; signal?: AbortSignal };
@@ -223,5 +223,44 @@ describe('SelectionLayer — 현재 상태기계', () => {
     setup(selection(), false);
     expect(screen.getByRole('button', { name: /번역/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /질문하기/ })).toBeTruthy();
+  });
+
+  it('closeSignal이 바뀌면 열려 있던 팝업이 닫힌다', () => {
+    const sel = selection();
+    const { rerender, viewerRef } = setup(sel);
+    expect(screen.getByRole('button', { name: /번역/ })).toBeTruthy();
+
+    rerender(
+      <div style={{ position: 'relative' }}>
+        <div ref={viewerRef}>
+          <section data-block-id="b0">An attention function</section>
+          <section data-block-id="b1">can be described</section>
+        </div>
+        <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={vi.fn()} translationVisible={false} closeSignal={1} />
+      </div>,
+    );
+    expect(screen.queryByRole('button', { name: /번역/ })).toBeNull();
+    expect(sel.clear).toHaveBeenCalled();
+  });
+
+  it('드래그 중 sel이 여러 번 바뀌어도 onOpen은 idle→toolbar 전이 때 한 번만 불린다', () => {
+    const onOpen = vi.fn();
+    const sel1 = selection({ text: 'a' });
+    const { rerender, viewerRef } = setup(sel1, false, onOpen);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // 드래그로 선택 범위가 늘어나며 useTextSelection이 새 객체를 반환 — toolbar 유지, onOpen 재호출 없음.
+    const sel2 = selection({ text: 'ab' });
+    vi.mocked(useTextSelection).mockReturnValue(sel2);
+    rerender(
+      <div style={{ position: 'relative' }}>
+        <div ref={viewerRef}>
+          <section data-block-id="b0">An attention function</section>
+          <section data-block-id="b1">can be described</section>
+        </div>
+        <SelectionLayer paperId="p-1" viewerRef={viewerRef} blocks={BLOCKS} onAsk={vi.fn()} translationVisible={false} closeSignal={0} onOpen={onOpen} />
+      </div>,
+    );
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });

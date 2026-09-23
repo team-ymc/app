@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentBlock;
+import com.ymc.paper.domain.DocumentPrerequisiteHighlight;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.Paper;
@@ -69,6 +70,39 @@ class KnowledgeCompileResultConsumptionIntegrationTest extends IntegrationTest {
         assertThat(document.knowledgeGraphStatus()).isEqualTo(KnowledgeGraphStatus.READY);
         assertThat(blocksOf(paper).get(1).getContent().get("textKor").asText()).contains("새로운 구조");
         assertThat(blocksOf(paper).get(3).getContent().has("textKor")).isFalse();
+    }
+
+    @Test
+    @DisplayName("completed: 선행지식 사이드카를 Document 단위로 적재한다")
+    void completedIngestsPrerequisiteHighlights() {
+        Paper paper = givenRequestedPaper("compile-highlight.pdf");
+
+        publishCompileResult("""
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKeyOf(paper)));
+        awaitCompileStatus(paper.getId(), CompileStatus.COMPLETED);
+
+        assertThat(documentPrerequisiteHighlightRepository
+                .findAllByDocumentIdOrderByIdAsc(paper.getDocumentId()))
+                .extracting(DocumentPrerequisiteHighlight::getHighlightId)
+                .containsExactly("prerequisite-0001", "prerequisite-0002");
+    }
+
+    @Test
+    @DisplayName("completed 동시 2건: 예외 없이 하이라이트 1세트만 남는다")
+    void concurrentCompletedIngestsOnce() throws Exception {
+        Paper paper = givenRequestedPaper("compile-dup.pdf");
+        String message = """
+                {"paper_id":"%s","status":"completed","message":"ok","manifest_key":"%s"}
+                """.formatted(paper.getId(), manifestKeyOf(paper));
+
+        publishCompileResult(message);
+        publishCompileResult(message);
+        awaitCompileStatus(paper.getId(), CompileStatus.COMPLETED);
+        Thread.sleep(1000); // 두 번째 메시지 처리까지 기다린다
+
+        assertThat(documentPrerequisiteHighlightRepository
+                .findAllByDocumentIdOrderByIdAsc(paper.getDocumentId())).hasSize(2);
     }
 
     @Test

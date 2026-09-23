@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ymc.paper.service.port.FileStorage;
 import com.ymc.paper.service.port.ParsedPaperPackage;
+import com.ymc.paper.service.port.ParsedPrerequisiteHighlight;
 import com.ymc.paper.service.port.PresignedDownload;
 import com.ymc.paper.service.port.PresignedUpload;
 import com.ymc.paper.service.port.UploadedObjectMetadata;
@@ -473,6 +474,99 @@ class S3PaperPackageReaderTest {
 
         assertThatThrownBy(() -> failingReader.readKnowledgeGraphKey("papers/s3err/manifest.json"))
                 .isInstanceOf(S3Exception.class);
+    }
+
+    @Test
+    void 선행지식_사이드카의_하이라이트를_순서대로_돌려준다(CapturedOutput output) {
+        Map<String, String> files = highlightPackage("hl", """
+                {"schema_version":1,"document_id":"hl","offset_encoding":"utf-16","highlights":[
+                  {"highlight_id":"prerequisite-0001","block_id":"p0000-b0001","start_offset":17,"end_offset":45,"text":"neural sequence transduction"},
+                  {"highlight_id":"prerequisite-0002","block_id":"p0000-b0002","start_offset":0,"end_offset":7,"text":"softmax"}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readPrerequisiteHighlights("papers/hl/manifest.json")).containsExactly(
+                new ParsedPrerequisiteHighlight("prerequisite-0001", "p0000-b0001", 17, 45, "neural sequence transduction"),
+                new ParsedPrerequisiteHighlight("prerequisite-0002", "p0000-b0002", 0, 7, "softmax"));
+        assertThat(output.getOut()).doesNotContain("WARN");
+    }
+
+    @Test
+    void manifest에_frontend_prerequisite_highlights가_없으면_빈_목록과_WARN이다(CapturedOutput output) {
+        assertThat(reader.readPrerequisiteHighlights("papers/p1/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("frontend_prerequisite_highlights");
+    }
+
+    @Test
+    void 선행지식_사이드카_schema_version이_1이_아니면_빈_목록과_WARN이다(CapturedOutput output) {
+        Map<String, String> files = highlightPackage("hlsv2", """
+                {"schema_version":2,"offset_encoding":"utf-16","highlights":[
+                  {"highlight_id":"h1","block_id":"b0","start_offset":0,"end_offset":3,"text":"abc"}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readPrerequisiteHighlights("papers/hlsv2/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("schema_version");
+    }
+
+    @Test
+    void 선행지식_사이드카_offset_encoding이_utf16이_아니면_빈_목록과_WARN이다(CapturedOutput output) {
+        Map<String, String> files = highlightPackage("hlenc", """
+                {"schema_version":1,"offset_encoding":"utf-8","highlights":[
+                  {"highlight_id":"h1","block_id":"b0","start_offset":0,"end_offset":3,"text":"abc"}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readPrerequisiteHighlights("papers/hlenc/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("offset_encoding");
+    }
+
+    @Test
+    void 필드가_빠졌거나_범위가_뒤집힌_하이라이트는_그_항목만_건너뛰고_WARN이다(CapturedOutput output) {
+        Map<String, String> files = highlightPackage("hlbad", """
+                {"schema_version":1,"offset_encoding":"utf-16","highlights":[
+                  {"highlight_id":"no-block","start_offset":0,"end_offset":3,"text":"abc"},
+                  {"highlight_id":"reversed","block_id":"b0","start_offset":5,"end_offset":5,"text":"abc"},
+                  {"highlight_id":"no-text","block_id":"b0","start_offset":0,"end_offset":3,"text":""},
+                  {"highlight_id":"ok","block_id":"b0","start_offset":0,"end_offset":3,"text":"abc"}
+                ]}
+                """);
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readPrerequisiteHighlights("papers/hlbad/manifest.json"))
+                .containsExactly(new ParsedPrerequisiteHighlight("ok", "b0", 0, 3, "abc"));
+        assertThat(output.getOut()).contains("no-block").contains("reversed").contains("no-text");
+    }
+
+    @Test
+    void 선행지식_사이드카_파일이_없으면_빈_목록과_WARN이다(CapturedOutput output) {
+        Map<String, String> files = highlightPackage("hlmissing", "{}");
+        files.remove("papers/hlmissing/frontend/prerequisite-highlights.json");
+        S3PaperPackageReader reader = new S3PaperPackageReader(mapStorage(files), new ObjectMapper());
+
+        assertThat(reader.readPrerequisiteHighlights("papers/hlmissing/manifest.json")).isEmpty();
+        assertThat(output.getOut()).contains("prerequisite-highlights.json");
+    }
+
+    /** manifest에 선행지식 사이드카 항목이 있는 최소 패키지. */
+    private static Map<String, String> highlightPackage(String paperId, String sidecarJson) {
+        Map<String, String> files = new HashMap<>();
+        files.put("papers/" + paperId + "/manifest.json", """
+                {
+                  "manifest_version": 3,
+                  "document_id": "%s",
+                  "artifacts": {
+                    "frontend_document": {"path": "frontend/document.json"},
+                    "structure_document": {"path": "structure/document.json"},
+                    "frontend_prerequisite_highlights": {"path": "frontend/prerequisite-highlights.json"}
+                  }
+                }
+                """.formatted(paperId));
+        files.put("papers/" + paperId + "/frontend/prerequisite-highlights.json", sidecarJson);
+        return files;
     }
 
     /** manifest에 사이드카 항목이 있고 본문은 최소인 패키지. */

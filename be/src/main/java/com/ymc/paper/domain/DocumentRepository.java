@@ -144,4 +144,9 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Modifying(clearAutomatically = true)
     @Query("update Document d set d.updatedAt = :at where d.id = :id")
     void backdateUpdatedAt(@Param("id") UUID id, @Param("at") Instant at);
+
+    /** 컴파일은 끝났는데 선행지식 행이 없는 Document. 일회성 채우기 대상이다. */
+    @Query("select d from Document d where d.compileStatus = com.ymc.paper.domain.CompileStatus.COMPLETED "
+            + "and not exists (select 1 from DocumentPrerequisiteHighlight h where h.documentId = d.id)")
+    List<Document> findAllCompiledWithoutPrerequisiteHighlights();
 }

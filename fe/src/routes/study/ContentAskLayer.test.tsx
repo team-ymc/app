@@ -65,4 +65,29 @@ describe('ContentAskLayer — 구성요소 질문하기', () => {
     fireEvent.click(screen.getByRole('button', { name: '질문하기' }));
     expect(screen.queryByRole('button', { name: '질문하기' })).toBeNull();
   });
+
+  it('closeSignal이 바뀌면 열려 있던 팝업이 닫힌다', () => {
+    const onAsk = vi.fn();
+    const viewerRef = createRef<HTMLDivElement>();
+    const { rerender } = render(
+      <div style={{ position: 'relative' }}>
+        <div ref={viewerRef}>
+          <section data-block-id="f0" id="f0">그림</section>
+        </div>
+        <ContentAskLayer viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} closeSignal={0} />
+      </div>,
+    );
+    fireEvent.click(document.querySelector('[data-block-id="f0"]')!);
+    expect(screen.getByRole('button', { name: '질문하기' })).toBeTruthy();
+
+    rerender(
+      <div style={{ position: 'relative' }}>
+        <div ref={viewerRef}>
+          <section data-block-id="f0" id="f0">그림</section>
+        </div>
+        <ContentAskLayer viewerRef={viewerRef} blocks={BLOCKS} onAsk={onAsk} closeSignal={1} />
+      </div>,
+    );
+    expect(screen.queryByRole('button', { name: '질문하기' })).toBeNull();
+  });
 });

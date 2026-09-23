@@ -16,7 +16,8 @@ public record PaperContentView(
         TranslationStatus translationStatus,
         int schemaVersion,
         List<Block> blocks,
-        Map<String, Asset> assets) {
+        Map<String, Asset> assets,
+        List<Highlight> prerequisiteHighlights) {
 
     public record Block(
             String blockId,
@@ -28,5 +29,8 @@ public record PaperContentView(
     }
 
     public record Asset(String url, String mediaType, Instant expiresAt) {
+    }
+
+    public record Highlight(String highlightId, String blockId, int startOffset, int endOffset, String text) {
     }
 }

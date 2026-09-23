@@ -26,9 +26,10 @@ export interface PaperViewerProps {
   containerRef: Ref<HTMLDivElement>;
   translationMode: TranslationMode;
   onImageError?: () => void;
+  prerequisiteVisible: boolean;
 }
 
-export function PaperViewer({ blocks, containerRef, translationMode, onImageError }: PaperViewerProps) {
+export function PaperViewer({ blocks, containerRef, translationMode, onImageError, prerequisiteVisible }: PaperViewerProps) {
   const side = translationMode === 'side';
   // 옆 배치에서만 바깥 wrap을 넓혀 두 열을 담는다. 시트(article)는 아트보드대로
   // wrap보다 좁게 한 번 더 조여 본문 폭을 1160px로 맞춘다(wrap 1320 - 시트 padding 40*2 = 1240 시트, 1240 - 40*2 = 1160 본문).
@@ -47,7 +48,7 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
         justifyContent: 'center',
       }}
     >
-      <div style={{ width: '100%', maxWidth: wrapWidth }}>
+      <div className={prerequisiteVisible ? undefined : 'pt-prerequisite-off'} style={{ width: '100%', maxWidth: wrapWidth }}>
         <PaperSheet style={{ width: '100%', maxWidth: sheetWidth, padding: side ? '28px 40px' : '28px 36px' }}>
           {/* 아래 배치는 쌍 사이를 문단 간격보다 넓혀 어떤 원문의 번역인지 구분한다. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: translationMode === 'below' ? '34px' : '24px' }}>
@@ -68,7 +69,15 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
                     {b.type === 'table' && b.tableHtml != null ? (
                       <SanitizedHtmlTable html={b.tableHtml} />
                     ) : (
-                      <PaperMarkdown sourcePos onImageError={onImageError}>{b.markdown ?? ''}</PaperMarkdown>
+                      <PaperMarkdown
+                        sourcePos
+                        onImageError={onImageError}
+                        highlights={b.highlights?.map((h) => ({
+                          id: h.id, start: h.start + (b.sourceOffsetShift ?? 0), end: h.end + (b.sourceOffsetShift ?? 0),
+                        }))}
+                      >
+                        {b.markdown ?? ''}
+                      </PaperMarkdown>
                     )}
                   </section>
                   {translation ? (

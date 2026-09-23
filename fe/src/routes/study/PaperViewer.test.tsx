@@ -27,7 +27,7 @@ const BLOCKS: PaperBlock[] = [
 
 function setup(mode: 'off' | 'below' | 'side') {
   const ref = createRef<HTMLDivElement>();
-  const { container } = render(<PaperViewer blocks={BLOCKS} containerRef={ref} translationMode={mode} />);
+  const { container } = render(<PaperViewer blocks={BLOCKS} containerRef={ref} translationMode={mode} prerequisiteVisible={false} />);
   return container;
 }
 

@@ -17,8 +17,7 @@ import com.ymc.paper.service.port.PaperPackageReader;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 컴파일 결과 반영. 병합과 상태 종결을 한 트랜잭션으로 묶는다 — 병합만 커밋되고 상태가 REQUESTED로 남거나,
- * 상태만 COMPLETED가 되고 번역이 없는 상태를 만들지 않기 위해서다.
+ * 컴파일 결과 반영. 병합·하이라이트 적재와 상태 종결을 한 트랜잭션으로 묶고 Document 행을 잠가 재전달을 직렬화한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,11 +28,12 @@ public class KnowledgeCompileResultService {
     private final DocumentRepository documentRepository;
     private final DocumentTransitions transitions;
     private final DocumentTranslationMergeService mergeService;
+    private final DocumentPrerequisiteHighlightIngestService highlightIngestService;
     private final PaperPackageReader packageReader;
 
     @Transactional
     public void apply(UUID requestPaperId, CompileStatus terminal, String errorCode, String manifestKey) {
-        Optional<Document> found = documentRepository.findByRequestPaperId(requestPaperId);
+        Optional<Document> found = documentRepository.findWithLockByRequestPaperId(requestPaperId);
         if (found.isEmpty()) {
             log.warn("컴파일 결과 미반영, 대응 document 없음: requestPaperId={}", requestPaperId);
             return;
@@ -58,11 +58,12 @@ public class KnowledgeCompileResultService {
                 log.warn("영어 문서인데 병합된 번역이 없습니다, READY로 응답되지만 번역 블록 없음: requestPaperId={}, "
                         + "documentId={}, manifestKey={}", requestPaperId, documentId, manifestKey);
             }
+            int highlights = highlightIngestService.ingest(documentId, manifestKey);
             // manifest를 한 번 더 읽는다. 재파싱 경로가 없어 두 읽기 사이에 manifest가 바뀌지 않는다.
             String knowledgeGraphKey = packageReader.readKnowledgeGraphKey(manifestKey).orElse(null);
             transitions.markCompiled(documentId, CompileStatus.COMPLETED, null, knowledgeGraphKey);
-            log.info("컴파일 완료 반영: requestPaperId={}, documentId={}, mergedBlocks={}, knowledgeGraphKey={}",
-                    requestPaperId, documentId, merged, knowledgeGraphKey);
+            log.info("컴파일 완료 반영: requestPaperId={}, documentId={}, mergedBlocks={}, highlights={}, "
+                    + "knowledgeGraphKey={}", requestPaperId, documentId, merged, highlights, knowledgeGraphKey);
             return;
         }
         transitions.markCompiled(documentId, CompileStatus.FAILED, errorCode, null);

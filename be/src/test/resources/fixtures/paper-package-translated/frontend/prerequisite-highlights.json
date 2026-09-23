@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "document_id": "fixture-translated",
+  "offset_encoding": "utf-16",
+  "highlights": [
+    {
+      "highlight_id": "prerequisite-0001",
+      "block_id": "p0000-b0001",
+      "start_offset": 13,
+      "end_offset": 29,
+      "text": "new architecture"
+    },
+    {
+      "highlight_id": "prerequisite-0002",
+      "block_id": "p0000-b0002",
+      "start_offset": 18,
+      "end_offset": 25,
+      "text": "English"
+    }
+  ]
+}

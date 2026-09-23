@@ -23,6 +23,9 @@ class PaperContentIntegrationTest extends IntegrationTest {
     @Autowired
     DocumentTranslationMergeService mergeService;
 
+    @Autowired
+    com.ymc.paper.service.DocumentPrerequisiteHighlightIngestService highlightIngestService;
+
     /** COMPLETED + 적재까지 끝난 논문. */
     private Paper givenIngestedPaper() {
         Paper paper = givenProcessingPaper("content.pdf");
@@ -38,6 +41,7 @@ class PaperContentIntegrationTest extends IntegrationTest {
         String manifestKey = givenTranslatedPackageOnS3(paper.getId());
         documentContentIngestService.ingest(paper.getDocumentId(), manifestKey);
         mergeService.merge(paper.getDocumentId(), manifestKey);
+        highlightIngestService.ingest(paper.getDocumentId(), manifestKey);
         documentTransitions.markCompiled(paper.getDocumentId(), CompileStatus.COMPLETED, null, null);
         return reload(paper.getId());
     }
@@ -145,6 +149,30 @@ class PaperContentIntegrationTest extends IntegrationTest {
     void 인증_없으면_401() throws Exception {
         mockMvc.perform(get("/api/papers/{id}/content", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 컴파일_전에는_prerequisiteHighlights가_빈_배열이다() throws Exception {
+        Paper paper = givenIngestedPaper();
+
+        mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prerequisiteHighlights").isArray())
+                .andExpect(jsonPath("$.prerequisiteHighlights").isEmpty());
+    }
+
+    @Test
+    void 컴파일_뒤에는_적재한_하이라이트를_문서_순서로_담는다() throws Exception {
+        Paper paper = givenIngestedTranslatedPaper();
+
+        mockMvc.perform(get("/api/papers/{id}/content", paper.getId()).with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prerequisiteHighlights.length()").value(2))
+                .andExpect(jsonPath("$.prerequisiteHighlights[0].highlightId").value("prerequisite-0001"))
+                .andExpect(jsonPath("$.prerequisiteHighlights[0].blockId").value("p0000-b0001"))
+                .andExpect(jsonPath("$.prerequisiteHighlights[0].startOffset").value(13))
+                .andExpect(jsonPath("$.prerequisiteHighlights[0].endOffset").value(29))
+                .andExpect(jsonPath("$.prerequisiteHighlights[0].text").value("new architecture"));
     }
 
     @Test
