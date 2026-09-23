@@ -3,7 +3,7 @@
 // 블록 콘텐츠 렌더는 PaperMarkdown이 전담 — brief Step 3 literal 계약대로
 // <section data-block-id id><PaperMarkdown>{markdown}</PaperMarkdown></section> 구조를 유지한다.
 // 타입별 wrapper 시각 스타일(heading/subheading 크기 등)은 markdown.css에서 맞춘다 (report 참고).
-import type { Ref } from 'react';
+import { memo, type Ref } from 'react';
 import { PaperSheet } from '../../design/components/PaperSheet';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import { SanitizedHtmlTable } from '../../markdown/SanitizedHtmlTable';
@@ -29,7 +29,8 @@ export interface PaperViewerProps {
   prerequisiteVisible: boolean;
 }
 
-export function PaperViewer({ blocks, containerRef, translationMode, onImageError, prerequisiteVisible }: PaperViewerProps) {
+// memo: 오버레이 상태로 StudyPage가 다시 렌더돼도 본문 DOM을 다시 만들지 않는다 — 드래그 중 교체되면 브라우저 선택이 리셋된다.
+export const PaperViewer = memo(function PaperViewer({ blocks, containerRef, translationMode, onImageError, prerequisiteVisible }: PaperViewerProps) {
   const side = translationMode === 'side';
   // 옆 배치에서만 바깥 wrap을 넓혀 두 열을 담는다. 시트(article)는 아트보드대로
   // wrap보다 좁게 한 번 더 조여 본문 폭을 1160px로 맞춘다(wrap 1320 - 시트 padding 40*2 = 1240 시트, 1240 - 40*2 = 1160 본문).
@@ -98,4 +99,4 @@ export function PaperViewer({ blocks, containerRef, translationMode, onImageErro
       </div>
     </div>
   );
-}
+});
