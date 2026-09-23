@@ -169,14 +169,16 @@ function StudyPageContent({
   }, []);
 
   const expiredRefetched = useRef(false);
-  function handleImageError() {
-    const expiresAt = contentQuery.data?.assetExpiresAt;
-    if (!expiresAt || expiredRefetched.current) return; // 재조회는 1회만 — 무한 루프 방지
-    if (Date.now() > Date.parse(expiresAt)) {
+  const assetExpiresAt = contentQuery.data?.assetExpiresAt;
+  const refetchContent = contentQuery.refetch;
+  // PaperViewer가 memo라 콜백 identity를 고정한다.
+  const handleImageError = useCallback(() => {
+    if (!assetExpiresAt || expiredRefetched.current) return; // 재조회는 1회만 — 무한 루프 방지
+    if (Date.now() > Date.parse(assetExpiresAt)) {
       expiredRefetched.current = true;
-      contentQuery.refetch();
+      refetchContent();
     }
-  }
+  }, [assetExpiresAt, refetchContent]);
 
   useEffect(() => {
     try {
