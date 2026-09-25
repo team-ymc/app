@@ -34,6 +34,16 @@ jobs:
         with:
           role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      # dev에서 검증한 dist를 그대로 prod에 올리기 위해 SHA별 tar로 보관한다. 같은 SHA 재배포면 건너뜀.
+      - name: Archive build artifact
+        run: |
+          KEY="fe/${{ github.sha }}.tar.gz"
+          if aws s3api head-object --bucket "${{ vars.ARTIFACTS_BUCKET }}" --key "$KEY" >/dev/null 2>&1; then
+            echo "artifact already exists, skipping"
+          else
+            tar -czf fe.tar.gz -C dist .
+            aws s3 cp fe.tar.gz "s3://${{ vars.ARTIFACTS_BUCKET }}/$KEY"
+          fi
       - run: aws s3 sync dist/ "s3://${{ vars.DEV_FE_BUCKET }}" --delete  # build 산출물 버킷과 동기화
       - run: >  # CDN 캐시 무효화
           aws cloudfront create-invalidation
