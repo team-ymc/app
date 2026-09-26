@@ -35,6 +35,8 @@ import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.support.IntegrationTest;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 class ChatConcurrencyIntegrationTest extends IntegrationTest {
 
     @Autowired
@@ -42,6 +44,13 @@ class ChatConcurrencyIntegrationTest extends IntegrationTest {
 
     @Autowired
     ChatMessageTransitions chatMessageTransitions;
+
+    @Autowired
+    MeterRegistry meterRegistry;
+
+    double rejectedRuns() {
+        return meterRegistry.get("chat.runs").tag("outcome", "rejected").counter().count();
+    }
 
     Paper givenCompletedPaper(UUID owner, String filename) {
         Paper paper = paperRepository.save(Paper.register(owner, filename, Instant.now()));
@@ -93,11 +102,13 @@ class ChatConcurrencyIntegrationTest extends IntegrationTest {
         long messages = chatMessageRepository.count();
         long records = usageRecordRepository.count();
         Instant accessedBefore = reload(paper.getId()).getLastAccessedAt();
+        double rejectedBefore = rejectedRuns();
 
         ApiException rejected = catchThrowableOfType(ApiException.class,
                 () -> startNewSession(TEST_USER_ID, paper));
 
         assertThat(rejected.code()).isEqualTo(ErrorCode.CHAT_CONCURRENCY_LIMIT_EXCEEDED);
+        assertThat(rejectedRuns()).isEqualTo(rejectedBefore + 1);
         assertThat(chatSessionRepository.count()).isEqualTo(sessions);
         assertThat(chatMessageRepository.count()).isEqualTo(messages);
         assertThat(usageRecordRepository.count()).isEqualTo(records);

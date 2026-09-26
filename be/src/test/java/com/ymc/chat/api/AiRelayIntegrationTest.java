@@ -31,6 +31,8 @@ import com.ymc.support.FakeAiSseServer;
 import com.ymc.support.FakeAiSseServer.Script;
 import com.ymc.support.IntegrationTest;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 /**
  * 실제 WebClient 어댑터 + fake AI SSE 서버로 wire 레벨을 검증한다.
  * ai.fake-stream을 뒤집으므로 베이스와 다른 컨텍스트(컨테이너 한 벌 추가)가 뜬다 — 의도된 비용.
@@ -63,6 +65,13 @@ class AiRelayIntegrationTest extends IntegrationTest {
 
     @Autowired
     com.ymc.chat.service.ChatStreamService chatStreamService;
+
+    @Autowired
+    MeterRegistry meterRegistry;
+
+    double openSseConnections(String stream) {
+        return meterRegistry.get("sse.connections").tag("stream", stream).gauge().value();
+    }
 
     private Paper givenCompletedPaper() {
         Paper paper = givenProcessingPaper("relay-" + UUID.randomUUID() + ".pdf");
@@ -106,7 +115,9 @@ class AiRelayIntegrationTest extends IntegrationTest {
                 FakeAiSseServer.messageCompleted("t", "진짜 응답"),
                 FakeAiSseServer.runCompleted("t")));
 
+        double before = openSseConnections("chat"); // 같은 컨텍스트의 다른 테스트가 남긴 연결은 제외
         MvcResult result = startStream(paper);
+        assertThat(openSseConnections("chat")).isEqualTo(before + 1);
         ChatMessage assistant = awaitAssistantTerminal();
 
         assertThat(assistant.getStatus()).isEqualTo(ChatMessageStatus.COMPLETED);
@@ -114,6 +125,8 @@ class AiRelayIntegrationTest extends IntegrationTest {
         String stream = streamBody(result);
         assertThat(stream).contains("event:message.delta");
         assertThat(stream).contains("event:message.completed");
+        // emitter 완료 콜백이 닫은 뒤 gauge가 돌아온다
+        await().atMost(Duration.ofSeconds(5)).until(() -> openSseConnections("chat") == before);
     }
 
     @Test

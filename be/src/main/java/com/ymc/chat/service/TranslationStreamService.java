@@ -39,6 +39,7 @@ public class TranslationStreamService {
 
     private static final Logger log = LoggerFactory.getLogger(TranslationStreamService.class);
 
+    private final SseConnectionMetrics sseConnectionMetrics;
     private final AiTranslateStreamPort aiTranslateStreamPort;
     private final TranslationRunTransitions transitions;
     private final ChatStreamProperties chatStreamProperties;
@@ -77,6 +78,7 @@ public class TranslationStreamService {
         private Run(SseEmitter emitter, TranslationStartResult ids) {
             this.emitter = emitter;
             this.ids = ids;
+            sseConnectionMetrics.track(emitter, SseConnectionMetrics.TRANSLATION);
             emitter.onCompletion(() -> feConnected.set(false));
             emitter.onError(t -> feConnected.set(false));
             emitter.onTimeout(() -> feConnected.set(false));

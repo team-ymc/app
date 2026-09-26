@@ -46,6 +46,7 @@ public class ChatCommandService {
     private final UsageService usageService;
     private final UserRepository userRepository;
     private final PlanProperties planProperties;
+    private final ChatRunMetrics metrics;
     private final TransactionTemplate requiresNewTx;
 
     public ChatCommandService(
@@ -56,6 +57,7 @@ public class ChatCommandService {
             UsageService usageService,
             UserRepository userRepository,
             PlanProperties planProperties,
+            ChatRunMetrics metrics,
             PlatformTransactionManager transactionManager) {
         this.paperChatAccessValidator = paperChatAccessValidator;
         this.paperAccessRecorder = paperAccessRecorder;
@@ -64,6 +66,7 @@ public class ChatCommandService {
         this.usageService = usageService;
         this.userRepository = userRepository;
         this.planProperties = planProperties;
+        this.metrics = metrics;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -109,6 +112,7 @@ public class ChatCommandService {
         long active = chatMessageRepository.countBySessionOwnerIdAndRoleAndStatus(
                 ownerId, ChatMessageRole.ASSISTANT, ChatMessageStatus.GENERATING);
         if (active >= maxActive) {
+            metrics.rejected();
             throw new ApiException(ErrorCode.CHAT_CONCURRENCY_LIMIT_EXCEEDED,
                     "동시에 진행 중인 답변이 " + maxActive + "개입니다. 하나가 끝나면 다시 시도하세요.");
         }

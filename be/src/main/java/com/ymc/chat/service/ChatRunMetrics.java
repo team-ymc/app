@@ -22,6 +22,7 @@ public class ChatRunMetrics {
     private final MeterRegistry registry;
     private final AtomicInteger active = new AtomicInteger(); // 여러 스레드가 동시에 +- 1 : Atomic
     private final Timer ttft;
+    private final Counter rejected;
 
     public ChatRunMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -34,6 +35,13 @@ public class ChatRunMetrics {
             Counter.builder("chat.runs").tag("outcome", outcome).register(registry);
             timer("chat.duration").tag("outcome", outcome).register(registry);
         }
+        // 실행 전 거절은 duration이 없다 — 실패와 분리해 세기만 한다
+        rejected = Counter.builder("chat.runs").tag("outcome", "rejected").register(registry);
+    }
+
+    /** 동시 실행 상한에 걸려 시작 트랜잭션에서 거절된 요청. active·duration에는 잡히지 않는다. */
+    public void rejected() {
+        rejected.increment();
     }
 
     private Timer.Builder timer(String name) {
