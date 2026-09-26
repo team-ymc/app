@@ -2,8 +2,17 @@
 server:
   # CloudFront·ALB 뒤에서 X-Forwarded-Proto/Host로 원래 scheme·host를 복원
   forward-headers-strategy: framework
+  tomcat:
+    mbeanregistry:
+      enabled: true               # tomcat_threads_* 노출 — 요청 스레드 고갈 관측
 
 management:
+  metrics:
+    distribution:
+      # http_server_requests에 bucket을 붙여 p95를 계산한다. 전 구간 histogram 대신 경계를
+      # 고정해 series 증가를 uri·status 조합당 11개로 묶는다
+      slo:
+        http.server.requests: 10ms,25ms,50ms,100ms,250ms,500ms,1s,2500ms,5s,10s
   health:
     redis:
       enabled: false                # Valkey 장애가 BE health check를 떨어뜨리지 않게 한다
