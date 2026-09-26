@@ -37,6 +37,8 @@ import com.ymc.support.FakeAiSseServer;
 import com.ymc.support.FakeAiSseServer.Script;
 import com.ymc.support.IntegrationTest;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 @TestPropertySource(properties = {
         "chat.stream.idle-timeout=1s",
         "chat.stream.deadline=4s",
@@ -67,6 +69,13 @@ class TranslationRelayIntegrationTest extends IntegrationTest {
 
     @Autowired
     TranslationStreamService streamService;
+
+    @Autowired
+    MeterRegistry meterRegistry;
+
+    double openSseConnections(String stream) {
+        return meterRegistry.get("sse.connections").tag("stream", stream).gauge().value();
+    }
 
     private Paper givenCompletedPaper() {
         Paper paper = givenPendingPaper("relay-" + UUID.randomUUID() + ".pdf");
@@ -114,9 +123,13 @@ class TranslationRelayIntegrationTest extends IntegrationTest {
                 FakeAiSseServer.Frame.of("run.completed",
                         "{\"type\":\"run.completed\",\"thread_id\":\"t\",\"estimated_cost_usd\":0.0007}")));
 
+        double before = openSseConnections("translation"); // 같은 컨텍스트의 다른 테스트가 남긴 연결은 제외
         MvcResult result = startStream(paper);
+        assertThat(openSseConnections("translation")).isEqualTo(before + 1);
         TranslationRun run = awaitTerminal();
         String stream = streamBody(result);
+        // emitter 완료 콜백이 닫은 뒤 gauge가 돌아온다
+        await().atMost(Duration.ofSeconds(5)).until(() -> openSseConnections("translation") == before);
 
         assertThat(run.getStatus()).isEqualTo(TranslationRunStatus.COMPLETED);
         assertThat(run.getTranslation()).isEqualTo("진짜 번역");

@@ -6,9 +6,10 @@
 | Prometheus 이름 | 의미 |
 |---|---|
 | `chat_active_runs` | 시작 트랜잭션 성공 후 실행 중인 채팅 수. FE 연결 종료로 감소하지 않음 |
-| `chat_runs_total{outcome}` | 최종 결과 success/error/timeout별 실행 수 |
+| `chat_runs_total{outcome}` | 최종 결과 success/error/timeout별 실행 수. rejected는 동시 실행 상한에 걸려 시작 전에 거절된 요청 수 |
 | `chat_ttft_seconds` | Controller 진입부터 첫 비어 있지 않은 AI delta의 중계 준비까지 histogram |
 | `chat_duration_seconds{outcome}` | Controller 진입부터 최종 저장·실패 처리 종료까지 histogram |
+| `sse_connections{stream}` | 열려 있는 SSE 연결 수. chat·translation별. FE가 떠나 emitter가 닫히면 즉시 감소 |
 
 success는 별도 `ChatMessageTransitions.complete()` 트랜잭션이 커밋되어 true를 반환한 뒤 기록한다. DB 전이에 실패하거나 전이 소유권을 얻지 못하면 error다. 결과는 실행당 한 번만 집계하고 첫 delta 없는 요청은 TTFT에 0을 넣지 않는다. 기존 finished 판정으로 늦은 콜백을 무시하고 메트릭도 중복 종료를 방지한다.
 

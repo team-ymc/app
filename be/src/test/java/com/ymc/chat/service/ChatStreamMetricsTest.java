@@ -35,7 +35,7 @@ class ChatStreamMetricsTest {
             listener.set(call.getArgument(1));
             return (AiRunHandle) () -> {};
         });
-        service = new ChatStreamService(new ChatRunMetrics(registry), port, transitions,
+        service = new ChatStreamService(new ChatRunMetrics(registry), new SseConnectionMetrics(registry), port, transitions,
                 new ChatStreamProperties(Duration.ofSeconds(60), Duration.ofSeconds(120),
                         Duration.ofSeconds(15), 10000, Duration.ofSeconds(150)), timer, relay);
     }

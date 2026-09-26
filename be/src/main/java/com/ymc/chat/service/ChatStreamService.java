@@ -46,6 +46,7 @@ public class ChatStreamService {
     private static final Logger log = LoggerFactory.getLogger(ChatStreamService.class);
 
     private final ChatRunMetrics metrics;
+    private final SseConnectionMetrics sseConnectionMetrics;
     private final AiAgentStreamPort aiAgentStreamPort;
     private final ChatMessageTransitions transitions;
     private final ChatStreamProperties chatStreamProperties;
@@ -84,6 +85,7 @@ public class ChatStreamService {
             this.measurement = metrics.start(requestedAtNanos);
             this.emitter = emitter;
             this.ids = ids;
+            sseConnectionMetrics.track(emitter, SseConnectionMetrics.CHAT);
             emitter.onCompletion(() -> feConnected.set(false));
             emitter.onError(t -> feConnected.set(false));
             emitter.onTimeout(() -> feConnected.set(false));

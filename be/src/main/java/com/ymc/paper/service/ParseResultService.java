@@ -1,5 +1,7 @@
 package com.ymc.paper.service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +29,7 @@ public class ParseResultService {
     private final DocumentRepository documentRepository;
     private final DocumentContentIngestService ingestService;
     private final KnowledgeCompileStarter compileStarter;
+    private final ParseMetrics metrics;
 
     public void apply(UUID requestPaperId, DocumentStatus terminal, String errorCode,
             String manifestKey) {
@@ -35,12 +38,18 @@ public class ParseResultService {
             log.warn("파싱 결과 미반영, 대응 document 없음: requestPaperId={}", requestPaperId);
             return;
         }
-        UUID documentId = found.get().getId();
+        Document document = found.get();
+        UUID documentId = document.getId();
+        // PROCESSING 전이 시각이 곧 요청 발행 시각. 선도착(UPLOADED)이나 중복 결과는 lead time을 재지 않는다
+        Instant requestedAt = document.getStatus() == DocumentStatus.PROCESSING ? document.getUpdatedAt() : null;
 
         boolean transitioned = transitions.markParsedAndSettle(documentId, terminal, errorCode);
         if (transitioned) {
             log.info("파싱 결과 반영: requestPaperId={}, documentId={}, status={}",
                     requestPaperId, documentId, terminal);
+            if (requestedAt != null) {
+                metrics.leadTime(terminal, Duration.between(requestedAt, Instant.now()));
+            }
         } else {
             log.warn("파싱 결과 미반영, 이미 terminal: requestPaperId={}, documentId={}, status={}",
                     requestPaperId, documentId, terminal);
