@@ -1,80 +1,64 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import LandingPage from './LandingPage';
 import { useAuth } from '../auth/AuthContext';
 
 const navigateMock = vi.fn();
+const startLoginMock = vi.fn();
 vi.mock('react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router')>()),
   useNavigate: () => navigateMock,
 }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
 vi.mock('../nav/GlobalNav', () => ({
-  GlobalNav: () => (
-    <nav data-testid="global-nav">
-      <a href="/">Paper Teacher</a>
-    </nav>
-  ),
-  GLOBAL_NAV_HEIGHT: 64,
+  GlobalNav: () => <nav data-testid="global-nav"><a href="/">Paper Teacher</a></nav>,
 }));
 
 const useAuthMock = vi.mocked(useAuth);
-
 function mockAuth(status: 'guest' | 'authed') {
   useAuthMock.mockReturnValue({
-    status,
-    user: null,
-    initialError: null,
-    startLogin: vi.fn(),
-    signOut: vi.fn(),
+    status, user: null, initialError: null, startLogin: startLoginMock, signOut: vi.fn(),
   });
 }
+function renderLanding() {
+  render(<MemoryRouter><LandingPage /></MemoryRouter>);
+}
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
+beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
-function renderLanding() {
-  return render(
-    <MemoryRouter>
-      <LandingPage />
-    </MemoryRouter>,
-  );
-}
-
 describe('LandingPage', () => {
-  it('guest: 로그인·회원가입 버튼이 보이고 내 서재로는 없다', () => {
+  it('방문자의 시작 CTA가 인증 흐름을 열고 기능 버튼이 소개 영역으로 이동한다', () => {
     mockAuth('guest');
     renderLanding();
-    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '내 서재로' })).toBeNull();
-  });
-
-  it('authed: 리다이렉트 없이 랜딩에 머물고 내 서재로 버튼만 보인다', () => {
-    mockAuth('authed');
-    renderLanding();
-    expect(screen.getByText('어떤 문서')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '내 서재로' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '회원가입' })).toBeNull();
-    expect(navigateMock).not.toHaveBeenCalled();
-  });
-
-  it('상단 바는 공통 GlobalNav 하나만 쓴다', () => {
-    mockAuth('guest');
-    renderLanding();
+    expect(screen.getByText(/논문 리딩의/)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /논문 업로드하고 시작하기/ })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: /논문 업로드하고 시작하기/ })[0]);
+    expect(startLoginMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: '기능 살펴보기' }).getAttribute('href')).toBe('#journey');
     expect(screen.getByTestId('global-nav')).toBeTruthy();
-    expect(screen.getAllByRole('link', { name: /Paper Teacher/ })).toHaveLength(1);
   });
 
-  it('authed: 내 서재로 클릭 시 /library로 이동한다', () => {
+  it('로그인 사용자의 시작 CTA는 서재로 이동한다', () => {
     mockAuth('authed');
     renderLanding();
-    fireEvent.click(screen.getByRole('button', { name: '내 서재로' }));
+    fireEvent.click(screen.getAllByRole('button', { name: /논문 업로드하고 시작하기/ })[1]);
     expect(navigateMock).toHaveBeenCalledWith('/library');
+    expect(startLoginMock).not.toHaveBeenCalled();
+  });
+
+  it('뷰어와 지식 그래프 화면을 화살표와 점으로 넘긴다', () => {
+    mockAuth('guest');
+    renderLanding();
+    const viewerImage = screen.getByAltText('논문에 실린 그래프 이미지를 보여주는 뷰어 화면');
+    expect(viewerImage.closest('figure')?.hidden).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '다음 논문 뷰어 화면' }));
+    expect(viewerImage.closest('figure')?.hidden).toBe(false);
+    fireEvent.click(screen.getByRole('tab', { name: '표' }));
+    expect(screen.getByAltText('논문 데이터 표를 보여주는 뷰어 화면').closest('figure')?.hidden).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 지식 그래프 화면' }));
+    expect(screen.getByAltText('지식 그래프의 섹션을 클릭해 오른쪽에 본문과 번역이 열린 화면').closest('figure')?.hidden).toBe(false);
   });
 });
