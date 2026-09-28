@@ -92,17 +92,17 @@ prerequisite:
 paper:
   upload:
     # 단일 PDF 상한. 계약의 CreatePaperRequest.size 최대값, FE의 MAX_PDF_UPLOAD_BYTES와 같은 값을 둔다
-    max-file-size: ${MAX_UPLOAD_FILE_SIZE:50MB}
+    max-file-size: ${MAX_UPLOAD_FILE_SIZE:10MB}
 
 # FT-011 플랜·사용량 — 베타 초기 정책. 변경 시 관련 제품 정책과 함께 검토한다
 plan:
   policy:
     free:
-      ai-query: { mode: MONTHLY, limit: 100 }
+      ai-query: { mode: MONTHLY, limit: 30 }
       paper-registration: { mode: MONTHLY, limit: 3 }
     pro:
-      ai-query: { mode: MONTHLY, limit: 1000 }
-      paper-registration: { mode: MONTHLY, limit: 100 }
+      ai-query: { mode: MONTHLY, limit: 500 }
+      paper-registration: { mode: MONTHLY, limit: 20 }
   chat:
     max-active-sessions: 3           # 사용자당 동시 GENERATING 세션 상한 (플랜 공통)
   cleanup:

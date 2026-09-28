@@ -6,7 +6,7 @@ import org.springframework.util.unit.DataSize;
 
 /** PDF 원본 업로드 정책. FE 안내와 무관하게 presign 서명과 complete 검증이 이 값을 강제한다. */
 @ConfigurationProperties(prefix = "paper.upload")
-public record PaperUploadPolicy(@DefaultValue("50MB") DataSize maxFileSize) {
+public record PaperUploadPolicy(@DefaultValue("10MB") DataSize maxFileSize) {
 
     public long maxFileBytes() {
         return maxFileSize.toBytes();

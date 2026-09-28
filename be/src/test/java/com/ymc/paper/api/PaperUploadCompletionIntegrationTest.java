@@ -195,7 +195,7 @@ class PaperUploadCompletionIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("실제 객체가 50 MiB를 넘으면 삭제하고 413 FILE_TOO_LARGE — 파싱 요청은 발행하지 않는다")
+    @DisplayName("실제 객체가 상한을 넘으면 삭제하고 413 FILE_TOO_LARGE — 파싱 요청은 발행하지 않는다")
     void rejectsAndDeletesOversizedObject() throws Exception {
         Paper paper = givenPendingPaper("attention-is-all-you-need.pdf");
         UploadedObjectMetadata oversized =
