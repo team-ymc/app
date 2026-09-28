@@ -33,9 +33,9 @@ class PlanApiIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.plan").value("FREE"))
                 .andExpect(jsonPath("$.planExpiresAt").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.usage.aiQuery.mode").value("MONTHLY"))
-                .andExpect(jsonPath("$.usage.aiQuery.limit").value(100))
+                .andExpect(jsonPath("$.usage.aiQuery.limit").value(30))
                 .andExpect(jsonPath("$.usage.aiQuery.used").value(0))
-                .andExpect(jsonPath("$.usage.aiQuery.remaining").value(100))
+                .andExpect(jsonPath("$.usage.aiQuery.remaining").value(30))
                 .andExpect(jsonPath("$.usage.aiQuery.resetAt").exists())
                 .andExpect(jsonPath("$.usage.paperRegistration.limit").value(3));
 
@@ -54,7 +54,7 @@ class PlanApiIntegrationTest extends IntegrationTest {
 
         mockMvc.perform(get("/api/me/plan").with(userJwt()))
                 .andExpect(jsonPath("$.usage.aiQuery.used").value(2))
-                .andExpect(jsonPath("$.usage.aiQuery.remaining").value(98));
+                .andExpect(jsonPath("$.usage.aiQuery.remaining").value(28));
     }
 
     @Test
@@ -69,8 +69,8 @@ class PlanApiIntegrationTest extends IntegrationTest {
         mockMvc.perform(get("/api/me/plan").with(userJwt()))
                 .andExpect(jsonPath("$.plan").value("PRO"))
                 .andExpect(jsonPath("$.planExpiresAt").value(ended.toString()))
-                .andExpect(jsonPath("$.usage.aiQuery.limit").value(1000))
-                .andExpect(jsonPath("$.usage.paperRegistration.limit").value(100));
+                .andExpect(jsonPath("$.usage.aiQuery.limit").value(500))
+                .andExpect(jsonPath("$.usage.paperRegistration.limit").value(20));
     }
 
     @Test

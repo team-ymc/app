@@ -50,8 +50,8 @@ class UsageServiceTest extends IntegrationTest {
     @Test
     @DisplayName("AI 질의 한도 초과는 CHAT_USAGE_LIMIT_EXCEEDED")
     void chatLimitCode() {
-        // Free AI 질의 100회를 원장으로 채운 뒤 101번째 예약
-        for (int i = 0; i < 100; i++) {
+        // Free AI 질의 30회를 원장으로 채운 뒤 31번째 예약
+        for (int i = 0; i < 30; i++) {
             tx.executeWithoutResult(s -> usageService.reserve(
                     TEST_USER_ID, UsageType.AI_QUERY, UUID.randomUUID(), UsageSourceType.CHAT_MESSAGE));
         }

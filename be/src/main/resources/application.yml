@@ -98,11 +98,11 @@ paper:
 plan:
   policy:
     free:
-      ai-query: { mode: MONTHLY, limit: 100 }
+      ai-query: { mode: MONTHLY, limit: 30 }
       paper-registration: { mode: MONTHLY, limit: 3 }
     pro:
-      ai-query: { mode: MONTHLY, limit: 1000 }
-      paper-registration: { mode: MONTHLY, limit: 100 }
+      ai-query: { mode: MONTHLY, limit: 500 }
+      paper-registration: { mode: MONTHLY, limit: 20 }
   chat:
     max-active-sessions: 3           # 사용자당 동시 GENERATING 세션 상한 (플랜 공통)
   cleanup:
