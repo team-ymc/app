@@ -6,6 +6,7 @@ import './design/global.css';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import LandingPage from './routes/LandingPage';
+import PlansPage from './routes/PlansPage';
 import BookshelfPage from './routes/BookshelfPage';
 import StudyPage from './routes/StudyPage';
 import KnowledgeGraphPage from './routes/KnowledgeGraphPage';
@@ -14,7 +15,7 @@ import ComingSoonPage from './routes/ComingSoonPage';
 const queryClient = new QueryClient();
 const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
-  { path: '/plans', element: <ComingSoonPage eyebrow="Plans" /> },
+  { path: '/plans', element: <PlansPage /> },
   { path: '/features', element: <ComingSoonPage eyebrow="Features" /> },
   {
     element: <RequireAuth />,
