@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useQueryClient } from '@tanstack/react-query';
 import { bootstrap, login, logout, onSessionExpired } from '../api/auth';
 import type { AuthUser } from '../api/types';
+import { isDevPreview, previewUser } from '../dev/preview';
 
 interface AuthContextValue {
   status: 'loading' | 'guest' | 'authed';
@@ -21,11 +22,14 @@ function loginErrorMessage(code: string): string {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<Pick<AuthContextValue, 'status' | 'user'>>({ status: 'loading', user: null });
+  const [state, setState] = useState<Pick<AuthContextValue, 'status' | 'user'>>(
+    isDevPreview ? { status: 'authed', user: previewUser } : { status: 'loading', user: null },
+  );
   const [initialError, setInitialError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (isDevPreview) return;
     const params = new URLSearchParams(window.location.search);
     const errorCode = params.get('error');
     if (errorCode) {
@@ -43,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const startLogin = useCallback(() => {
+    if (isDevPreview) {
+      setState({ status: 'authed', user: previewUser });
+      return;
+    }
     login({
       onComplete: (user, error) => {
         if (user) setState({ status: 'authed', user });
@@ -52,6 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    if (isDevPreview) {
+      queryClient.clear();
+      setState({ status: 'guest', user: null });
+      return;
+    }
     try { await logout(); } catch { /* 로컬 세션은 정리 — 쿠키는 다음 refresh 실패로 소멸 */ }
     // 재로그인 시 이전 사용자 캐시 노출 방지.
     queryClient.clear();
