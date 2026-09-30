@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.hibernate.annotations.DynamicUpdate;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -19,8 +21,11 @@ import lombok.Getter;
  *
  * <p>상태는 연결된 {@link Document}가 소유하고 조회 시 파생한다 ({@link
  * com.ymc.paper.service.PaperDocumentViews}) — 엔티티에는 생성 불변식만 남는다.
+ *
+ * <p>이름 변경·접근 기록 같은 엔티티 저장이 bulk UPDATE로 바뀐 failed_at·document_id를 옛 값으로 덮지 않도록 바뀐 컬럼만 쓴다.
  */
 @Getter
+@DynamicUpdate
 @Entity
 @Table(name = "paper")
 public class Paper {
@@ -74,6 +79,14 @@ public class Paper {
     /** 논리 삭제 시각. 값이 있으면 사용자 경로에서 보이지 않는다. 내부 정산·정리 경로는 그대로 본다. */
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    /** 환불된 시각. 값이 있으면 Document 상태와 무관하게 실패로 보인다. 재시도가 다시 예약하며 지운다. */
+    @Column(name = "failed_at")
+    private Instant failedAt;
+
+    /** 환불 당시의 실패 코드. 내부 기록용이라 API 응답에는 나가지 않는다. */
+    @Column(name = "failed_error_code")
+    private String failedErrorCode;
 
     protected Paper() {
         // JPA

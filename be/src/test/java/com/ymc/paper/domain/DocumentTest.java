@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class DocumentTest {
 
@@ -50,5 +52,29 @@ class DocumentTest {
         assertThat(doc.translationStatus()).isEqualTo(TranslationStatus.PENDING);
         doc.recordSourceLanguage("ko");
         assertThat(doc.translationStatus()).isEqualTo(TranslationStatus.NOT_APPLICABLE);
+    }
+
+    @Test
+    @DisplayName("파싱 시도가 상한 미만이면 남은 횟수가 있다")
+    void parseAttemptsLeftBelowMax() {
+        Document document = Document.create(
+                UUID.randomUUID(), "checksum", "uploads/x/original.pdf", UUID.randomUUID(), Instant.now());
+        ReflectionTestUtils.setField(document, "attempt", Document.MAX_ATTEMPTS - 1);
+        assertThat(document.parseAttemptsLeft()).isTrue();
+
+        ReflectionTestUtils.setField(document, "attempt", Document.MAX_ATTEMPTS);
+        assertThat(document.parseAttemptsLeft()).isFalse();
+    }
+
+    @Test
+    @DisplayName("컴파일 시도는 파싱 시도와 따로 센다")
+    void compileAttemptsCountedSeparately() {
+        Document document = Document.create(
+                UUID.randomUUID(), "checksum", "uploads/x/original.pdf", UUID.randomUUID(), Instant.now());
+        ReflectionTestUtils.setField(document, "attempt", Document.MAX_ATTEMPTS);
+        ReflectionTestUtils.setField(document, "compileAttempt", 1);
+
+        assertThat(document.parseAttemptsLeft()).isFalse();
+        assertThat(document.compileAttemptsLeft()).isTrue();
     }
 }
