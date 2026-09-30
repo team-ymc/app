@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.ymc.paper.domain.PaperFailReason;
 import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.PaperListView;
 
@@ -16,10 +17,11 @@ public record PaperListResponse(List<Item> papers) {
 
     /** 계약 `PaperListItem`. */
     public record Item(UUID paperId, String title, String filename, PaperStatus status,
-                       Instant createdAt, Instant updatedAt, Instant lastAccessedAt) {
+                       Instant createdAt, Instant updatedAt, Instant lastAccessedAt,
+                       PaperFailReason failReason) {
         public static Item from(PaperListView v) {
             return new Item(v.paperId(), v.title(), v.filename(), v.status(), v.createdAt(), v.updatedAt(),
-                    v.lastAccessedAt());
+                    v.lastAccessedAt(), v.failReason());
         }
     }
 }
