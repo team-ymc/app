@@ -46,7 +46,7 @@ public class PrerequisiteHighlightBackfill {
         List<Document> targets = documentRepository.findAllCompiledWithoutPrerequisiteHighlights();
         int filled = 0;
         for (Document document : targets) {
-            String manifestKey = "papers/" + document.getRequestPaperId() + "/manifest.json";
+            String manifestKey = PaperPackageKeys.manifestKey(document.getRequestPaperId());
             try {
                 if (ingestService.ingest(document.getId(), manifestKey) > 0) {
                     filled++;

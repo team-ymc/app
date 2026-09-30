@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.Paper;
@@ -54,6 +55,7 @@ public class PaperRetryTransitions {
         return switch (status) {
             case FAILED -> beginParsing(paper, document);
             case UPLOADED, PROCESSING -> RetryStart.of(Kind.WAITING, document);
+            case COMPLETED -> beginCompile(document);
             default -> throw notRetryable();
         };
     }
@@ -87,6 +89,27 @@ public class PaperRetryTransitions {
                 yield RetryStart.of(Kind.PUBLISH_PARSE, document);
             }
         };
+    }
+
+    /** 파싱은 이미 확정됐다 — 사용량과 환불 표시는 건드리지 않는다. */
+    private RetryStart beginCompile(Document document) {
+        CompileStatus compile = document.getCompileStatus();
+        if (compile == CompileStatus.REQUESTED) {
+            return RetryStart.of(Kind.WAITING, document);
+        }
+        if (compile != CompileStatus.FAILED) {
+            throw notRetryable();
+        }
+        if (!document.compileAttemptsLeft()) {
+            throw new ApiException(ErrorCode.RETRY_LIMIT_EXCEEDED,
+                    "번역과 지식 그래프를 더 이상 다시 만들 수 없습니다.");
+        }
+        if (documentRepository.markCompileRetrying(
+                document.getId(), Document.MAX_ATTEMPTS) != 1) {
+            throw new IllegalStateException(
+                    "잠금 안에서 컴파일 재요청 전이가 실패했습니다: documentId=" + document.getId());
+        }
+        return RetryStart.of(Kind.PUBLISH_COMPILE, document);
     }
 
     /** 다시 예약하고 환불 표시를 지운다. 한도가 찼으면 예외로 끝나 아무것도 바뀌지 않는다. */

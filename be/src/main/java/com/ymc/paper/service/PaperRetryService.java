@@ -26,6 +26,7 @@ public class PaperRetryService {
 
     private final PaperRetryTransitions transitions;
     private final DocumentParsingStarter parsingStarter;
+    private final KnowledgeCompileStarter compileStarter;
     private final PaperRepository paperRepository;
     private final PaperDocumentViews views;
 
@@ -36,6 +37,8 @@ public class PaperRetryService {
         if (start.kind() == Kind.PUBLISH_PARSE) {
             parsingStarter.publishRetry(
                     start.documentId(), start.requestPaperId(), start.fileKey());
+        } else if (start.kind() == Kind.PUBLISH_COMPILE) {
+            compileStarter.publishRetry(start.documentId(), start.requestPaperId());
         }
         Paper paper = paperRepository.findActiveById(paperId).orElseThrow(() ->
                 new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId));
