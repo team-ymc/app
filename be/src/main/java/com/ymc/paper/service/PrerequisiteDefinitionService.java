@@ -20,9 +20,9 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentContentRepository;
 import com.ymc.paper.domain.DocumentPrerequisiteHighlight;
 import com.ymc.paper.domain.DocumentPrerequisiteHighlightRepository;
-import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.infra.ai.PrerequisiteDefinitionProperties;
 import com.ymc.paper.service.port.PrerequisiteDefinitionCache;
 import com.ymc.paper.service.port.PrerequisiteDefinitionGenerator;
@@ -109,7 +109,7 @@ public class PrerequisiteDefinitionService {
         }
         Document document = views.documentOf(paper).orElseThrow(
                 () -> new ApiException(ErrorCode.PREREQUISITE_NOT_READY, "논문이 아직 준비되지 않았습니다."));
-        if (document.getStatus() != DocumentStatus.COMPLETED
+        if (PaperDocumentViews.derivedStatus(paper, document) != PaperStatus.COMPLETED
                 || document.getCompileStatus() != CompileStatus.COMPLETED
                 || contentRepository.findById(document.getId()).isEmpty()) {
             throw new ApiException(ErrorCode.PREREQUISITE_NOT_READY, "선행지식이 아직 준비되지 않았습니다.");

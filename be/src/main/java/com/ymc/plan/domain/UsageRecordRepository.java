@@ -40,4 +40,19 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecord, UUID> 
     int settleAll(@Param("usageType") UsageType usageType,
             @Param("sourceIds") Collection<UUID> sourceIds,
             @Param("to") UsageRecordStatus to, @Param("now") Instant now);
+
+    /**
+     * 환불된 기록을 주어진 버킷으로 옮기며 다시 예약한다. RELEASED일 때만 1 row.
+     * bucket_id는 엔티티 저장으로는 바뀌지 않게 매핑돼 있어 네이티브 UPDATE로 옮긴다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            update usage_record
+               set status = 'RESERVED', bucket_id = :bucketId, updated_at = :now
+             where usage_type = :usageType
+               and source_id = :sourceId
+               and status = 'RELEASED'
+            """, nativeQuery = true)
+    int reReserve(@Param("usageType") String usageType, @Param("sourceId") UUID sourceId,
+            @Param("bucketId") UUID bucketId, @Param("now") Instant now);
 }

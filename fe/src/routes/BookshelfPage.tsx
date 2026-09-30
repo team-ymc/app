@@ -26,6 +26,8 @@ import { ApiError } from '../api/types';
 import PaperRowMenu from './bookshelf/PaperRowMenu';
 import PaperTitleEditor from './bookshelf/PaperTitleEditor';
 import ConfirmDialog from './bookshelf/ConfirmDialog';
+import FailedRowStatus from './bookshelf/FailedRowStatus';
+import { useRetryPaper } from './bookshelf/useRetryPaper';
 import { simulatedProgress } from './bookshelf/simulatedProgress';
 import { GlobalNav } from '../nav/GlobalNav';
 import type { Paper, PaperStatus } from '../api/types';
@@ -79,6 +81,7 @@ export default function BookshelfPage() {
     setToast(text);
     toastTimerRef.current = setTimeout(() => setToast(null), TOAST_DURATION_MS);
   }
+  const { retryingId, retry } = useRetryPaper(showToast);
 
   // StudyPage 진입 가드(비-COMPLETED → /library) 등, 다른 라우트가 라우터 state로 넘긴 토스트 메시지를 표시한다.
   // 표시 후 state를 비워 뒤로가기/새로고침에서 재노출되지 않게 한다 (Task 12).
@@ -102,7 +105,9 @@ export default function BookshelfPage() {
       return;
     }
     if (paper.status === 'FAILED' || paper.status === 'EXPIRED') {
-      showToast('분석에 실패한 논문입니다');
+      showToast(paper.failReason === 'PROCESSING_FAILED'
+        ? '분석에 실패한 논문입니다. 다시 시도를 눌러 주세요'
+        : '분석에 실패한 논문입니다');
       return;
     }
     showToast('아직 분석 중인 논문입니다');
@@ -333,6 +338,8 @@ export default function BookshelfPage() {
                     onRenameSave={(name) => handleRenameSave(paper, name)}
                     onRenameCancel={() => setRenamingId(null)}
                     onDeleteRequest={() => setDeleteTarget(paper)}
+                    retrying={retryingId === paper.paperId}
+                    onRetry={() => retry(paper)}
                   />
                 ))}
               </div>
@@ -349,6 +356,8 @@ export default function BookshelfPage() {
                     onRenameSave={(name) => handleRenameSave(paper, name)}
                     onRenameCancel={() => setRenamingId(null)}
                     onDeleteRequest={() => setDeleteTarget(paper)}
+                    retrying={retryingId === paper.paperId}
+                    onRetry={() => retry(paper)}
                   />
                 ))}
               </div>
@@ -529,7 +538,9 @@ function SimulatedProgressBar({ createdAt, completing = false }: { createdAt: st
   );
 }
 
-function StatusBadge({ paper }: { paper: Paper }) {
+function StatusBadge({ paper, retrying, onRetry, stacked = false }: {
+  paper: Paper; retrying: boolean; onRetry: () => void; stacked?: boolean;
+}) {
   const backendPhase = statusPhase(paper.status);
   const [visualPhase, setVisualPhase] = useState<RowPhase>(backendPhase);
   const [completing, setCompleting] = useState(false);
@@ -557,11 +568,7 @@ function StatusBadge({ paper }: { paper: Paper }) {
     );
   }
   if (visualPhase === 'failed') {
-    return (
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, color: 'var(--color-danger)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-        실패
-      </span>
-    );
+    return <FailedRowStatus paper={paper} retrying={retrying} onRetry={onRetry} stacked={stacked} />;
   }
   return <SimulatedProgressBar createdAt={paper.createdAt} completing={completing} />;
 }
@@ -575,9 +582,11 @@ interface PaperItemProps {
   onRenameSave: (title: string) => void;
   onRenameCancel: () => void;
   onDeleteRequest: () => void;
+  retrying: boolean;
+  onRetry: () => void;
 }
 
-function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, onRenameSave, onRenameCancel, onDeleteRequest }: PaperItemProps) {
+function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, onRenameSave, onRenameCancel, onDeleteRequest, retrying, onRetry }: PaperItemProps) {
   const [hover, setHover] = useState(false);
   return (
     <div
@@ -635,13 +644,13 @@ function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, on
           onCancel={onRenameCancel}
         />
       </div>
-      <StatusBadge paper={paper} />
+      <StatusBadge paper={paper} retrying={retrying} onRetry={onRetry} />
       <PaperRowMenu paper={paper} onDownload={onDownload} onRename={onRenameStart} onDelete={onDeleteRequest} />
     </div>
   );
 }
 
-function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, onRenameSave, onRenameCancel, onDeleteRequest }: PaperItemProps) {
+function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, onRenameSave, onRenameCancel, onDeleteRequest, retrying, onRetry }: PaperItemProps) {
   return (
     <div
       role="button"
@@ -700,7 +709,7 @@ function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, o
           onCancel={onRenameCancel}
         />
       </div>
-      <StatusBadge paper={paper} />
+      <StatusBadge paper={paper} retrying={retrying} onRetry={onRetry} stacked />
     </div>
   );
 }

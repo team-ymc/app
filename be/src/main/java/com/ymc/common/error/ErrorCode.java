@@ -70,6 +70,12 @@ public enum ErrorCode {
     /** 문서 등록 월간 사용량 한도 초과 (FT-011) */
     PAPER_USAGE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS),
 
+    /** 재시도할 실패가 없는 논문 */
+    PAPER_NOT_RETRYABLE(HttpStatus.CONFLICT),
+
+    /** 같은 파일의 시도 횟수를 모두 씀 */
+    RETRY_LIMIT_EXCEEDED(HttpStatus.CONFLICT),
+
     /** 지식 그래프가 아직 준비되지 않음 — PENDING·FAILED·Document 연결 전 (FT-009) */
     KNOWLEDGE_GRAPH_NOT_READY(HttpStatus.CONFLICT),
 

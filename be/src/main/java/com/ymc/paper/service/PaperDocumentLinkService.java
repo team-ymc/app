@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * complete의 "checksum → Document 결정 + Paper 연결"을 한 트랜잭션으로 처리한다.
  * 생성 경쟁의 패자는 ON CONFLICT 0 row로 감지해 기존 Document 연결로 전환한다.
+ * 연결한 Document가 실패 상태면 닫지 않고 재처리를 시작한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,8 +32,12 @@ public class PaperDocumentLinkService {
     private final PaperRepository paperRepository;
     private final UsageService usageService;
 
-    /** duplicateOfPaperId가 있으면 연결하지 않고 이 Paper를 제거한 것이다. */
-    public record LinkOutcome(Document document, boolean linkedToExisting, UUID duplicateOfPaperId) {
+    /**
+     * duplicateOfPaperId가 있으면 연결하지 않고 이 Paper를 제거한 것이다.
+     * retryStarted가 true면 실패한 Document의 재처리를 이 트랜잭션이 시작했고, 호출자가 커밋 뒤 발행한다.
+     */
+    public record LinkOutcome(Document document, boolean linkedToExisting, UUID duplicateOfPaperId,
+            boolean retryStarted) {
     }
 
     @Transactional
@@ -53,7 +58,7 @@ public class PaperDocumentLinkService {
         if (!sameOwnerPaperIds.isEmpty()) {
             paperRepository.markDeleted(paperId, now);
             usageService.release(UsageType.PAPER_REGISTRATION, paperId);
-            return new LinkOutcome(document, true, sameOwnerPaperIds.get(0));
+            return new LinkOutcome(document, true, sameOwnerPaperIds.get(0), false);
         }
         int linked = paperRepository.linkDocument(paperId, document.getId(), now);
         if (linked == 0) {
@@ -62,9 +67,28 @@ public class PaperDocumentLinkService {
         if (document.getStatus() == DocumentStatus.COMPLETED) {
             usageService.confirm(UsageType.PAPER_REGISTRATION, paperId, null);
         } else if (document.getStatus() == DocumentStatus.FAILED) {
+            if (restartFailed(document, paperId, now)) {
+                return new LinkOutcome(document, !created, null, true);
+            }
             usageService.release(UsageType.PAPER_REGISTRATION, paperId);
+            paperRepository.markFailed(paperId, document.getErrorCode(), now);
         }
-        return new LinkOutcome(document, !created, null);
+        return new LinkOutcome(document, !created, null, false);
+    }
+
+    /**
+     * 실패한 Document의 파싱을 다시 시작한다. 판정과 전이를 연결 트랜잭션 안, Document 잠금 아래에 둔다 —
+     * 밖에서 하면 그 사이 횟수가 차서 예약만 남는다.
+     *
+     * @return 시도 횟수가 남아 재처리를 시작했으면 true
+     */
+    private boolean restartFailed(Document document, UUID paperId, Instant now) {
+        if (!document.parseAttemptsLeft()) {
+            return false;
+        }
+        paperRepository.markFailedOthers(document.getId(), paperId, document.getErrorCode(), now);
+        return documentRepository.markRetrying(
+                document.getId(), Document.MAX_ATTEMPTS, now) == 1;
     }
 
     /** 연결 CAS 0행의 원인을 구분한다 — 동일 Document면 멱등, 만료·대체됐으면 complete를 중단한다. */

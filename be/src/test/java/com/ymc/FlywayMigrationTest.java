@@ -23,7 +23,7 @@ class FlywayMigrationTest {
 
             Flyway flyway = flyway(postgres);
 
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
             assertThat(count(postgres,
                     "select count(*) from flyway_schema_history where version = '0' and type = 'BASELINE'"))
                     .isZero();
@@ -34,9 +34,18 @@ class FlywayMigrationTest {
                     "select count(*) from flyway_schema_history where version = '2' and success"))
                     .isEqualTo(1);
             assertThat(count(postgres,
+                    "select count(*) from flyway_schema_history where version = '3' and success"))
+                    .isEqualTo(1);
+            assertThat(count(postgres,
                     "select count(*) from information_schema.tables "
                             + "where table_schema = 'public' and table_name in "
                             + "('paper', 'users', 'usage_record', 'document_prerequisite_highlight')"))
+                    .isEqualTo(4);
+            assertThat(count(postgres,
+                    "select count(*) from information_schema.columns "
+                            + "where table_schema = 'public' and ("
+                            + "(table_name = 'paper' and column_name in ('failed_at', 'failed_error_code')) or "
+                            + "(table_name = 'document' and column_name in ('attempt', 'compile_attempt')))"))
                     .isEqualTo(4);
         }
     }
@@ -50,7 +59,7 @@ class FlywayMigrationTest {
 
             Flyway flyway = flyway(postgres);
 
-            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
             assertThat(count(postgres,
                     "select count(*) from flyway_schema_history where version = '0' and type = 'BASELINE'"))
                     .isEqualTo(1);
@@ -59,6 +68,9 @@ class FlywayMigrationTest {
                     .isEqualTo(1);
             assertThat(count(postgres,
                     "select count(*) from flyway_schema_history where version = '2' and success"))
+                    .isEqualTo(1);
+            assertThat(count(postgres,
+                    "select count(*) from flyway_schema_history where version = '3' and success"))
                     .isEqualTo(1);
             assertThat(count(postgres,
                     "select count(*) from information_schema.columns "

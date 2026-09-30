@@ -11,6 +11,7 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.KnowledgeGraphStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.PresignedDownload;
 
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,9 @@ public class KnowledgeGraphViewService {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
         Document document = views.documentOf(paper).orElse(null);
-        if (document == null || document.knowledgeGraphStatus() != KnowledgeGraphStatus.READY) {
+        if (document == null
+                || PaperDocumentViews.derivedStatus(paper, document) != PaperStatus.COMPLETED
+                || document.knowledgeGraphStatus() != KnowledgeGraphStatus.READY) {
             throw new ApiException(ErrorCode.KNOWLEDGE_GRAPH_NOT_READY, "지식 그래프가 아직 준비되지 않았습니다: " + paperId);
         }
         return assetUrlCache.issue(document.getKnowledgeGraphKey());

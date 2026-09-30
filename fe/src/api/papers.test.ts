@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createPaper, completeUpload, getStatus, getDownloadUrl, uploadToS3, listPapers, fetchPaperContent,
-  renamePaper, deletePaper, getKnowledgeGraphView,
+  renamePaper, deletePaper, getKnowledgeGraphView, retryPaper,
 } from './papers';
 
 function mockFetch({ ok = true, status = 200, body = {} }: { ok?: boolean; status?: number; body?: unknown }) {
@@ -99,6 +99,19 @@ describe('api.js — fetch 계열', () => {
     await expect(createPaper('a.pdf', 'application/pdf', 1234, 'ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=')).rejects.toMatchObject({
       code: 'PAPER_USAGE_LIMIT_EXCEEDED', httpStatus: 429, message: '중복',
     });
+  });
+
+  it('retryPaper: POST /retry → 상태 응답', async () => {
+    mockFetch({ body: { paperId: 'p1', status: 'PROCESSING', failReason: null, compileRetryable: false } });
+    const res = await retryPaper('p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/papers/p1/retry',
+      expect.objectContaining({ method: 'POST' }));
+    expect(res.status).toBe('PROCESSING');
+  });
+
+  it('retryPaper: 409는 ApiError(code)로 던진다', async () => {
+    mockFetch({ ok: false, status: 409, body: { code: 'RETRY_LIMIT_EXCEEDED', message: '처리할 수 없는 파일입니다.' } });
+    await expect(retryPaper('p1')).rejects.toMatchObject({ code: 'RETRY_LIMIT_EXCEEDED', httpStatus: 409 });
   });
 });
 

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.ymc.paper.domain.CompileStatus;
 import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.DocumentStatus;
@@ -47,6 +48,30 @@ public class KnowledgeCompileStarter {
         }
         log.info("컴파일 요청 발행: documentId={}, requestPaperId={}, manifestKey={}",
                 documentId, document.getRequestPaperId(), manifestKey);
+    }
+
+    /** 컴파일 재요청 전이를 마친 Document의 요청을 발행한다. 실패하면 컴파일을 다시 실패로 닫는다. */
+    public void publishRetry(UUID paperId, UUID documentId, UUID requestPaperId) {
+        String manifestKey = PaperPackageKeys.manifestKey(requestPaperId);
+        try {
+            publisher.publish(requestPaperId, manifestKey);
+        } catch (RuntimeException e) {
+            closeFailedBestEffort(documentId);
+            log.warn("재시도 컴파일 요청 발행 실패, 실패로 닫음: paperId={}, documentId={}, requestPaperId={}",
+                    paperId, documentId, requestPaperId, e);
+            throw e;
+        }
+        log.info("재시도 컴파일 요청 발행: paperId={}, documentId={}, requestPaperId={}, manifestKey={}",
+                paperId, documentId, requestPaperId, manifestKey);
+    }
+
+    private void closeFailedBestEffort(UUID documentId) {
+        try {
+            transitions.markCompiled(documentId, CompileStatus.FAILED, DocumentTransitions.PUBLISH_FAILED, null);
+        } catch (RuntimeException closeFailure) {
+            log.warn("재시도 컴파일 실패 기록 실패, REQUESTED 정체 가능: documentId={}",
+                    documentId, closeFailure);
+        }
     }
 
     private void revertBestEffort(UUID documentId) {

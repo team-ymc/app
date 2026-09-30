@@ -33,6 +33,11 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("select d from Document d where d.requestPaperId = :requestPaperId")
     Optional<Document> findWithLockByRequestPaperId(@Param("requestPaperId") UUID requestPaperId);
 
+    /** 재시도 직렬화용 잠금 조회. 정산·연결이 잡는 것과 같은 행이다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Document d where d.id = :id")
+    Optional<Document> findWithLockById(@Param("id") UUID id);
+
     /**
      * checksum·requestPaperId 유일성을 지키는 생성. unique 위반 예외에 의존하면 PostgreSQL이
      * 트랜잭션을 abort시켜 같은 Tx에서 기존-Document 경로로 전환할 수 없으므로
@@ -59,6 +64,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("""
             update Document d
                set d.status = com.ymc.paper.domain.DocumentStatus.PROCESSING,
+                   d.attempt = d.attempt + 1,
                    d.updatedAt = :now
              where d.id = :id
                and d.status = com.ymc.paper.domain.DocumentStatus.UPLOADED
@@ -75,6 +81,24 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
                and d.status = com.ymc.paper.domain.DocumentStatus.PROCESSING
             """)
     int revertToUploaded(@Param("id") UUID id, @Param("now") Instant now);
+
+    /**
+     * 실패한 Document의 파싱을 다시 시작한다. 시도 횟수가 남았을 때만 1 row.
+     * updated_at을 갱신하지 않으면 정체 정리가 옛 시각을 보고 곧바로 실패 처리한다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+               set d.status = com.ymc.paper.domain.DocumentStatus.PROCESSING,
+                   d.errorCode = null,
+                   d.attempt = d.attempt + 1,
+                   d.updatedAt = :now
+             where d.id = :id
+               and d.status = com.ymc.paper.domain.DocumentStatus.FAILED
+               and d.attempt < :maxAttempts
+            """)
+    int markRetrying(@Param("id") UUID id, @Param("maxAttempts") int maxAttempts,
+            @Param("now") Instant now);
 
     /** 결과 수신 전이. UPLOADED 포함 — PROCESSING 커밋 전에 결과가 도착하는 경합을 흡수한다. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -97,7 +121,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Document d
-               set d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED
+               set d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED,
+                   d.compileAttempt = d.compileAttempt + 1
              where d.id = :id
                and d.compileStatus is null
             """)
@@ -112,6 +137,19 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
                and d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED
             """)
     int revertCompileRequested(@Param("id") UUID id);
+
+    /** 실패한 컴파일을 다시 요청한다. 컴파일 시도 횟수가 남았을 때만 1 row. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+               set d.compileStatus = com.ymc.paper.domain.CompileStatus.REQUESTED,
+                   d.compileErrorCode = null,
+                   d.compileAttempt = d.compileAttempt + 1
+             where d.id = :id
+               and d.compileStatus = com.ymc.paper.domain.CompileStatus.FAILED
+               and d.compileAttempt < :maxAttempts
+            """)
+    int markCompileRetrying(@Param("id") UUID id, @Param("maxAttempts") int maxAttempts);
 
     /** 컴파일 결과 수신 종결. null 포함 — 선점 커밋 전에 결과가 도착하는 경합을 흡수한다. 종결 뒤에는 키도 바꾸지 않는다. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)

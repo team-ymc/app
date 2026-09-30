@@ -11,8 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * 상태는 Paper가 아니라 연결된 {@link Document}가 소유한다 — Paper 자신의 전이는
- * document 연결(CAS) 하나뿐이다.
+ * 처리 상태는 연결된 {@link Document}가 소유한다. Paper가 갖는 것은 document 연결과
+ * 환불 여부(failed_at)다.
  */
 public interface PaperRepository extends JpaRepository<Paper, UUID> {
 
@@ -80,8 +80,57 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     List<UUID> findSameOwnerActiveIds(@Param("ownerId") UUID ownerId,
             @Param("documentId") UUID documentId, @Param("paperId") UUID paperId);
 
-    @Query("select p.id from Paper p where p.documentId = :documentId")
-    List<UUID> findIdsByDocumentId(@Param("documentId") UUID documentId);
+    /** 정산 대상 — 아직 환불되지 않은 Paper. 삭제된 행도 포함한다. */
+    @Query("select p.id from Paper p where p.documentId = :documentId and p.failedAt is null")
+    List<UUID> findUnfailedIdsByDocumentId(@Param("documentId") UUID documentId);
+
+    /** 실패 정산 표시. 이미 표시된 Paper의 시각과 코드는 덮어쓰지 않는다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = :now, p.failedErrorCode = :errorCode, p.updatedAt = :now
+             where p.documentId = :documentId
+               and p.failedAt is null
+            """)
+    int markFailedByDocumentId(@Param("documentId") UUID documentId,
+            @Param("errorCode") String errorCode, @Param("now") Instant now);
+
+    /**
+     * 재시도가 시작될 때 같은 Document의 다른 Paper 중 환불 표시가 빠진 것을 채운다.
+     * Document가 실패를 벗어나는 길이 이 시점 하나라 여기서 채우면 빠지는 Paper가 없다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = :now, p.failedErrorCode = :errorCode, p.updatedAt = :now
+             where p.documentId = :documentId
+               and p.id <> :exceptPaperId
+               and p.failedAt is null
+            """)
+    int markFailedOthers(@Param("documentId") UUID documentId,
+            @Param("exceptPaperId") UUID exceptPaperId,
+            @Param("errorCode") String errorCode, @Param("now") Instant now);
+
+    /** Paper 하나에 환불 표시. 시도 횟수를 모두 쓴 Document에 새로 연결될 때 쓴다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = :now, p.failedErrorCode = :errorCode, p.updatedAt = :now
+             where p.id = :paperId
+               and p.failedAt is null
+            """)
+    int markFailed(@Param("paperId") UUID paperId,
+            @Param("errorCode") String errorCode, @Param("now") Instant now);
+
+    /** 재시도가 다시 예약하며 환불 표시를 지운다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = null, p.failedErrorCode = null, p.updatedAt = :now
+             where p.id = :paperId
+               and p.failedAt is not null
+            """)
+    int clearFailed(@Param("paperId") UUID paperId, @Param("now") Instant now);
 
     /** 정리 스케줄러의 정체 UPLOAD_PENDING 스캔 — document 미연결, 아직 만료 전. */
     @Query("""

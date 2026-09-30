@@ -95,8 +95,8 @@ class PaperUsageIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("FAILED document 재사용 연결은 즉시 release")
-    void reuseFailedReleases() {
+    @DisplayName("FAILED document 재사용 연결은 예약을 유지하고 파싱을 다시 시작한다")
+    void reuseFailedRestartsParsing() {
         Paper first = givenReservedPendingPaper("origin.pdf");
         Document document = givenLinkedDocument(first);
         documentTransitions.markProcessing(document.getId());
@@ -108,11 +108,44 @@ class PaperUsageIntegrationTest extends IntegrationTest {
                 Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
         tx.executeWithoutResult(s -> usageService.reserve(
                 OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
-        tx.executeWithoutResult(s -> linkService.linkOrCreate(
+        PaperDocumentLinkService.LinkOutcome outcome = tx.execute(s -> linkService.linkOrCreate(
                 second.getId(), second.getOwnerId(), second.getFileKey(),
                 document.getChecksumSha256()));
 
+        assertThat(outcome.retryStarted()).isTrue();
+        assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.RESERVED);
+        assertThat(reload(second.getId()).getFailedAt()).isNull();
+        Document after = documentRepository.findById(document.getId()).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(DocumentStatus.PROCESSING);
+        assertThat(after.getAttempt()).isEqualTo(2);
+        assertThat(recordStatusOf(first.getId())).isEqualTo(UsageRecordStatus.RELEASED);
+        assertThat(reload(first.getId()).getFailedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("시도 횟수를 모두 쓴 FAILED document 연결은 즉시 해제하고 실패로 표시한다")
+    void reuseExhaustedFailedReleases() {
+        Paper first = givenReservedPendingPaper("origin.pdf");
+        Document document = givenLinkedDocument(first);
+        documentTransitions.markProcessing(document.getId());
+        tx.executeWithoutResult(s -> documentTransitions.markParsedAndSettle(
+                document.getId(), DocumentStatus.FAILED, "PARSE_FAILED"));
+        jdbcTemplate.update("update document set attempt = ? where id = ?",
+                Document.MAX_ATTEMPTS, document.getId());
+
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "reuse.pdf", Instant.now()));
+        tx.executeWithoutResult(s -> usageService.reserve(
+                OTHER_USER_ID, UsageType.PAPER_REGISTRATION, second.getId(), UsageSourceType.PAPER));
+        PaperDocumentLinkService.LinkOutcome outcome = tx.execute(s -> linkService.linkOrCreate(
+                second.getId(), second.getOwnerId(), second.getFileKey(),
+                document.getChecksumSha256()));
+
+        assertThat(outcome.retryStarted()).isFalse();
         assertThat(recordStatusOf(second.getId())).isEqualTo(UsageRecordStatus.RELEASED);
+        assertThat(reload(second.getId()).getFailedAt()).isNotNull();
+        assertThat(documentRepository.findById(document.getId()).orElseThrow().getStatus())
+                .isEqualTo(DocumentStatus.FAILED);
     }
 
     @Test

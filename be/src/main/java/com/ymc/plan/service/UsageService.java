@@ -66,29 +66,50 @@ public class UsageService {
             }
             return; // 같은 실행의 재전달 — 이미 예약·확정됨
         }
+        UsageBucket bucket = bucketWithRoom(userId, usageType, now);
+        // 동시 같은 sourceId는 유니크 제약이 최후 방어선이다 — flush로 위반을 호출 지점에서
+        // 동기적으로 드러내 호출부 트랜잭션의 기존 방어가 받게 한다
+        recordRepository.saveAndFlush(
+                UsageRecord.reserve(bucket.getId(), usageType, sourceId, sourceType, now));
+    }
+
+    /**
+     * 환불된 기록을 지금 달의 한도 안에서 다시 예약한다. 사용자가 실패를 다시 신청하는 경로 전용이다 —
+     * 재전달 방어가 필요한 호출부는 reserve를 쓴다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reReserve(UUID userId, UsageType usageType, UUID sourceId) {
+        UsageRecord existing = recordRepository.findByUsageTypeAndSourceId(usageType, sourceId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "재예약할 사용량 기록이 없습니다: " + usageType + "/" + sourceId));
+        if (existing.getStatus() != UsageRecordStatus.RELEASED) {
+            return;
+        }
+        Instant now = Instant.now();
+        UsageBucket bucket = bucketWithRoom(userId, usageType, now);
+        recordRepository.reReserve(usageType.name(), sourceId, bucket.getId(), now);
+    }
+
+    /** 지금 달 버킷을 확보한다. 유한 정책이면 버킷을 잠근 뒤 남은 횟수를 확인한다. */
+    private UsageBucket bucketWithRoom(UUID userId, UsageType usageType, Instant now) {
         PlanCode plan = planService.effectivePlan(userId, now);
         PlanProperties.Policy policy = properties.policyOf(plan, usageType);
         Instant bucketStart = BucketPeriod.startOf(now);
         bucketRepository.insertIfAbsent(UUID.randomUUID(), userId,
                 usageType.name(), plan.name(), bucketStart, now);
 
-        UsageBucket bucket;
-        if (policy.mode() == PolicyMode.MONTHLY) {
-            bucket = bucketRepository
-                    .findWithLock(userId, usageType, plan, bucketStart).orElseThrow();
-            long used = recordRepository.countByBucketIdAndStatusIn(bucket.getId(), ACTIVE);
-            if (used >= policy.limit()) {
-                throw limitExceeded(usageType);
-            }
-        } else {
-            bucket = bucketRepository
+        if (policy.mode() != PolicyMode.MONTHLY) {
+            return bucketRepository
                     .findByUserIdAndUsageTypeAndPlanCodeAndBucketStart(
                             userId, usageType, plan, bucketStart).orElseThrow();
         }
-        // 동시 같은 sourceId는 유니크 제약이 최후 방어선이다 — flush로 위반을 호출 지점에서
-        // 동기적으로 드러내 호출부 트랜잭션의 기존 방어가 받게 한다
-        recordRepository.saveAndFlush(
-                UsageRecord.reserve(bucket.getId(), usageType, sourceId, sourceType, now));
+        UsageBucket bucket = bucketRepository
+                .findWithLock(userId, usageType, plan, bucketStart).orElseThrow();
+        long used = recordRepository.countByBucketIdAndStatusIn(bucket.getId(), ACTIVE);
+        if (used >= policy.limit()) {
+            throw limitExceeded(usageType);
+        }
+        return bucket;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

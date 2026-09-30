@@ -29,6 +29,9 @@ import lombok.Getter;
                 name = "ux_document_request_paper", columnList = "request_paper_id", unique = true))
 public class Document {
 
+    /** 파싱과 컴파일 각각의 시도 상한. 같은 파일을 올린 모든 사용자가 함께 쓴다. */
+    public static final int MAX_ATTEMPTS = 3;
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -65,6 +68,14 @@ public class Document {
     /** 컴파일이 만든 지식 그래프(viz.html)의 S3 키. COMPLETED인데 null이면 산출물이 없다. */
     @Column(name = "knowledge_graph_key")
     private String knowledgeGraphKey;
+
+    /** 파싱을 시작한 횟수. */
+    @Column(name = "attempt", nullable = false)
+    private int attempt;
+
+    /** 컴파일을 요청한 횟수. */
+    @Column(name = "compile_attempt", nullable = false)
+    private int compileAttempt;
 
     /**
      * AI 작업 상관키 = 이 Document를 만든 최초 paperId. FK가 아니다 — 대표 Paper가 삭제돼도
@@ -114,5 +125,13 @@ public class Document {
 
     public KnowledgeGraphStatus knowledgeGraphStatus() {
         return KnowledgeGraphStatus.of(compileStatus, knowledgeGraphKey);
+    }
+
+    public boolean parseAttemptsLeft() {
+        return attempt < MAX_ATTEMPTS;
+    }
+
+    public boolean compileAttemptsLeft() {
+        return compileAttempt < MAX_ATTEMPTS;
     }
 }

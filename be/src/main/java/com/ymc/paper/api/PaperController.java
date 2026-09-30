@@ -30,6 +30,7 @@ import com.ymc.paper.service.PaperDownloadService;
 import com.ymc.paper.service.PaperListService;
 import com.ymc.paper.service.PaperManagementService;
 import com.ymc.paper.service.PaperRegistrationService;
+import com.ymc.paper.service.PaperRetryService;
 import com.ymc.paper.service.PaperStatusService;
 import com.ymc.paper.service.PaperStatusView;
 import com.ymc.paper.service.PaperUploadCompletionService;
@@ -53,6 +54,7 @@ public class PaperController {
     private final PaperContentQueryService contentQueryService;
     private final PaperManagementService managementService;
     private final PrerequisiteDefinitionService prerequisiteDefinitionService;
+    private final PaperRetryService retryService;
 
     /** 논문 레코드 생성 및 presigned 업로드 URL 발급. 소유자는 인증 주체다 (YMC-215). */
     @PostMapping
@@ -78,6 +80,13 @@ public class PaperController {
     public PaperStatusResponse status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
         UUID ownerId = UUID.fromString(jwt.getSubject());
         return toResponse(statusService.getStatus(paperId, ownerId));
+    }
+
+    /** 실패한 논문 재시도. 무엇을 다시 할지는 현재 상태로 정한다. */
+    @PostMapping("/{paperId}/retry")
+    public PaperStatusResponse retry(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID paperId) {
+        UUID ownerId = UUID.fromString(jwt.getSubject());
+        return toResponse(retryService.retry(paperId, ownerId));
     }
 
     /** 원본 PDF 다운로드 URL 발급. */
@@ -135,6 +144,7 @@ public class PaperController {
 
     private static PaperStatusResponse toResponse(PaperStatusView view) {
         return new PaperStatusResponse(view.paperId(), view.status(), view.translationStatus(),
-                view.knowledgeGraphStatus(), view.updatedAt());
+                view.knowledgeGraphStatus(), view.updatedAt(),
+                view.failReason(), view.compileRetryable());
     }
 }

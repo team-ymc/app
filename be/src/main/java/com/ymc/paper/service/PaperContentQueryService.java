@@ -17,9 +17,9 @@ import com.ymc.paper.domain.DocumentContentAssetRepository;
 import com.ymc.paper.domain.DocumentContentBlockRepository;
 import com.ymc.paper.domain.DocumentContentRepository;
 import com.ymc.paper.domain.DocumentPrerequisiteHighlightRepository;
-import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
+import com.ymc.paper.domain.PaperStatus;
 import com.ymc.paper.service.port.PresignedDownload;
 
 import lombok.RequiredArgsConstructor;
@@ -53,9 +53,10 @@ public class PaperContentQueryService {
         }
         Document document = views.documentOf(paper).orElseThrow(() ->
                 new ApiException(ErrorCode.PAPER_NOT_READY, "논문이 아직 완료 상태가 아닙니다."));
-        if (document.getStatus() != DocumentStatus.COMPLETED) {
+        PaperStatus status = PaperDocumentViews.derivedStatus(paper, document);
+        if (status != PaperStatus.COMPLETED) {
             throw new ApiException(ErrorCode.PAPER_NOT_READY,
-                    "논문이 아직 완료 상태가 아닙니다: " + document.getStatus());
+                    "논문이 아직 완료 상태가 아닙니다: " + status);
         }
         DocumentContent content = contentRepository.findById(document.getId()).orElseThrow(
                 () -> new ApiException(ErrorCode.PAPER_NOT_READY, "본문이 아직 적재되지 않았습니다."));
