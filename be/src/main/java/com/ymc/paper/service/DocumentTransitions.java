@@ -52,16 +52,18 @@ public class DocumentTransitions {
         if (terminal == null || !terminal.isTerminal()) {
             throw new IllegalArgumentException("Document 종결 상태만 허용됩니다: " + terminal);
         }
-        boolean owner = documentRepository.markParsed(documentId, terminal, errorCode,
-                Instant.now()) == 1;
+        Instant now = Instant.now();
+        boolean owner = documentRepository.markParsed(documentId, terminal, errorCode, now) == 1;
         if (!owner) {
             return false;
         }
-        List<UUID> paperIds = paperRepository.findIdsByDocumentId(documentId);
+        // 실패 표시가 남은 Paper는 이미 환불됐다 — 확정도 해제도 하지 않는다
+        List<UUID> paperIds = paperRepository.findUnfailedIdsByDocumentId(documentId);
         if (terminal == DocumentStatus.COMPLETED) {
             usageService.confirmAll(UsageType.PAPER_REGISTRATION, paperIds);
         } else {
             usageService.releaseAll(UsageType.PAPER_REGISTRATION, paperIds);
+            paperRepository.markFailedByDocumentId(documentId, errorCode, now);
         }
         return true;
     }
