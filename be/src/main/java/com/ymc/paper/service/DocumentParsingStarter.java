@@ -49,28 +49,26 @@ public class DocumentParsingStarter {
                 documentId, document.getRequestPaperId());
     }
 
-    private static final String PUBLISH_FAILED = "PUBLISH_FAILED";
-
     /**
      * 재시도 전이를 마친 Document의 요청을 발행한다. 실패하면 상태만 되돌리지 않고 실패 정산한다 —
      * 전이와 발행 사이에 합류한 Paper의 예약까지 풀어야 하기 때문이다.
      */
-    public void publishRetry(UUID documentId, UUID requestPaperId, String fileKey) {
+    public void publishRetry(UUID paperId, UUID documentId, UUID requestPaperId, String fileKey) {
         try {
             parseRequestPublisher.publish(requestPaperId, fileKey);
         } catch (RuntimeException e) {
             settleFailedBestEffort(documentId);
-            log.warn("재시도 파싱 요청 발행 실패, 실패 정산: documentId={}, requestPaperId={}",
-                    documentId, requestPaperId, e);
+            log.warn("재시도 파싱 요청 발행 실패, 실패 정산: paperId={}, documentId={}, requestPaperId={}",
+                    paperId, documentId, requestPaperId, e);
             throw e;
         }
-        log.info("재시도 파싱 요청 발행: documentId={}, requestPaperId={}",
-                documentId, requestPaperId);
+        log.info("재시도 파싱 요청 발행: paperId={}, documentId={}, requestPaperId={}",
+                paperId, documentId, requestPaperId);
     }
 
     private void settleFailedBestEffort(UUID documentId) {
         try {
-            transitions.markParsedAndSettle(documentId, DocumentStatus.FAILED, PUBLISH_FAILED);
+            transitions.markParsedAndSettle(documentId, DocumentStatus.FAILED, DocumentTransitions.PUBLISH_FAILED);
         } catch (RuntimeException settleFailure) {
             // 정산까지 실패하면 PROCESSING 정체 — 정체 정리가 실패로 닫는다
             log.warn("재시도 실패 정산 실패, 정체 가능: documentId={}", documentId, settleFailure);

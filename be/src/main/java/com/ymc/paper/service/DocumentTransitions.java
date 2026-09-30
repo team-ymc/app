@@ -25,6 +25,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DocumentTransitions {
 
+    /** 발행에 실패해 닫을 때 기록하는 실패 코드. */
+    public static final String PUBLISH_FAILED = "PUBLISH_FAILED";
+
     private final DocumentRepository documentRepository;
     private final PaperRepository paperRepository;
     private final UsageService usageService;

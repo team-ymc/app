@@ -97,7 +97,7 @@ public class PaperUploadCompletionService {
         if (outcome.retryStarted()) {
             Document document = outcome.document();
             parsingStarter.publishRetry(
-                    document.getId(), document.getRequestPaperId(), document.getFileKey());
+                    paperId, document.getId(), document.getRequestPaperId(), document.getFileKey());
         } else {
             parsingStarter.startIfUploaded(outcome.document().getId());
         }

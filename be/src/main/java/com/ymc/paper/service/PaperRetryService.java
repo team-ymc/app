@@ -36,9 +36,9 @@ public class PaperRetryService {
                 paperId, start.documentId(), start.kind());
         if (start.kind() == Kind.PUBLISH_PARSE) {
             parsingStarter.publishRetry(
-                    start.documentId(), start.requestPaperId(), start.fileKey());
+                    paperId, start.documentId(), start.requestPaperId(), start.fileKey());
         } else if (start.kind() == Kind.PUBLISH_COMPILE) {
-            compileStarter.publishRetry(start.documentId(), start.requestPaperId());
+            compileStarter.publishRetry(paperId, start.documentId(), start.requestPaperId());
         }
         Paper paper = paperRepository.findActiveById(paperId).orElseThrow(() ->
                 new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId));
