@@ -3,7 +3,6 @@
 import { type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, BookOpen } from '@phosphor-icons/react';
-import { PaperStackMark } from '../../design/components/PaperStackMark';
 import { AccountMenu } from '../../account/AccountMenu';
 import type { KnowledgeGraphStatus } from '../../api/types';
 import { knowledgeGraphDisabledReason } from './knowledgeGraphStatus';
@@ -84,8 +83,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: '0 20px 0 16px', gap: '16px' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
-          <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', letterSpacing: '-0.005em', whiteSpace: 'nowrap' }}>
             Paper Teacher
           </span>

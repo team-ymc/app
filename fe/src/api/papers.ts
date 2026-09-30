@@ -7,12 +7,24 @@ import {
   type CreatePaperResponse, type Paper, type PaperStatusResponse, type PaperContentResponse,
   type PaperUploadHeaders, type KnowledgeGraphView, type PrerequisiteDefinitionResponse,
 } from './types';
+import {
+  completePreviewUpload,
+  createPreviewPaper,
+  deletePreviewPaper,
+  getPreviewPaperContent,
+  getPreviewPaperStatus,
+  getPreviewPrerequisiteDefinition,
+  isDevPreview,
+  listPreviewPapers,
+  renamePreviewPaper,
+} from '../dev/preview';
 
 // size는 presigned PUT 서명에 박히는 정확한 바이트 수다 — 업로드가 이 값과 다르면 S3가 403으로 거절한다.
 // checksumSha256도 서명에 들어간다 — 실제 바이트의 digest와 다르면 S3가 400 BadDigest로 거절한다.
 export async function createPaper(
   filename: string, contentType: string, size: number, checksumSha256: string,
 ): Promise<CreatePaperResponse> {
+  if (isDevPreview) return createPreviewPaper(filename);
   const res = await authFetch('/api/papers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -26,6 +38,10 @@ export async function createPaper(
 export function uploadToS3(
   uploadUrl: string, file: Blob, headers: PaperUploadHeaders, onProgress?: (pct: number) => void,
 ): Promise<void> {
+  if (isDevPreview) {
+    onProgress?.(100);
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl);
@@ -47,12 +63,14 @@ export function uploadToS3(
 }
 
 export async function completeUpload(paperId: string): Promise<PaperStatusResponse> {
+  if (isDevPreview) return completePreviewUpload(paperId);
   const res = await authFetch(`/api/papers/${paperId}/complete`, { method: 'POST' });
   if (!res.ok) throw await apiError(res);
   return res.json(); // { paperId, status, updatedAt }
 }
 
 export async function getStatus(paperId: string): Promise<PaperStatusResponse> {
+  if (isDevPreview) return getPreviewPaperStatus(paperId);
   const res = await authFetch(`/api/papers/${paperId}/status`);
   if (!res.ok) throw await apiError(res);
   return res.json(); // { paperId, status, updatedAt }
@@ -81,6 +99,7 @@ export async function getKnowledgeGraphView(paperId: string): Promise<KnowledgeG
 
 // 서재 목록 (FT-002, BE는 YMC-223). D3 폐기 — 실제 목록을 받는다.
 export async function listPapers(): Promise<{ papers: Paper[] }> {
+  if (isDevPreview) return listPreviewPapers();
   const res = await authFetch('/api/papers');
   if (!res.ok) throw await apiError(res);
   return res.json(); // { papers: [{ paperId, title, filename, status, createdAt, updatedAt }] }
@@ -88,6 +107,7 @@ export async function listPapers(): Promise<{ papers: Paper[] }> {
 
 // 서재 표시 제목 변경. 원본 filename과 다운로드 저장 파일명은 바뀌지 않는다.
 export async function renamePaper(paperId: string, title: string): Promise<Paper> {
+  if (isDevPreview) return renamePreviewPaper(paperId, title);
   const res = await authFetch(`/api/papers/${paperId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -99,12 +119,14 @@ export async function renamePaper(paperId: string, title: string): Promise<Paper
 
 // 논리 삭제 (계약 0.4.0). 204라 본문이 없다.
 export async function deletePaper(paperId: string): Promise<void> {
+  if (isDevPreview) return deletePreviewPaper(paperId);
   const res = await authFetch(`/api/papers/${paperId}`, { method: 'DELETE' });
   if (!res.ok) throw await apiError(res);
 }
 
 // 파싱된 논문 본문 조회 (blocks는 globalOrder 오름차순으로 온다).
 export async function fetchPaperContent(paperId: string): Promise<PaperContentResponse> {
+  if (isDevPreview) return getPreviewPaperContent(paperId);
   const res = await authFetch(`/api/papers/${paperId}/content`);
   if (!res.ok) throw await apiError(res);
   return res.json();
@@ -116,6 +138,7 @@ export async function createPrerequisiteDefinition(
   highlightId: string,
   signal?: AbortSignal,
 ): Promise<PrerequisiteDefinitionResponse> {
+  if (isDevPreview) return getPreviewPrerequisiteDefinition(highlightId);
   const res = await authFetch(
     `/api/papers/${paperId}/prerequisite-highlights/${encodeURIComponent(highlightId)}/definition`,
     { method: 'POST', signal },

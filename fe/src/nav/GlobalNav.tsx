@@ -1,10 +1,9 @@
-// 글로벌 상단 바 — 로고 · 메뉴(플랜/기능) · 오른쪽 계정 영역. 랜딩과 서재가 같은 것을 쓴다.
+// 글로벌 상단 바 — 제품명 · 메뉴(플랜/기능) · 오른쪽 계정 영역. 랜딩과 서재가 같은 것을 쓴다.
 // 학습 페이지는 논문 제목·야간 모드가 있어 자체 상단 바를 유지한다.
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { AccountMenu } from '../account/AccountMenu';
-import { PaperStackMark } from '../design/components/PaperStackMark';
 
 export const GLOBAL_NAV_HEIGHT = 64;
 
@@ -36,8 +35,7 @@ export function GlobalNav() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '22px', height: '100%' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
-          <PaperStackMark size={22} color="var(--color-on-dark)" style={{ flexShrink: 0 }} />
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>Paper Teacher</span>
         </Link>
         <div style={{ width: '1px', height: '18px', background: 'rgba(255,253,247,0.18)', flexShrink: 0 }} />
