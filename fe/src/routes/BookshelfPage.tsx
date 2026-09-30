@@ -26,6 +26,7 @@ import { ApiError } from '../api/types';
 import PaperRowMenu from './bookshelf/PaperRowMenu';
 import PaperTitleEditor from './bookshelf/PaperTitleEditor';
 import ConfirmDialog from './bookshelf/ConfirmDialog';
+import { simulatedProgress } from './bookshelf/simulatedProgress';
 import { GlobalNav } from '../nav/GlobalNav';
 import type { Paper, PaperStatus } from '../api/types';
 
@@ -198,7 +199,6 @@ export default function BookshelfPage() {
         overflow: 'hidden',
       }}
     >
-      {/* 불확정 진행률 바 애니메이션 — global.css가 아닌 페이지 전용 스타일로 정의 (spec §8-1) */}
       <style>{`
         @keyframes bookshelf-indeterminate {
           0% { transform: translateX(-60%); }
@@ -464,41 +464,91 @@ export default function BookshelfPage() {
   );
 }
 
-// 진행률 데이터 없음 — 계약 PaperStatusResponse에 progress 필드가 없다 (spec §8-1).
-// 같은 자리·같은 크기의 바에 좌우로 흐르는 불확정 애니메이션으로 대체한다.
-function IndeterminateBar() {
+// 백엔드에 실제 progress 필드가 없어 createdAt부터의 경과 시간으로 예상치를 보여준다.
+// 3분에 95%, 이후에는 99%까지 느리게 진행하며 완료 여부는 백엔드 상태만 신뢰한다.
+function SimulatedProgressBar({ createdAt, completing = false }: { createdAt: string; completing?: boolean }) {
+  const [progress, setProgress] = useState(() => simulatedProgress(createdAt));
+
+  useEffect(() => {
+    if (completing) return;
+    setProgress(simulatedProgress(createdAt));
+    const timer = window.setInterval(() => setProgress(simulatedProgress(createdAt)), 1000);
+    return () => window.clearInterval(timer);
+  }, [createdAt, completing]);
+
+  const displayedProgress = completing ? 100 : Math.floor(progress);
   return (
-    <div
-      style={{
-        width: '120px',
-        maxWidth: '100%',
-        height: '5px',
-        background: 'var(--color-border)',
-        borderRadius: 'var(--radius-pill)',
-        overflow: 'hidden',
-        position: 'relative',
-        flexShrink: 0,
-      }}
-    >
+    <div style={{ width: '132px', maxWidth: '100%', flexShrink: 0 }}>
       <div
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '40%',
-          height: '100%',
-          background: 'var(--color-accent-brass)',
-          borderRadius: 'var(--radius-pill)',
-          animation: 'bookshelf-indeterminate 1.1s ease-in-out infinite',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          marginBottom: '5px',
+          fontFamily: 'var(--font-sans)',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: 'var(--color-text-muted)',
+          whiteSpace: 'nowrap',
         }}
-      />
+      >
+        <span>분석 중</span>
+        <span>{displayedProgress}%</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="논문 분석 진행률"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={displayedProgress}
+        style={{
+          width: '100%',
+          height: '5px',
+          background: 'var(--color-border)',
+          borderRadius: 'var(--radius-pill)',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: completing ? '100%' : '40%',
+            height: '100%',
+            background: 'var(--color-accent-brass)',
+            borderRadius: 'var(--radius-pill)',
+            animation: completing ? 'none' : 'bookshelf-indeterminate 1.1s ease-in-out infinite',
+            transition: completing ? 'width 600ms ease-out' : undefined,
+          }}
+        />
+      </div>
     </div>
   );
 }
 
 function StatusBadge({ paper }: { paper: Paper }) {
-  const phase = statusPhase(paper.status);
-  if (phase === 'completed') {
+  const backendPhase = statusPhase(paper.status);
+  const [visualPhase, setVisualPhase] = useState<RowPhase>(backendPhase);
+  const [completing, setCompleting] = useState(false);
+
+  useEffect(() => {
+    if (backendPhase === 'completed' && visualPhase === 'progress') {
+      setCompleting(true);
+      const timer = window.setTimeout(() => {
+        setVisualPhase('completed');
+        setCompleting(false);
+      }, 650);
+      return () => window.clearTimeout(timer);
+    }
+
+    setVisualPhase(backendPhase);
+    setCompleting(false);
+  }, [backendPhase, visualPhase]);
+
+  if (visualPhase === 'completed') {
     const { prefix, iso } = accessDisplay(paper);
     return (
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -506,21 +556,14 @@ function StatusBadge({ paper }: { paper: Paper }) {
       </div>
     );
   }
-  if (phase === 'failed') {
+  if (visualPhase === 'failed') {
     return (
       <span style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, color: 'var(--color-danger)', flexShrink: 0, whiteSpace: 'nowrap' }}>
         실패
       </span>
     );
   }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-        분석 중
-      </span>
-      <IndeterminateBar />
-    </div>
-  );
+  return <SimulatedProgressBar createdAt={paper.createdAt} completing={completing} />;
 }
 
 interface PaperItemProps {
