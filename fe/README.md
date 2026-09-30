@@ -16,6 +16,11 @@ npm i
 npm run dev
 ```
 
+## 실행:preview
+```bash
+npm run dev:preview
+```
+
 BE(Spring Boot)와 LocalStack이 함께 떠 있어야 로그인·업로드·챗이 동작한다. `infra/local`을 참조.
 
 ```bash
