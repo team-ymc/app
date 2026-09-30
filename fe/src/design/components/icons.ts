@@ -16,6 +16,7 @@ import {
   DownloadSimple,
   PencilSimple,
   Trash,
+  ArrowClockwise,
   type Icon,
 } from '@phosphor-icons/react';
 
@@ -36,6 +37,7 @@ export const ICONS: Record<string, Icon> = {
   'download-simple': DownloadSimple,
   'pencil-simple': PencilSimple,
   trash: Trash,
+  'arrow-clockwise': ArrowClockwise,
 };
 
 export function iconComponent(kebab: string): Icon | undefined {
