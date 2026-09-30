@@ -22,8 +22,8 @@ import com.ymc.paper.domain.TranslationStatus;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Paper 응답 값의 파생 규칙 — 파싱 상태의 진실 원천은 연결된 Document 하나다.
- * 연결 전(document 없음)은 paper 자신의 상태를 쓴다.
+ * Paper 응답 값의 파생 규칙. 처리 상태는 연결된 Document에서 오지만, 환불된 Paper는
+ * Document가 완료돼도 실패로 본다. 본문·채팅·선행지식·지식 그래프가 모두 이 규칙을 거친다.
  */
 @Component
 @RequiredArgsConstructor
@@ -85,10 +85,13 @@ public class PaperDocumentViews {
         return listViews(List.of(paper)).get(0);
     }
 
-    /** Document 상태는 API PaperStatus와 이름 1:1이다. 연결 전 = 업로드 대기. */
+    /** 만료, 환불 표시, 미연결 순으로 보고 그 뒤에야 Document 상태를 따른다. */
     static PaperStatus derivedStatus(Paper paper, Document document) {
         if (paper.getExpiredAt() != null) {
             return PaperStatus.EXPIRED;
+        }
+        if (paper.getFailedAt() != null) {
+            return PaperStatus.FAILED;
         }
         if (document == null) {
             return PaperStatus.UPLOAD_PENDING;
