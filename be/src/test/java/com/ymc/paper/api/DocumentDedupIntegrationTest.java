@@ -142,7 +142,7 @@ class DocumentDedupIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void 기존_document가_FAILED면_새_paper도_FAILED를_보고_재파싱하지_않는다() throws Exception {
+    void 기존_document가_FAILED면_새_등록이_파싱을_다시_시작한다() throws Exception {
         Paper first = completedVia(TEST_USER_ID, "fail-1.pdf", userJwt());
         tx.execute(s -> documentRepository.markParsed(
                 first.getDocumentId(), DocumentStatus.FAILED, "PARSE_RETRIES_EXHAUSTED",
@@ -154,7 +154,30 @@ class DocumentDedupIntegrationTest extends IntegrationTest {
         givenUploadedObject(second);
         mockMvc.perform(post("/api/papers/{id}/complete", second.getId()).with(otherUserJwt()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSING"));
+
+        // 요청 식별자와 원본은 재처리를 시작한 second가 아니라 Document를 만든 first의 것이다
+        verify(parseRequestPublisher, times(1)).publish(first.getId(), first.getFileKey());
+        assertThat(reload(first.getId()).getFailedAt()).isNotNull();
+    }
+
+    @Test
+    void 시도_횟수를_모두_쓴_FAILED_document는_새_등록도_FAILED를_본다() throws Exception {
+        Paper first = completedVia(TEST_USER_ID, "exhausted-1.pdf", userJwt());
+        tx.execute(s -> documentRepository.markParsed(
+                first.getDocumentId(), DocumentStatus.FAILED, "PARSE_RETRIES_EXHAUSTED",
+                Instant.now()));
+        jdbcTemplate.update("update document set attempt = ? where id = ?",
+                Document.MAX_ATTEMPTS, first.getDocumentId());
+        clearInvocations(parseRequestPublisher);
+
+        Paper second = paperRepository.save(
+                Paper.register(OTHER_USER_ID, "exhausted-2.pdf", Instant.now()));
+        givenUploadedObject(second);
+        mockMvc.perform(post("/api/papers/{id}/complete", second.getId()).with(otherUserJwt()))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FAILED"));
+
         verify(parseRequestPublisher, times(0)).publish(any(), any());
     }
 

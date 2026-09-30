@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.ymc.common.error.ApiException;
 import com.ymc.common.error.ErrorCode;
+import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.Paper;
 import com.ymc.paper.domain.PaperRepository;
 import com.ymc.paper.service.PaperDocumentLinkService.LinkOutcome;
@@ -23,7 +24,8 @@ import lombok.RequiredArgsConstructor;
  * paper 조회·소유 확인
  * → 이미 연결됨: 발행 규칙(정체 구제 창구) 후 파생 상태 반환 (HEAD 없음)
  * → 미연결: HEAD(checksum 포함) 검증 → [Tx] Document 생성/연결 → 중복 객체 삭제(best-effort)
- *          → 같은 소유자의 동일 파일이면 DUPLICATE_PAPER → 발행 규칙 → 파생 상태 반환
+ *          → 같은 소유자의 동일 파일이면 DUPLICATE_PAPER
+ *          → 실패한 Document면 재처리 발행, 아니면 발행 규칙 → 파생 상태 반환
  * </pre>
  *
  * <p><b>이 클래스에 {@code @Transactional}을 걸지 말 것.</b> 연결 커밋·선점 커밋·큐 발행은
@@ -92,7 +94,13 @@ public class PaperUploadCompletionService {
             throw new DuplicatePaperException(outcome.duplicateOfPaperId());
         }
 
-        parsingStarter.startIfUploaded(outcome.document().getId());
+        if (outcome.retryStarted()) {
+            Document document = outcome.document();
+            parsingStarter.publishRetry(
+                    document.getId(), document.getRequestPaperId(), document.getFileKey());
+        } else {
+            parsingStarter.startIfUploaded(outcome.document().getId());
+        }
         return views.statusView(find(paperId));
     }
 
