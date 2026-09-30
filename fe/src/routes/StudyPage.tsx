@@ -15,6 +15,9 @@ import { getPaperContent } from '../markdown/paperContent';
 import { translationDisabledReason } from './study/translationStatus';
 import { PaperViewer, type TranslationMode } from './study/PaperViewer';
 import { TranslationModeButton } from './study/TranslationModeButton';
+import { CompileRetryButton } from './study/CompileRetryButton';
+import { compileRetryErrorMessage } from './retryMessage';
+import { retryPaper } from '../api/papers';
 import { PrerequisiteToggle } from './study/PrerequisiteToggle';
 import { PrerequisiteLayer } from './study/PrerequisiteLayer';
 import { prerequisiteDisabledReason } from './study/prerequisiteStatus';
@@ -80,14 +83,38 @@ export default function StudyPage() {
       paperId={paperId}
       translationStatus={statusQuery.data.translationStatus}
       knowledgeGraphStatus={statusQuery.data.knowledgeGraphStatus}
+      compileRetryable={statusQuery.data.compileRetryable ?? false}
     />
   );
 }
 
 function StudyPageContent({
-  paperId, translationStatus, knowledgeGraphStatus,
-}: { paperId: string; translationStatus: TranslationStatus; knowledgeGraphStatus: KnowledgeGraphStatus | null }) {
+  paperId, translationStatus, knowledgeGraphStatus, compileRetryable,
+}: {
+  paperId: string;
+  translationStatus: TranslationStatus;
+  knowledgeGraphStatus: KnowledgeGraphStatus | null;
+  compileRetryable: boolean;
+}) {
   const queryClient = useQueryClient();
+  const [compileRetryBusy, setCompileRetryBusy] = useState(false);
+  const [compileRetryError, setCompileRetryError] = useState<{ message: string; blocked: boolean } | null>(null);
+
+  // 응답을 상태 캐시에 넣으면 PENDING이 되어 기존 폴링이 이어진다
+  async function handleCompileRetry() {
+    setCompileRetryBusy(true);
+    setCompileRetryError(null);
+    try {
+      const next = await retryPaper(paperId);
+      queryClient.setQueryData(['paper-status', paperId], next);
+    } catch (e) {
+      const blocked = e instanceof ApiError && e.httpStatus === 409;
+      setCompileRetryError({ message: compileRetryErrorMessage(e), blocked });
+      queryClient.invalidateQueries({ queryKey: ['paper-status', paperId] });
+    } finally {
+      setCompileRetryBusy(false);
+    }
+  }
   const contentQuery = useQuery({
     queryKey: ['paper-content', paperId],
     queryFn: () => getPaperContent(paperId),
@@ -320,6 +347,14 @@ function StudyPageContent({
               disabledReason={translationDisabledReason(translationStatus, hasTranslation)}
               onCycle={handleCycleTranslation}
             />
+            {(compileRetryable || compileRetryError !== null) && (
+              <CompileRetryButton
+                busy={compileRetryBusy}
+                error={compileRetryError?.message ?? null}
+                blocked={compileRetryError?.blocked ?? false}
+                onRetry={handleCompileRetry}
+              />
+            )}
             <IconButton
               icon={nightMode ? 'sun' : 'moon'}
               label={nightMode ? '주간 모드로 전환' : 'Night Study Mode 켜기'}
