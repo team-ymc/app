@@ -148,7 +148,7 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
         )}
         {layer.phase === 'success' && (
           <>
-            <p style={{ margin: 0, fontFamily: "Georgia,'Times New Roman',serif", fontSize: 14, lineHeight: 1.5, color: '#3c3935' }}>{layer.en}</p>
+            <p style={{ margin: 0, fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: 1.5, color: '#3c3935' }}>{layer.en}</p>
             <div style={{ height: 1, margin: '20px 0 16px', background: '#ded3c3' }} />
             <p style={{ margin: 0, fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: 1.65, color: '#45413c' }}>{layer.ko}</p>
           </>
