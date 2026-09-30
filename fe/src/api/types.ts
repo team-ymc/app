@@ -8,6 +8,9 @@ export type TranslationStatus = 'NOT_APPLICABLE' | 'PENDING' | 'READY' | 'FAILED
 // 지식 그래프(viz.html) 준비 상태. 컴파일이 만드는 산출물이라 파싱 status와 별개다. Document 연결 전에는 null.
 export type KnowledgeGraphStatus = 'PENDING' | 'READY' | 'FAILED';
 
+// 실패한 논문의 재시도 가능 여부. 내부 실패 코드는 오지 않는다.
+export type PaperFailReason = 'PROCESSING_FAILED' | 'RETRY_LIMIT_EXCEEDED';
+
 export const TERMINAL_STATUSES: ReadonlySet<PaperStatus> = new Set(['COMPLETED', 'FAILED', 'EXPIRED']);
 
 export interface Paper {
@@ -21,6 +24,8 @@ export interface Paper {
   updatedAt: string;
   /** 마지막 접근 시각. 접근 이력이 없으면 null. */
   lastAccessedAt: string | null;
+  /** status가 FAILED일 때만 값이 있다. 이 필드가 없는 BE 응답도 받을 수 있어 선택 필드다. */
+  failReason?: PaperFailReason | null;
 }
 
 // 계약 PaperUploadHeaders: 필수 2키 + 향후 서명 헤더 추가 허용. FE는 맵 전체를 그대로 PUT에 싣는다.
@@ -45,6 +50,10 @@ export interface PaperStatusResponse {
   translationStatus: TranslationStatus;
   knowledgeGraphStatus: KnowledgeGraphStatus | null;
   updatedAt: string;
+  /** status가 FAILED일 때만 값이 있다. */
+  failReason?: PaperFailReason | null;
+  /** 번역·지식 그래프 생성을 다시 요청할 수 있으면 true. */
+  compileRetryable?: boolean;
 }
 
 export interface AuthUser { email?: string; displayName?: string; }

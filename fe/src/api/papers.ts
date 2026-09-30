@@ -58,6 +58,13 @@ export async function getStatus(paperId: string): Promise<PaperStatusResponse> {
   return res.json(); // { paperId, status, updatedAt }
 }
 
+// 실패한 논문 재시도. 파싱을 다시 할지 번역·지식 그래프만 다시 만들지는 BE가 현재 상태로 정한다.
+export async function retryPaper(paperId: string): Promise<PaperStatusResponse> {
+  const res = await authFetch(`/api/papers/${paperId}/retry`, { method: 'POST' });
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
 // 원본 PDF 다운로드 URL 발급 (계약 0.1.1).
 export async function getDownloadUrl(paperId: string): Promise<{ downloadUrl: string; expiresAt: string }> {
   const res = await authFetch(`/api/papers/${paperId}/download`);
