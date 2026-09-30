@@ -95,6 +95,43 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     int markFailedByDocumentId(@Param("documentId") UUID documentId,
             @Param("errorCode") String errorCode, @Param("now") Instant now);
 
+    /**
+     * 재시도가 시작될 때 같은 Document의 다른 Paper 중 환불 표시가 빠진 것을 채운다.
+     * Document가 실패를 벗어나는 길이 이 시점 하나라 여기서 채우면 빠지는 Paper가 없다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = :now, p.failedErrorCode = :errorCode, p.updatedAt = :now
+             where p.documentId = :documentId
+               and p.id <> :exceptPaperId
+               and p.failedAt is null
+            """)
+    int markFailedOthers(@Param("documentId") UUID documentId,
+            @Param("exceptPaperId") UUID exceptPaperId,
+            @Param("errorCode") String errorCode, @Param("now") Instant now);
+
+    /** Paper 하나에 환불 표시. 시도 횟수를 모두 쓴 Document에 새로 연결될 때 쓴다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = :now, p.failedErrorCode = :errorCode, p.updatedAt = :now
+             where p.id = :paperId
+               and p.failedAt is null
+            """)
+    int markFailed(@Param("paperId") UUID paperId,
+            @Param("errorCode") String errorCode, @Param("now") Instant now);
+
+    /** 재시도가 다시 예약하며 환불 표시를 지운다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Paper p
+               set p.failedAt = null, p.failedErrorCode = null, p.updatedAt = :now
+             where p.id = :paperId
+               and p.failedAt is not null
+            """)
+    int clearFailed(@Param("paperId") UUID paperId, @Param("now") Instant now);
+
     /** 정리 스케줄러의 정체 UPLOAD_PENDING 스캔 — document 미연결, 아직 만료 전. */
     @Query("""
             select p.id from Paper p
