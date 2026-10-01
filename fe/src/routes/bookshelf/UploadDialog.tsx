@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { X, UploadSimple, FileText } from '@phosphor-icons/react';
 import { Button } from '../../design/components/Button';
 import { createPaper, uploadToS3, completeUpload } from '../../api/papers';
+import { track } from '../../analytics/analytics';
 import { sha256Base64 } from './fileChecksum';
 import { ApiError } from '../../api/types';
 import { validatePdfUpload } from './uploadValidation';
@@ -113,6 +114,7 @@ export default function UploadDialog({ open, onClose, onUploaded }: UploadDialog
       const created = await createPaper(selectedFile.name, 'application/pdf', selectedFile.size, checksum);
       await uploadToS3(created.uploadUrl, selectedFile, created.uploadHeaders, (pct) => setUploadPct(pct));
       await completeUpload(created.paperId);
+      track('paper_uploaded', { paper_id: created.paperId });
       queryClient.invalidateQueries({ queryKey: ['papers'] });
       onClose();
       onUploaded();

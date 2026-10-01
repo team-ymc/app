@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.ymc.support.IntegrationTest;
 import com.ymc.user.domain.AuthProvider;
-import com.ymc.user.domain.User;
 
 class OAuthUserServiceIntegrationTest extends IntegrationTest {
 
@@ -25,18 +24,23 @@ class OAuthUserServiceIntegrationTest extends IntegrationTest {
     @Test
     @DisplayName("신규 provider+providerId → 사용자 생성 (FT-001 Story 2)")
     void 신규면_생성한다() {
-        User user = oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
-        assertThat(userRepository.findById(user.getId())).isPresent();
-        assertThat(user.getEmail()).isEqualTo("a@b.c");
+        OAuthUserService.UpsertResult result =
+                oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
+        assertThat(userRepository.findById(result.user().getId())).isPresent();
+        assertThat(result.user().getEmail()).isEqualTo("a@b.c");
+        assertThat(result.created()).isTrue();
     }
 
     @Test
     @DisplayName("같은 provider+providerId 재로그인 → 같은 사용자 (레코드 1개)")
     void 기존이면_같은_사용자를_돌려준다() {
         long before = userRepository.count();
-        User first = oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
-        User second = oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
-        assertThat(second.getId()).isEqualTo(first.getId());
+        OAuthUserService.UpsertResult first =
+                oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
+        OAuthUserService.UpsertResult second =
+                oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
+        assertThat(second.user().getId()).isEqualTo(first.user().getId());
+        assertThat(second.created()).isFalse();
         assertThat(userRepository.count()).isEqualTo(before + 1);
     }
 
@@ -49,7 +53,7 @@ class OAuthUserServiceIntegrationTest extends IntegrationTest {
         try {
             CountDownLatch ready = new CountDownLatch(threads);
             CountDownLatch start = new CountDownLatch(1);
-            List<Future<User>> results = new ArrayList<>();
+            List<Future<OAuthUserService.UpsertResult>> results = new ArrayList<>();
             for (int i = 0; i < threads; i++) {
                 results.add(pool.submit(() -> {
                     ready.countDown();
@@ -59,9 +63,11 @@ class OAuthUserServiceIntegrationTest extends IntegrationTest {
             }
             ready.await();
             start.countDown();
-            User first = results.get(0).get();
-            User second = results.get(1).get();
-            assertThat(first.getId()).isEqualTo(second.getId());
+            OAuthUserService.UpsertResult first = results.get(0).get();
+            OAuthUserService.UpsertResult second = results.get(1).get();
+            assertThat(first.user().getId()).isEqualTo(second.user().getId());
+            // 가입 신호는 실제로 행을 만든 쪽 하나에만 나간다
+            assertThat(first.created() ^ second.created()).isTrue();
             assertThat(userRepository.count()).isEqualTo(before + 1);
         } finally {
             pool.shutdown();

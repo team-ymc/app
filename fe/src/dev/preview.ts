@@ -14,6 +14,7 @@ import type {
 export const isDevPreview = import.meta.env.DEV && import.meta.env.MODE === 'preview';
 
 export const previewUser: AuthUser = {
+  userId: '00000000-0000-0000-0000-000000000000',
   displayName: 'Preview User',
   email: 'preview@paperteacher.local',
 };

@@ -42,9 +42,11 @@ function doRefresh(): Promise<AuthUser | null> {
  * Google 로그인 시작 — 팝업에서 진행하고 랜딩을 떠나지 않는다.
  * 완료 신호는 postMessage(opener 생존 시)와 BroadcastChannel(COOP로 opener가 끊긴 경우) 이중화 —
  * 먼저 도착한 쪽이 이기고 나머지는 정리된다. 팝업 차단 시 전체 리다이렉트 폴백.
- * 반환값은 리스너 해제 함수.
+ * signup은 이 로그인으로 계정이 새로 만들어졌는지다. 반환값은 리스너 해제 함수.
  */
-export function login({ onComplete }: { onComplete: (user: AuthUser | null, error: string | null) => void }): () => void {
+export function login({ onComplete }: {
+  onComplete: (user: AuthUser | null, error: string | null, signup: boolean) => void;
+}): () => void {
   const url = '/api/oauth2/authorization/google';
   const popup = window.open(url, 'ymc-auth', 'width=480,height=640');
   if (!popup) {
@@ -63,22 +65,22 @@ export function login({ onComplete }: { onComplete: (user: AuthUser | null, erro
     }
   };
 
-  const finish = async (error: string | null) => {
+  const finish = async (error: string | null, signup: boolean) => {
     if (done) return;
     done = true;
     cleanup();
     if (error) {
-      onComplete(null, error);
+      onComplete(null, error, false);
       return;
     }
     const user = await doRefresh();
-    onComplete(user, user ? null : 'refresh_failed');
+    onComplete(user, user ? null : 'refresh_failed', user !== null && signup);
   };
 
   const onWindowMessage = (event: MessageEvent) => {
     if (event.origin !== window.location.origin) return;
     if (!event.data || event.data.type !== 'auth:complete') return;
-    finish(event.data.error ?? null);
+    finish(event.data.error ?? null, event.data.signup === true);
   };
 
   window.addEventListener('message', onWindowMessage);
@@ -86,7 +88,7 @@ export function login({ onComplete }: { onComplete: (user: AuthUser | null, erro
     channel = new BroadcastChannel('ymc-auth');
     channel.addEventListener('message', (event) => {
       if (!event.data || event.data.type !== 'auth:complete') return;
-      finish(event.data.error ?? null);
+      finish(event.data.error ?? null, event.data.signup === true);
     });
   }
   return cleanup;

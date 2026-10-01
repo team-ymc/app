@@ -44,10 +44,28 @@ class OAuthLoginSuccessHandlerTest {
 
     @Test
     void 성공_시_upsert_쿠키_브릿지_리다이렉트() throws Exception {
+        MockHttpServletResponse response = login(false);
+
+        verify(oAuthUserService).upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
+        assertThat(response.getHeader("Set-Cookie")).contains("ymc_refresh=raw-refresh");
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:5173/auth/popup-done.html");
+    }
+
+    @Test
+    void 신규_가입이면_리다이렉트에_signup을_붙인다() throws Exception {
+        MockHttpServletResponse response = login(true);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:5173/auth/popup-done.html?signup=true");
+    }
+
+    private MockHttpServletResponse login(boolean created) throws Exception {
         OAuthLoginSuccessHandler handler = new OAuthLoginSuccessHandler(
                 oAuthUserService, authService, new RefreshTokenCookie(props), props);
         User user = User.register(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동", Instant.now());
-        when(oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동")).thenReturn(user);
+        when(oAuthUserService.upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동"))
+                .thenReturn(new OAuthUserService.UpsertResult(user, created));
         when(authService.issueTokens(any(UUID.class)))
                 .thenReturn(new AuthService.IssuedTokens("access", 1800L, "raw-refresh"));
 
@@ -59,10 +77,6 @@ class OAuthLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response,
                 new TestingAuthenticationToken(principal, null));
-
-        verify(oAuthUserService).upsert(AuthProvider.GOOGLE, "sub-1", "a@b.c", "홍길동");
-        assertThat(response.getHeader("Set-Cookie")).contains("ymc_refresh=raw-refresh");
-        assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:5173/auth/popup-done.html");
+        return response;
     }
 }

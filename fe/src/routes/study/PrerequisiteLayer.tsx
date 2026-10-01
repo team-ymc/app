@@ -2,6 +2,7 @@
 // 성공한 설명은 highlightId별로 페이지 메모리에 두어 다시 열 때 요청 없이 보여준다.
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPrerequisiteDefinition } from '../../api/papers';
+import { track } from '../../analytics/analytics';
 import type { PrerequisiteDefinitionResponse, PrerequisiteHighlight } from '../../api/types';
 import { computeToolbarPosition } from './selectionPosition';
 
@@ -61,6 +62,7 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
       baseScrollTopRef.current = el!.scrollTop;
       setScrollDelta(0);
       onOpen();
+      track('prerequisite_clicked', { paper_id: paperId });
       const memo = memoRef.current.get(id);
       if (memo) {
         setLayer({ phase: 'success', id, term: h.text, rect, mark, en: memo.definitionEn, ko: memo.definitionKo });
@@ -70,7 +72,7 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
     }
     el.addEventListener('click', handleClick);
     return () => el.removeEventListener('click', handleClick);
-  }, [viewerRef, highlights, visible, onOpen]);
+  }, [viewerRef, highlights, visible, onOpen, paperId]);
 
   // loading 진입에 반응해 요청한다. 닫히거나 다른 하이라이트로 바뀌면 abort.
   useEffect(() => {

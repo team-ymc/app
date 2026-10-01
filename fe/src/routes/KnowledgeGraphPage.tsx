@@ -1,7 +1,7 @@
 // 지식 그래프 화면: AI 컴파일 워커가 만든 단독 HTML(viz.html)을 presigned URL로 iframe에 그대로 띄운다.
 // 그래프·섹션 리더·번역 토글은 viz.html 자체 기능이라 여기서는 상단 바와 준비 상태만 다룬다.
 // 이식: project-docs/design/v2/Paper Knowledge Graph Page.dc.html — R1 top bar / R2 iframe.
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { getKnowledgeGraphView } from '../api/papers';
@@ -10,6 +10,7 @@ import { getPaperContent } from '../markdown/paperContent';
 import { StudyTopBar } from './study/StudyTopBar';
 import { usePaperStatusQuery } from './study/usePaperStatusQuery';
 import { knowledgeGraphDisabledReason } from './study/knowledgeGraphStatus';
+import { track } from '../analytics/analytics';
 
 export default function KnowledgeGraphPage() {
   const { paperId } = useParams<{ paperId: string }>();
@@ -44,6 +45,9 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
     queryFn: () => getPaperContent(paperId),
   });
   const ready = knowledgeGraphStatus === 'READY';
+  useEffect(() => {
+    track('knowledge_graph_opened', { paper_id: paperId });
+  }, [paperId]);
   // 진입할 때마다 새 URL을 받는다(gcTime 0). 떠 있는 동안은 포커스·재접속에도 다시 받지 않는다 — URL이 바뀌면 iframe이 통째로 다시 로드된다.
   const viewQuery = useQuery({
     queryKey: ['knowledge-graph-view', paperId],

@@ -72,7 +72,20 @@ describe('auth.js', () => {
       data: { type: 'auth:complete', error: null }, origin: window.location.origin,
     }));
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalled());
-    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ email: 'e@x.y' }), null);
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ email: 'e@x.y' }), null, false);
+  });
+
+  it('login: 완료 신호의 signup을 onComplete로 전달한다', async () => {
+    vi.stubGlobal('open', vi.fn(() => ({})));
+    globalThis.fetch = vi.fn().mockResolvedValue(jsonRes(200, TOKEN_BODY)) as unknown as typeof fetch;
+    const onComplete = vi.fn();
+
+    login({ onComplete });
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'auth:complete', error: null, signup: true }, origin: window.location.origin,
+    }));
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1' }), null, true);
   });
 
   it('login: 다른 origin 메시지는 무시', async () => {

@@ -11,6 +11,10 @@ import BookshelfPage from './routes/BookshelfPage';
 import StudyPage from './routes/StudyPage';
 import KnowledgeGraphPage from './routes/KnowledgeGraphPage';
 import ComingSoonPage from './routes/ComingSoonPage';
+import { initAnalytics } from './analytics/analytics';
+
+// 첫 페이지 조회와 UTM을 놓치지 않게 렌더 전에 초기화한다.
+initAnalytics();
 
 const queryClient = new QueryClient();
 const router = createBrowserRouter([

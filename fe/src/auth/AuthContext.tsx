@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useQueryClient } from '@tanstack/react-query';
 import { bootstrap, login, logout, onSessionExpired } from '../api/auth';
 import type { AuthUser } from '../api/types';
+import { identifyUser, resetUser, track } from '../analytics/analytics';
 import { isDevPreview, previewUser } from '../dev/preview';
 
 interface AuthContextValue {
@@ -36,13 +37,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.history.replaceState(null, '', '/');
       setInitialError(loginErrorMessage(errorCode));
     }
+    // 팝업이 막혀 전체 리다이렉트로 로그인한 경우 신규 가입 신호가 주소로 돌아온다.
+    const signedUp = params.get('signup') === 'true';
+    if (signedUp) window.history.replaceState(null, '', '/');
     // 세션 만료 시 이전 사용자 캐시가 다음 로그인 사용자에게 노출되지 않도록 정리한다.
     onSessionExpired(() => {
       queryClient.clear();
+      resetUser();
       setState({ status: 'guest', user: null });
     });
     bootstrap()
-      .then((user) => setState({ status: user ? 'authed' : 'guest', user }))
+      .then((user) => {
+        setState({ status: user ? 'authed' : 'guest', user });
+        if (!user) return;
+        identifyUser(user.userId);
+        if (signedUp) track('signup_completed');
+      })
       .catch(() => setState({ status: 'guest', user: null }));
   }, [queryClient]);
 
@@ -52,9 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     login({
-      onComplete: (user, error) => {
-        if (user) setState({ status: 'authed', user });
-        else if (error) setInitialError(loginErrorMessage(error));
+      onComplete: (user, error, signup) => {
+        if (user) {
+          setState({ status: 'authed', user });
+          // 식별을 먼저 해야 가입 이벤트가 이 사용자에게 붙는다.
+          identifyUser(user.userId);
+          if (signup) track('signup_completed');
+        } else if (error) setInitialError(loginErrorMessage(error));
       },
     });
   }, []);
@@ -68,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await logout(); } catch { /* 로컬 세션은 정리 — 쿠키는 다음 refresh 실패로 소멸 */ }
     // 재로그인 시 이전 사용자 캐시 노출 방지.
     queryClient.clear();
+    resetUser();
     setState({ status: 'guest', user: null });
   }, [queryClient]);
 

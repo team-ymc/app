@@ -56,7 +56,7 @@ export interface PaperStatusResponse {
   compileRetryable?: boolean;
 }
 
-export interface AuthUser { email?: string; displayName?: string; }
+export interface AuthUser { userId: string; email?: string; displayName?: string; }
 
 export class ApiError extends Error {
   constructor(message: string, readonly code: string | undefined, readonly httpStatus: number) {

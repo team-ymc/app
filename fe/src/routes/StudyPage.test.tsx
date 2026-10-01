@@ -6,6 +6,7 @@ import StudyPage, { splitPctForChatWidth } from './StudyPage';
 import { getStatus, fetchPaperContent } from '../api/papers';
 import { getMyPlan } from '../api/plan';
 import { useTextSelection, type TextSelection } from './study/useTextSelection';
+import { track } from '../analytics/analytics';
 import type { KnowledgeGraphStatus, PaperContentResponse, TranslationStatus } from '../api/types';
 
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), fetchPaperContent: vi.fn() }));
@@ -13,6 +14,7 @@ vi.mock('../api/plan', () => ({ getMyPlan: vi.fn() }));
 vi.mock('../account/AccountMenu', () => ({ AccountMenu: () => <div /> }));
 vi.mock('./study/TutorPanel', () => ({ TutorPanel: () => <div data-testid="tutor-panel" /> }));
 vi.mock('./study/useTextSelection', () => ({ useTextSelection: vi.fn() }));
+vi.mock('../analytics/analytics', () => ({ track: vi.fn() }));
 
 const STORAGE_KEY = 'pt-translation-mode';
 
@@ -335,5 +337,51 @@ describe('StudyPage — 선행지식 토글', () => {
 
     fireEvent.click(toggle);
     expect(document.querySelector('.pt-prerequisite-off')).not.toBeNull();
+  });
+});
+
+describe('StudyPage — 분석 이벤트', () => {
+  function calls(event: string) {
+    return vi.mocked(track).mock.calls.filter(([name]) => name === event);
+  }
+
+  it('본문이 표시되면 viewer_opened를 한 번 보낸다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+
+    expect(calls('viewer_opened')).toEqual([['viewer_opened', { paper_id: 'p1' }]]);
+  });
+
+  it('전체 번역은 켤 때만 translation_requested를 보낸다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+
+    fireEvent.click(modeButton()); // off → 아래
+    fireEvent.click(modeButton()); // 아래 → 옆
+    fireEvent.click(modeButton()); // 옆 → off
+
+    expect(calls('translation_requested')).toEqual([
+      ['translation_requested', { paper_id: 'p1', type: 'full' }],
+    ]);
+  });
+
+  it('선행지식 토글은 누를 때마다 바뀐 상태를 보낸다', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true, 'en', 'READY', [
+      { highlightId: 'h1', blockId: 'b1', startOffset: 0, endOffset: 2, text: 'An' },
+    ]));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(calls('prerequisite_toggled')).toEqual([]);
+
+    const toggle = screen.getByRole('switch', { name: '선행지식' });
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+
+    expect(calls('prerequisite_toggled')).toEqual([
+      ['prerequisite_toggled', { paper_id: 'p1', enabled: true }],
+      ['prerequisite_toggled', { paper_id: 'p1', enabled: false }],
+    ]);
   });
 });
