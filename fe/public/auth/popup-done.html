@@ -5,8 +5,11 @@
     <script>
       // OAuth 복귀 지점. 완료 신호를 BroadcastChannel과 opener postMessage로 이중 송신한다 —
       // Google 경유 중 COOP로 opener가 끊길 수 있어 어느 한쪽만으로는 부족하다.
-      var error = new URLSearchParams(location.search).get('error');
-      var payload = { type: 'auth:complete', error: error };
+      var params = new URLSearchParams(location.search);
+      var error = params.get('error');
+      // 이 로그인으로 계정이 새로 만들어졌으면 BE가 signup=true를 붙여 보낸다.
+      var signup = params.get('signup') === 'true';
+      var payload = { type: 'auth:complete', error: error, signup: signup };
       if (typeof BroadcastChannel !== 'undefined') {
         var channel = new BroadcastChannel('ymc-auth');
         channel.postMessage(payload);
@@ -18,7 +21,7 @@
       window.close();
       // close가 무시되는 경우(전체 리다이렉트 폴백 등) 앱으로 복귀
       setTimeout(function () {
-        location.replace(error ? '/?error=' + encodeURIComponent(error) : '/');
+        location.replace(error ? '/?error=' + encodeURIComponent(error) : signup ? '/?signup=true' : '/');
       }, 150);
     </script>
   </body>
