@@ -22,6 +22,7 @@ import { NotebookSection } from '../../design/components/NotebookSection';
 import { StudentMessage } from '../../design/components/StudentMessage';
 import { IconButton } from '../../design/components/IconButton';
 import type { SelectionAnchors } from './selectionAnchors';
+import { track } from '../../analytics/analytics';
 
 // 첨부 목록은 StudyPage가 소유한다(attachSelection 로직). attachEvent는 "방금 첨부됨" 신호 —
 // mode==='new'면 새 채팅으로 reset하고(seq당 한 번), 어느 모드든 입력창에 포커스한다.
@@ -419,6 +420,7 @@ export function TutorPanel({
     setInput('');
     resetComposerHeight();
     run(crypto.randomUUID(), question, false, attachments.map((a) => a.anchors));
+    track('chat_question_sent', { paper_id: paperId });
     onAttachmentsConsumed();
   }
 

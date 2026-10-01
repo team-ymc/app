@@ -14,6 +14,7 @@ import { checkTranslationSelection, type TranslationSelectionCheck } from '../..
 import { streamTranslation } from '../../translation/translationStream';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import type { SelectionAnchors } from './selectionAnchors';
+import { track } from '../../analytics/analytics';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 export interface SelectionLayerProps {
@@ -188,6 +189,8 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationV
     setScrollDelta(0);
     setDragOffset({ dx: 0, dy: 0 });
     setLayer({ phase: 'translating', text, rect, clear, anchors });
+    // 위치를 못 잡은 선택은 요청 없이 바로 실패하므로 세지 않는다.
+    if (anchors) track('translation_requested', { paper_id: paperId, type: 'inline' });
   }
 
   function handleDragStart(e: React.MouseEvent) {

@@ -32,6 +32,7 @@ import { usePlanQuery } from '../plan/usePlanQuery';
 import { isExhausted, exhaustedPlaceholder } from '../plan/planLabels';
 import { StudyTopBar } from './study/StudyTopBar';
 import { usePaperStatusQuery } from './study/usePaperStatusQuery';
+import { track } from '../analytics/analytics';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
@@ -138,6 +139,12 @@ function StudyPageContent({
     prevKnowledgeGraphStatus.current = knowledgeGraphStatus;
   }, [knowledgeGraphStatus, paperId, queryClient]);
 
+  // 본문이 처음 표시될 때 한 번. 재조회로 데이터가 바뀌어도 다시 보내지 않는다.
+  const contentShown = contentQuery.isSuccess;
+  useEffect(() => {
+    if (contentShown) track('viewer_opened', { paper_id: paperId });
+  }, [contentShown, paperId]);
+
   const planQuery = usePlanQuery();
   const aiUsage = planQuery.data?.usage.aiQuery;
 
@@ -226,11 +233,19 @@ function StudyPageContent({
   // 옆 배치로 들어갈 때만 채팅 폭을 한 번 맞춘다. 이후 스플리터 조작과 off 복귀는 건드리지 않는다.
   function handleCycleTranslation() {
     const next: TranslationMode = translationMode === 'off' ? 'below' : translationMode === 'below' ? 'side' : 'off';
+    // 켤 때만 보낸다 — 아래↔옆 배치 전환은 요청이 아니다.
+    if (translationMode === 'off') track('translation_requested', { paper_id: paperId, type: 'full' });
     if (next === 'side' && !chatCollapsed) {
       const pct = splitPctForChatWidth(splitRegionRef.current?.getBoundingClientRect().width ?? 0);
       if (pct !== null) setSplitPct(pct);
     }
     setTranslationMode(next);
+  }
+
+  function handleTogglePrerequisite() {
+    const next = !prerequisiteOn;
+    setPrerequisiteOn(next);
+    track('prerequisite_toggled', { paper_id: paperId, enabled: next });
   }
 
   function handleJump(blockId: string) {
@@ -339,7 +354,7 @@ function StudyPageContent({
               checked={prerequisiteOn}
               disabled={!prerequisiteEnabled}
               disabledReason={prerequisiteDisabledReason(prerequisiteHighlights.length)}
-              onToggle={() => setPrerequisiteOn((v) => !v)}
+              onToggle={handleTogglePrerequisite}
             />
             <TranslationModeButton
               mode={effectiveMode}
