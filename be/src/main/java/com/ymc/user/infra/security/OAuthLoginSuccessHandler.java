@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import com.ymc.common.config.AuthProperties;
 import com.ymc.user.domain.AuthProvider;
-import com.ymc.user.domain.User;
 import com.ymc.user.service.AuthService;
 import com.ymc.user.service.OAuthUserService;
 
@@ -39,11 +38,14 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
         String email = principal.getAttribute("email");
         String displayName = principal.getAttribute("name");
 
-        User user = oAuthUserService.upsert(AuthProvider.GOOGLE, providerId, email, displayName);
-        AuthService.IssuedTokens tokens = authService.issueTokens(user.getId());
+        OAuthUserService.UpsertResult result =
+                oAuthUserService.upsert(AuthProvider.GOOGLE, providerId, email, displayName);
+        AuthService.IssuedTokens tokens = authService.issueTokens(result.user().getId());
 
         response.addHeader(HttpHeaders.SET_COOKIE,
                 refreshTokenCookie.issue(tokens.rawRefreshToken()).toString());
-        response.sendRedirect(props.feOrigin() + "/auth/popup-done.html");
+        // 신규 가입이면 FE가 가입 이벤트를 남길 수 있게 알린다.
+        response.sendRedirect(props.feOrigin() + "/auth/popup-done.html"
+                + (result.created() ? "?signup=true" : ""));
     }
 }
