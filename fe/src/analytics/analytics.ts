@@ -5,8 +5,8 @@ import mixpanel from 'mixpanel-browser/src/loaders/loader-module-core';
 // 프로젝트 토큰은 브라우저에 노출되는 공개 값이다. 목록에 없는 주소(로컬 등)에서는 전송하지 않는다.
 // prod가 dev 빌드 산출물을 그대로 쓰므로 빌드 환경변수가 아니라 접속 주소로 고른다.
 const PROJECT_TOKENS: Record<string, string> = {
-  'papertutor.co.kr': '',
-  'dev.papertutor.co.kr': '',
+  'papertutor.co.kr': 'd0317d5c843c705dae6b005375931460',
+  'dev.papertutor.co.kr': '10e7979901fd75f78a643ee0a3022516',
 };
 
 export interface AnalyticsEventProps {
