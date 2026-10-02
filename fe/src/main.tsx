@@ -10,7 +10,6 @@ import PlansPage from './routes/PlansPage';
 import BookshelfPage from './routes/BookshelfPage';
 import StudyPage from './routes/StudyPage';
 import KnowledgeGraphPage from './routes/KnowledgeGraphPage';
-import ComingSoonPage from './routes/ComingSoonPage';
 import { initAnalytics } from './analytics/analytics';
 
 // 첫 페이지 조회와 UTM을 놓치지 않게 렌더 전에 초기화한다.
@@ -20,7 +19,13 @@ const queryClient = new QueryClient();
 const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   { path: '/plans', element: <PlansPage /> },
-  { path: '/features', element: <ComingSoonPage eyebrow="Features" /> },
+  {
+    path: '/features',
+    lazy: async () => {
+      const { default: Component } = await import('./routes/FeaturesPage');
+      return { Component };
+    },
+  },
   {
     element: <RequireAuth />,
     children: [
