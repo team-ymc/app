@@ -84,7 +84,7 @@ public class ChatCommandService {
     public ChatStartResult start(
             UUID ownerId, UUID paperId, UUID sessionIdOrNull, UUID clientMessageId, String content) {
 
-        paperChatAccessValidator.validateChatReady(paperId, ownerId);
+        UUID aiPaperId = paperChatAccessValidator.requireReadyRequestPaperId(paperId, ownerId);
         rejectDuplicate(ownerId, paperId, clientMessageId, content);
 
         ChatSession session = resolveSession(ownerId, paperId, sessionIdOrNull, content);
@@ -139,7 +139,7 @@ public class ChatCommandService {
             throw e; // rejectDuplicate가 못 잡는 위반이면 예상 밖 — 그대로 5xx
         }
 
-        return new ChatStartResult(paperId, session.getId(), assistant.getId(), clientMessageId);
+        return new ChatStartResult(paperId, aiPaperId, session.getId(), assistant.getId(), clientMessageId);
     }
 
     /**

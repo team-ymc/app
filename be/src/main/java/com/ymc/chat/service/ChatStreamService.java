@@ -59,7 +59,7 @@ public class ChatStreamService {
         try {
             run.sendStarted();
             AiRunHandle handle = aiAgentStreamPort.stream(
-                    new AiRunRequest(started.sessionId().toString(), started.paperId().toString(), userContent, selections), run);
+                    new AiRunRequest(started.sessionId().toString(), started.aiPaperId().toString(), userContent, selections), run);
             run.arm(handle);
         } catch (RuntimeException e) {
             run.cancelUpstream();

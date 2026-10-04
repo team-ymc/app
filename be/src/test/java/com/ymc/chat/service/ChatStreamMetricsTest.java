@@ -41,7 +41,7 @@ class ChatStreamMetricsTest {
     }
     @AfterEach void close() { timer.shutdownNow(); relay.shutdownNow(); registry.close(); }
     void begin() {
-        service.begin(new SseEmitter(), new ChatStartResult(UUID.randomUUID(), UUID.randomUUID(),
+        service.begin(new SseEmitter(), new ChatStartResult(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), UUID.randomUUID()), "question", null, System.nanoTime());
     }
     double count(String outcome) { return registry.counter("chat.runs", "outcome", outcome).count(); }
