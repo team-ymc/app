@@ -130,6 +130,27 @@ class AiRelayIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("기존 Document에 연결된 논문은 AI paper_id로 처음 올린 Paper의 id(requestPaperId)를 보낸다")
+    void dedupLinkedPaperSendsRequestPaperId() throws Exception {
+        Paper first = givenCompletedPaper();
+        Paper second = givenPendingPaper("shared-again.pdf");
+        tx.execute(s -> paperRepository.linkDocument(second.getId(), first.getDocumentId(), java.time.Instant.now()));
+        aiServer.enqueue(Script.of(
+                FakeAiSseServer.runStarted("t"),
+                FakeAiSseServer.messageCompleted("t", "답"),
+                FakeAiSseServer.runCompleted("t")));
+
+        MvcResult result = startStream(reload(second.getId()));
+        awaitAssistantTerminal();
+        String stream = streamBody(result);
+
+        assertThat(aiServer.lastRequestBody()).contains("\"paper_id\":\"" + first.getId() + "\"");
+        assertThat(aiServer.lastRequestBody()).doesNotContain("\"paper_id\":\"" + second.getId() + "\"");
+        // FE로 가는 이벤트의 paperId는 요청한 논문 그대로다
+        assertThat(stream).contains("\"paperId\":\"" + second.getId() + "\"");
+    }
+
+    @Test
     @DisplayName("run.failed — FAILED 저장, raw error 미노출, AI_RUN_FAILED")
     void runFailedOverWire() throws Exception {
         Paper paper = givenCompletedPaper();

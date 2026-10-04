@@ -32,7 +32,7 @@ public class ChatQueryService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
 
-    /** 논문 파싱 상태와 무관하게 조회한다 — validateChatReady가 아니라 validateOwned. */
+    /** 논문 파싱 상태와 무관하게 조회한다 — 소유만 검증한다. */
     @Transactional(readOnly = true)
     public List<ChatSession> listSessions(UUID ownerId, UUID paperId) {
         paperChatAccessValidator.validateOwned(paperId, ownerId);

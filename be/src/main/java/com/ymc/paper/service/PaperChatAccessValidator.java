@@ -28,21 +28,6 @@ public class PaperChatAccessValidator {
     private final PaperDocumentViews views;
 
     /**
-     * @throws ApiException PAPER_NOT_FOUND(404) — 논문 없음
-     * @throws ApiException FORBIDDEN(403) — 소유자가 아님
-     * @throws ApiException PAPER_NOT_READY(409) — 파싱 완료 상태가 아님
-     */
-    @Transactional(readOnly = true)
-    public void validateChatReady(UUID paperId, UUID ownerId) {
-        Paper paper = getOwned(paperId, ownerId);
-        PaperStatus status = PaperDocumentViews.derivedStatus(paper, views.documentOf(paper).orElse(null));
-        if (status != PaperStatus.COMPLETED) {
-            throw new ApiException(ErrorCode.PAPER_NOT_READY,
-                    "논문이 아직 학습 가능한 상태가 아닙니다: " + status);
-        }
-    }
-
-    /**
      * 채팅 가능 검증 + AI가 패키지를 찾는 식별자 반환. AI 패키지 경로는 파싱 요청의
      * paper_id(= Document.requestPaperId) 기준이라 중복 연결 논문에서는 Paper.id와 다르다.
      *
