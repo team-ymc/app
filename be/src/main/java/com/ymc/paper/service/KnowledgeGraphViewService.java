@@ -41,6 +41,25 @@ public class KnowledgeGraphViewService {
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
+        return issue(paper);
+    }
+
+    /**
+     * 체험 경로. 소유권 대신 trial 플래그를 본다.
+     *
+     * @throws ApiException {@code PAPER_NOT_FOUND} — 없거나 체험 논문이 아님
+     * @throws ApiException {@code KNOWLEDGE_GRAPH_NOT_READY} — Document 미연결이거나 READY가 아님
+     */
+    @Transactional(readOnly = true)
+    public PresignedDownload viewTrial(UUID paperId) {
+        Paper paper = paperRepository.findActiveTrialById(paperId)
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다: " + paperId));
+        return issue(paper);
+    }
+
+    private PresignedDownload issue(Paper paper) {
+        UUID paperId = paper.getId();
         Document document = views.documentOf(paper).orElse(null);
         if (document == null
                 || PaperDocumentViews.derivedStatus(paper, document) != PaperStatus.COMPLETED

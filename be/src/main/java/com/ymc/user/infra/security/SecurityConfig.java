@@ -21,7 +21,7 @@ import com.ymc.common.config.AuthProperties;
 import lombok.RequiredArgsConstructor;
 
 /**
- * /api/** 는 bearer access JWT 필수. 예외는 refresh·logout(인증 수단이 쿠키 자체)뿐이다.
+ * /api/** 는 bearer access JWT 필수. 예외는 refresh·logout(인증 수단이 쿠키 자체)과 체험 경로(/api/trial, 공개)뿐이다.
  * /api 밖(actuator 등)은 체인 미적용 — vite proxy가 /api만 전달하므로 노출면이 아니다.
  * CSRF는 끈다 — 쿠키 인증 POST(refresh/logout)는 SameSite=Lax가 크로스사이트 전송을 차단한다 (FT-001).
  */
@@ -56,8 +56,23 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * 체험 전용 체인 — 가입 없이 체험 논문을 읽는 경로. resource server를 켜지 않아 만료되거나 깨진
+     * bearer 헤더가 와도 401이 아니다 (계약 security: []). 노출 범위는 서비스가 paper.trial로 좁힌다.
+     */
     @Bean
     @Order(2)
+    SecurityFilterChain trialChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/trial/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(3)
     SecurityFilterChain apiChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
         http
                 .securityMatcher("/api/**")

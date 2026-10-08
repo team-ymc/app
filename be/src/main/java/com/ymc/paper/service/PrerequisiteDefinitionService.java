@@ -82,6 +82,34 @@ public class PrerequisiteDefinitionService {
                     "다른 선행지식 설명을 생성 중입니다.");
         }
         try {
+            return generate(resolved, key, highlightId);
+        } finally {
+            lock.release(ownerId, token);
+        }
+    }
+
+    /**
+     * 체험 경로. 소유권 대신 trial 플래그를 보고, 캐시 키는 같아 로그인 사용자와 결과를 공유한다.
+     * 사용자 키가 없으므로 동시 생성 잠금은 걸지 않는다.
+     */
+    public PrerequisiteDefinitionView defineTrial(UUID paperId, String highlightId) {
+        Paper paper = paperRepository.findActiveTrialById(paperId).orElseThrow(
+                () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
+        Resolved resolved = resolve(paper, highlightId);
+        DocumentPrerequisiteHighlight h = resolved.highlight();
+        String key = cacheKey(resolved.documentId(), h.getText());
+
+        Optional<PrerequisiteDefinition> cached = cache.get(key);
+        if (cached.isPresent()) {
+            metrics.hit();
+            return view(h, cached.get());
+        }
+        return generate(resolved, key, highlightId);
+    }
+
+    private PrerequisiteDefinitionView generate(Resolved resolved, String key, String highlightId) {
+        DocumentPrerequisiteHighlight h = resolved.highlight();
+        try {
             PrerequisiteDefinition generated = generator.generate(
                     resolved.requestPaperId().toString(), h.getBlockId(), h.getStartOffset(), h.getEndOffset());
             cache.put(key, generated);
@@ -91,8 +119,6 @@ public class PrerequisiteDefinitionService {
             metrics.failed();
             log.warn("선행지식 설명 생성 실패: documentId={}, highlightId={}", resolved.documentId(), highlightId, e);
             throw new ApiException(ErrorCode.PREREQUISITE_DEFINITION_FAILED, "설명 생성에 실패했습니다.");
-        } finally {
-            lock.release(ownerId, token);
         }
     }
 
@@ -107,6 +133,10 @@ public class PrerequisiteDefinitionService {
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
+        return resolve(paper, highlightId);
+    }
+
+    private Resolved resolve(Paper paper, String highlightId) {
         Document document = views.documentOf(paper).orElseThrow(
                 () -> new ApiException(ErrorCode.PREREQUISITE_NOT_READY, "논문이 아직 준비되지 않았습니다."));
         if (PaperDocumentViews.derivedStatus(paper, document) != PaperStatus.COMPLETED
