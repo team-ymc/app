@@ -131,13 +131,14 @@ function StudyPageContent({
   const translationStatus = translationStatusProp ?? contentQuery.data?.translationStatus ?? 'PENDING';
 
   // READY로 바뀌는 순간 본문을 다시 받는다. 기존 데이터를 보여주다 새 데이터로 바뀌므로 화면이 비지 않는다.
+  // 상태를 폴링으로 받을 때만이다 — 체험은 본문 응답의 상태를 쓰므로 첫 응답이 전환처럼 보여 재요청하면 안 된다.
   const prevTranslationStatus = useRef(translationStatus);
   useEffect(() => {
-    if (prevTranslationStatus.current !== 'READY' && translationStatus === 'READY') {
+    if (translationStatusProp !== null && prevTranslationStatus.current !== 'READY' && translationStatus === 'READY') {
       queryClient.invalidateQueries({ queryKey: ['paper-content', paperId] });
     }
     prevTranslationStatus.current = translationStatus;
-  }, [translationStatus, paperId, queryClient]);
+  }, [translationStatus, translationStatusProp, paperId, queryClient]);
 
   // 지식 그래프 컴파일이 끝나 READY가 되는 순간에도 본문을 다시 받는다 — 선행지식 하이라이트가 이때 채워진다.
   const prevKnowledgeGraphStatus = useRef(knowledgeGraphStatus);

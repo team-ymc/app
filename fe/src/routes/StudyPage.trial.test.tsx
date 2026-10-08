@@ -60,6 +60,9 @@ describe('StudyPage — 체험 모드', () => {
     renderTrialStudy();
     await screen.findAllByText('체험 논문');
     expect(fetchTrialPaperContent).toHaveBeenCalledWith('p1');
+    // 본문 응답의 번역 상태가 READY로 '바뀌는' 것은 폴링 전환이 아니다 — 재요청하지 않는다.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fetchTrialPaperContent).toHaveBeenCalledTimes(1);
     expect(fetchPaperContent).not.toHaveBeenCalled();
     expect(getStatus).not.toHaveBeenCalled();
     expect(getMyPlan).not.toHaveBeenCalled();
