@@ -14,7 +14,13 @@ export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, strin
     space: '03bb177f-bf69-4bca-b603-2f4202998790',
     sleep: 'a8c6b6a3-d141-4c1f-8046-b1927ef207fa',
   },
-  'papertutor.co.kr': {},
+  'papertutor.co.kr': {
+    love: '572d3d66-181d-4364-8319-352317d3405a',
+    ai: '35cc834e-ff84-4159-b9a7-c5c9716da9a3',
+    semiconductor: '43710f00-174a-43a3-bd65-d5a21bd2451c',
+    space: 'dde1989b-99b0-4387-8a2a-034fb382077f',
+    // sleep: prod에서는 당분간 '준비 중'으로 둔다. 켤 때 0209060b-f4fd-4cfe-ad98-aea5b7fd9b79.
+  },
 };
 
 const PREVIEW_IDS: Record<TrialTopicKey, string> = {
