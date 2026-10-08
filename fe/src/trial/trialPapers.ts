@@ -7,7 +7,13 @@ export type TrialTopicKey = 'love' | 'ai' | 'semiconductor' | 'space' | 'sleep';
 
 /** 호스트별 체험 논문 paperId. 마스터 계정이 올린 뒤 trial을 켠 논문이다. 비어 있으면 "준비 중"으로 보인다. */
 export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, string>>> = {
-  'dev.papertutor.co.kr': {},
+  'dev.papertutor.co.kr': {
+    love: '1e90a612-731b-40bc-8a57-267326ca0882',
+    ai: '374defd7-bc38-4655-8025-3cc443c761e1',
+    semiconductor: '71d0231d-73be-442a-8c25-6a327f07dae6',
+    space: '03bb177f-bf69-4bca-b603-2f4202998790',
+    sleep: 'a8c6b6a3-d141-4c1f-8046-b1927ef207fa',
+  },
   'papertutor.co.kr': {},
 };
 
