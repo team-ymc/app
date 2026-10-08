@@ -53,8 +53,8 @@ public class PrerequisiteDefinitionService {
     public record PrerequisiteDefinitionView(String term, String definitionEn, String definitionKo) {
     }
 
-    /** 검증 결과. AI 요청과 캐시 키에 필요한 값만 담는다. */
-    record Resolved(UUID documentId, UUID requestPaperId, DocumentPrerequisiteHighlight highlight) {
+    /** 검증 결과. AI 요청과 캐시 키에 필요한 값만 담는다. trial이면 설명을 만료 없이 둔다. */
+    record Resolved(UUID documentId, UUID requestPaperId, DocumentPrerequisiteHighlight highlight, boolean trial) {
     }
 
     public PrerequisiteDefinitionView define(UUID paperId, UUID ownerId, String highlightId) {
@@ -65,6 +65,7 @@ public class PrerequisiteDefinitionService {
         Optional<PrerequisiteDefinition> cached = cache.get(key);
         if (cached.isPresent()) {
             metrics.hit();
+            if (resolved.trial()) cache.keepForever(key);
             return view(h, cached.get());
         }
 
@@ -89,8 +90,8 @@ public class PrerequisiteDefinitionService {
     }
 
     /**
-     * 체험 경로. 소유권 대신 trial 플래그를 보고, 캐시 키는 같아 로그인 사용자와 결과를 공유한다.
-     * 사용자 키가 없으므로 동시 생성 잠금은 걸지 않는다.
+     * 체험 경로. 소유권 대신 trial 플래그를 보고, 미리 만들어 둔 설명만 돌려준다 — AI는 부르지 않는다.
+     * 캐시 키는 로그인 경로와 같아 운영자가 로그인 경로로 만든 설명이 그대로 HIT다.
      */
     public PrerequisiteDefinitionView defineTrial(UUID paperId, String highlightId) {
         Paper paper = paperRepository.findActiveTrialById(paperId).orElseThrow(
@@ -100,11 +101,11 @@ public class PrerequisiteDefinitionService {
         String key = cacheKey(resolved.documentId(), h.getText());
 
         Optional<PrerequisiteDefinition> cached = cache.get(key);
-        if (cached.isPresent()) {
-            metrics.hit();
-            return view(h, cached.get());
+        if (cached.isEmpty()) {
+            throw new ApiException(ErrorCode.PREREQUISITE_NOT_READY, "선행지식 설명이 아직 준비되지 않았습니다.");
         }
-        return generate(resolved, key, highlightId);
+        metrics.hit();
+        return view(h, cached.get());
     }
 
     private PrerequisiteDefinitionView generate(Resolved resolved, String key, String highlightId) {
@@ -113,6 +114,8 @@ public class PrerequisiteDefinitionService {
             PrerequisiteDefinition generated = generator.generate(
                     resolved.requestPaperId().toString(), h.getBlockId(), h.getStartOffset(), h.getEndOffset());
             cache.put(key, generated);
+            // 체험 논문은 운영자가 로그인 경로로 미리 만들어 둔다 — 체험 경로가 계속 HIT하도록 만료를 없앤다.
+            if (resolved.trial()) cache.keepForever(key);
             metrics.generated();
             return view(h, generated);
         } catch (PrerequisiteDefinitionGenerator.GenerationFailedException e) {
@@ -147,7 +150,7 @@ public class PrerequisiteDefinitionService {
         DocumentPrerequisiteHighlight highlight = highlightRepository
                 .findByDocumentIdAndHighlightId(document.getId(), highlightId).orElseThrow(
                         () -> new ApiException(ErrorCode.PREREQUISITE_HIGHLIGHT_NOT_FOUND, "없는 선행지식입니다."));
-        return new Resolved(document.getId(), document.getRequestPaperId(), highlight);
+        return new Resolved(document.getId(), document.getRequestPaperId(), highlight, paper.isTrial());
     }
 
     private PrerequisiteDefinitionView view(DocumentPrerequisiteHighlight h, PrerequisiteDefinition d) {

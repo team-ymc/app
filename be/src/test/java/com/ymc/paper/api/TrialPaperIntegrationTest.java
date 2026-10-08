@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterAll;
@@ -125,24 +126,32 @@ class TrialPaperIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("체험 논문 선행지식 설명: 인증 없이 생성하고, 로그인 사용자와 캐시를 공유")
-    void generatesTrialDefinitionAndSharesCache() throws Exception {
+    @DisplayName("체험 논문 선행지식 설명: 미리 만든 것만 주고, 없으면 AI를 부르지 않고 409")
+    void servesOnlyPrebuiltTrialDefinitions() throws Exception {
         Paper paper = givenCompiledPaper("trial-def.pdf");
         markTrial(paper);
-        aiServer.enqueue(Reply.ok(FakeAiJsonServer.definitionJson("new architecture", "An en line", "국문 한 줄", "0.1")));
 
+        mockMvc.perform(post("/api/trial/papers/{id}/prerequisite-highlights/{h}/definition",
+                        paper.getId(), "prerequisite-0001"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PREREQUISITE_NOT_READY"));
+        assertThat(aiServer.calls()).isZero();
+
+        // 운영자가 로그인 경로로 만들어 두면 체험 경로가 HIT하고, 설명은 만료 없이 남는다.
+        aiServer.enqueue(Reply.ok(FakeAiJsonServer.definitionJson("new architecture", "An en line", "국문 한 줄", "0.1")));
+        mockMvc.perform(post("/api/papers/{id}/prerequisite-highlights/{h}/definition",
+                        paper.getId(), "prerequisite-0001").with(userJwt()))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/trial/papers/{id}/prerequisite-highlights/{h}/definition",
                         paper.getId(), "prerequisite-0001"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.term").value("new architecture"))
                 .andExpect(jsonPath("$.definitionKo").value("국문 한 줄"));
-
-        // 같은 하이라이트를 소유자가 로그인 경로로 읽으면 AI 호출 없이 HIT다.
-        mockMvc.perform(post("/api/papers/{id}/prerequisite-highlights/{h}/definition",
-                        paper.getId(), "prerequisite-0001").with(userJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.definitionKo").value("국문 한 줄"));
         assertThat(aiServer.calls()).isEqualTo(1);
+
+        Set<String> keys = redisTemplate.keys("prerequisite-definition:v1:" + paper.getDocumentId() + ":*");
+        assertThat(keys).hasSize(1);
+        assertThat(redisTemplate.getExpire(keys.iterator().next())).isEqualTo(-1L);
     }
 
     @Test

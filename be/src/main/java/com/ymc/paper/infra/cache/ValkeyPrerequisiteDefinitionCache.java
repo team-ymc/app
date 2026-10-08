@@ -70,4 +70,14 @@ public class ValkeyPrerequisiteDefinitionCache implements PrerequisiteDefinition
             log.warn("선행지식 캐시 저장 실패, 생성 결과는 그대로 반환: key={}", key, e);
         }
     }
+
+    @Override
+    public void keepForever(String key) {
+        try {
+            redis.persist(key);
+        } catch (RuntimeException e) {
+            metrics.cacheError();
+            log.warn("선행지식 캐시 만료 해제 실패, TTL이 남는다: key={}", key, e);
+        }
+    }
 }
