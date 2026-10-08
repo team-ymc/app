@@ -88,6 +88,10 @@ public class Paper {
     @Column(name = "failed_error_code")
     private String failedErrorCode;
 
+    /** 체험 논문 여부. 켜면 인증 없는 /api/trial 경로에서 읽을 수 있다. 운영자가 SQL로만 바꾼다. */
+    @Column(name = "trial", nullable = false)
+    private boolean trial;
+
     protected Paper() {
         // JPA
     }

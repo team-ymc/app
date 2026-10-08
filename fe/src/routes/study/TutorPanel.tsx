@@ -17,6 +17,7 @@ import type { ChatSessionSummary } from '../../api/chatSessions';
 import { ApiError } from '../../api/types';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import type { PaperBlock } from '../../markdown/paperContent';
+import { useTrialMode } from '../../trial/TrialMode';
 import { TutorNotebook } from '../../design/components/TutorNotebook';
 import { NotebookSection } from '../../design/components/NotebookSection';
 import { StudentMessage } from '../../design/components/StudentMessage';
@@ -269,6 +270,7 @@ export function TutorPanel({
   queryLocked = false,
   lockPlaceholder,
 }: TutorPanelProps) {
+  const { trial, requestSignup } = useTrialMode();
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const [input, setInput] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
@@ -417,6 +419,11 @@ export function TutorPanel({
     if (queryLocked) return;
     const question = input.trim();
     if (!question || state.streaming) return;
+    if (trial) {
+      // 체험: 입력은 그대로 두고 가입 모달만 연다 (YMC-430)
+      requestSignup('chat');
+      return;
+    }
     setInput('');
     resetComposerHeight();
     run(crypto.randomUUID(), question, false, attachments.map((a) => a.anchors));
@@ -613,6 +620,9 @@ export function TutorPanel({
           flexShrink: 0,
         }}
       >
+        {trial ? (
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, color: 'var(--color-text-heading)', paddingLeft: 6 }}>AI 튜터</div>
+        ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <div style={{ position: 'relative' }}>
             <IconButton icon="clock-counter-clockwise" label="이전 대화 기록" size={36} onClick={handleToggleHistory} />
@@ -655,6 +665,7 @@ export function TutorPanel({
           </div>
           <IconButton icon="note-pencil" label="새 대화" size={36} onClick={handleNewConversation} />
         </div>
+        )}
         <IconButton icon="sidebar-simple" label="AI 튜터 접기" size={36} onClick={onToggleCollapse} />
       </div>
 

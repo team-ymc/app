@@ -1,0 +1,12 @@
+.signup-backdrop { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(43,34,27,.55); }
+.signup-modal { width:440px; max-width:100%; padding:40px 40px 32px; border:1px solid #e0d6c5; border-radius:14px; background:#fffdf8; color:#26211d; box-shadow:0 30px 70px rgba(43,34,27,.3); text-align:center; font-family:var(--font-sans); }
+.signup-modal > svg { margin-bottom:18px; }
+.signup-modal h2 { margin:0 0 12px; font-family:var(--font-serif); font-size:26px; font-weight:600; line-height:1.35; letter-spacing:-.02em; word-break:keep-all; }
+.signup-modal p { margin:0 0 28px; font-size:15px; line-height:1.7; color:#6e675e; word-break:keep-all; }
+.signup-google { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; min-height:52px; border:1px solid #d6cbb8; border-radius:9999px; background:#fff; color:#26211d; font:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:border-color 150ms ease,background 150ms ease; }
+.signup-google:hover { border-color:#243a55; background:#fbfaf6; }
+.signup-google:disabled { opacity:.6; cursor:default; }
+.signup-google svg { width:20px; height:20px; }
+.signup-error { margin:14px 0 0; color:#a1443a; font-size:13px; }
+.signup-dismiss { margin-top:18px; border:0; border-bottom:1px solid transparent; background:transparent; color:#8b8173; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.signup-dismiss:hover { color:#243a55; border-bottom-color:#243a55; }

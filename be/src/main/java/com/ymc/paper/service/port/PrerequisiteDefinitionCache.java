@@ -10,4 +10,7 @@ public interface PrerequisiteDefinitionCache {
     Optional<PrerequisiteDefinition> get(String key);
 
     void put(String key, PrerequisiteDefinition value);
+
+    /** 만료를 없앤다. 체험 논문의 설명은 미리 만들어 두고 TTL 없이 유지한다. 실패는 WARN만 남긴다. */
+    void keepForever(String key);
 }

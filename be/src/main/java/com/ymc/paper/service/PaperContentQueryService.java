@@ -51,6 +51,23 @@ public class PaperContentQueryService {
         if (!paper.getOwnerId().equals(ownerId)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
         }
+        return assemble(paper, true);
+    }
+
+    /**
+     * 체험 경로. 소유권 대신 trial 플래그를 보고, 조회 시각은 남기지 않는다.
+     *
+     * @throws ApiException PAPER_NOT_FOUND(404) — 없거나 체험 논문이 아님
+     * @throws ApiException PAPER_NOT_READY(409) — COMPLETED가 아니거나 아직 미적재
+     */
+    @Transactional(readOnly = true)
+    public PaperContentView getTrialContent(UUID paperId) {
+        Paper paper = paperRepository.findActiveTrialById(paperId).orElseThrow(
+                () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
+        return assemble(paper, false);
+    }
+
+    private PaperContentView assemble(Paper paper, boolean recordAccess) {
         Document document = views.documentOf(paper).orElseThrow(() ->
                 new ApiException(ErrorCode.PAPER_NOT_READY, "논문이 아직 완료 상태가 아닙니다."));
         PaperStatus status = PaperDocumentViews.derivedStatus(paper, document);
@@ -61,7 +78,9 @@ public class PaperContentQueryService {
         DocumentContent content = contentRepository.findById(document.getId()).orElseThrow(
                 () -> new ApiException(ErrorCode.PAPER_NOT_READY, "본문이 아직 적재되지 않았습니다."));
 
-        paper.markAccessed(Instant.now()); // 최신 조회 시간 갱신
+        if (recordAccess) {
+            paper.markAccessed(Instant.now()); // 최신 조회 시간 갱신
+        }
 
         List<PaperContentView.Block> blocks = blockRepository
                 .findAllByDocumentIdOrderByGlobalOrderAsc(document.getId()).stream()

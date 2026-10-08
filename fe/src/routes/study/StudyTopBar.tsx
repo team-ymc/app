@@ -6,6 +6,7 @@ import { ArrowLeft, BookOpen } from '@phosphor-icons/react';
 import { AccountMenu } from '../../account/AccountMenu';
 import type { KnowledgeGraphStatus } from '../../api/types';
 import { knowledgeGraphDisabledReason } from './knowledgeGraphStatus';
+import { useTrialMode } from '../../trial/TrialMode';
 
 export type StudyView = 'content' | 'graph';
 
@@ -64,6 +65,8 @@ function KnowledgeGraphIcon() {
 }
 
 export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rightSlot }: StudyTopBarProps) {
+  const { trial, requestSignup } = useTrialMode();
+  const base = trial ? '/try/papers' : '/papers';
   const graphDisabled = knowledgeGraphStatus !== 'READY';
   const graphReason = knowledgeGraphDisabledReason(knowledgeGraphStatus);
 
@@ -90,7 +93,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
         </Link>
         <div style={DIVIDER} />
         <Link
-          to="/library"
+          to={trial ? '/try' : '/library'}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -109,7 +112,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
           }}
         >
           <ArrowLeft size={14} />
-          서재로
+          {trial ? '다른 논문 보기' : '서재로'}
         </Link>
         <div style={DIVIDER} />
         <div
@@ -130,7 +133,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <Link
-            to={`/papers/${paperId}`}
+            to={`${base}/${paperId}`}
             aria-current={current === 'content' ? 'page' : undefined}
             title="본문"
             style={pairLinkStyle(current === 'content', false)}
@@ -139,7 +142,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
             <span>본문</span>
           </Link>
           <Link
-            to={`/papers/${paperId}/graph`}
+            to={`${base}/${paperId}/graph`}
             aria-current={current === 'graph' ? 'page' : undefined}
             aria-disabled={graphDisabled ? 'true' : undefined}
             tabIndex={graphDisabled ? -1 : undefined}
@@ -164,7 +167,21 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
       >
         {rightSlot}
         {rightSlot ? <div style={DIVIDER} /> : null}
-        <AccountMenu />
+        {trial ? (
+          <button
+            type="button"
+            onClick={() => requestSignup('login')}
+            style={{
+              height: '34px', padding: '0 16px', fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 600,
+              color: 'var(--color-on-dark)', background: 'transparent', border: '1px solid rgba(255,253,247,0.35)',
+              borderRadius: 'var(--radius-pill)', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            로그인
+          </button>
+        ) : (
+          <AccountMenu />
+        )}
       </div>
     </div>
   );

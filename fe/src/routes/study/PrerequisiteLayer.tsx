@@ -1,7 +1,8 @@
 // 선행지식 팝오버 (Design v3). 뷰어 안 mark 클릭을 위임으로 받아 선택 구간 아래에 연다.
 // 성공한 설명은 highlightId별로 페이지 메모리에 두어 다시 열 때 요청 없이 보여준다.
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { createPrerequisiteDefinition } from '../../api/papers';
+import { createPrerequisiteDefinition, createTrialPrerequisiteDefinition } from '../../api/papers';
+import { useTrialMode } from '../../trial/TrialMode';
 import { track } from '../../analytics/analytics';
 import type { PrerequisiteDefinitionResponse, PrerequisiteHighlight } from '../../api/types';
 import { computeToolbarPosition } from './selectionPosition';
@@ -27,6 +28,7 @@ type Layer =
   | { phase: 'failed'; id: string; term: string; rect: DOMRect; mark: HTMLElement };
 
 export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, openSignal, onOpen }: PrerequisiteLayerProps) {
+  const { trial } = useTrialMode();
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   const popupRef = useRef<HTMLDivElement>(null);
   const memoRef = useRef(new Map<string, PrerequisiteDefinitionResponse>());
@@ -79,7 +81,8 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
     if (layer.phase !== 'loading') return;
     const { id, term, rect, mark } = layer;
     const controller = new AbortController();
-    createPrerequisiteDefinition(paperId, id, controller.signal)
+    const define = trial ? createTrialPrerequisiteDefinition : createPrerequisiteDefinition;
+    define(paperId, id, controller.signal)
       .then((res) => {
         memoRef.current.set(id, res);
         setLayer((prev) => (prev.phase === 'loading' && prev.id === id
@@ -92,7 +95,7 @@ export function PrerequisiteLayer({ paperId, viewerRef, highlights, visible, ope
       });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.phase === 'loading' ? layer.id : null, paperId]);
+  }, [layer.phase === 'loading' ? layer.id : null, paperId, trial]);
 
   // 뷰어 스크롤을 따라간다.
   useEffect(() => {

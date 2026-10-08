@@ -147,6 +147,34 @@ export async function createPrerequisiteDefinition(
   return res.json();
 }
 
+// 체험 경로(YMC-430, 계약 0.14.0). 인증 없이 paper.trial인 논문만 읽힌다 — authFetch 대신 fetch.
+export async function fetchTrialPaperContent(paperId: string): Promise<PaperContentResponse> {
+  if (isDevPreview) return getPreviewPaperContent(paperId);
+  const res = await fetch(`/api/trial/papers/${paperId}/content`);
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
+export async function getTrialKnowledgeGraphView(paperId: string): Promise<KnowledgeGraphView> {
+  const res = await fetch(`/api/trial/papers/${paperId}/knowledge-graph`);
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
+export async function createTrialPrerequisiteDefinition(
+  paperId: string,
+  highlightId: string,
+  signal?: AbortSignal,
+): Promise<PrerequisiteDefinitionResponse> {
+  if (isDevPreview) return getPreviewPrerequisiteDefinition(highlightId);
+  const res = await fetch(
+    `/api/trial/papers/${paperId}/prerequisite-highlights/${encodeURIComponent(highlightId)}/definition`,
+    { method: 'POST', signal },
+  );
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
 export async function apiError(res: Response): Promise<ApiError> {
   let body: { code?: string; message?: string } = {};
   try { body = await res.json(); } catch { /* 비-JSON 응답 */ }

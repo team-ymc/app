@@ -4,7 +4,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { getKnowledgeGraphView } from '../api/papers';
+import { getKnowledgeGraphView, getTrialKnowledgeGraphView } from '../api/papers';
+import { useTrialMode } from '../trial/TrialMode';
 import { ApiError, type KnowledgeGraphStatus } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
 import { StudyTopBar } from './study/StudyTopBar';
@@ -14,10 +15,15 @@ import { track } from '../analytics/analytics';
 
 export default function KnowledgeGraphPage() {
   const { paperId } = useParams<{ paperId: string }>();
-  const statusQuery = usePaperStatusQuery(paperId);
+  const { trial } = useTrialMode();
+  // 체험 논문은 status 경로가 없다 — 항상 준비된 논문만 노출되므로 READY로 본다.
+  const statusQuery = usePaperStatusQuery(trial ? undefined : paperId);
 
   if (!paperId) {
     return <Navigate to="/library" replace state={{ toast: '잘못된 접근입니다' }} />;
+  }
+  if (trial) {
+    return <KnowledgeGraphContent paperId={paperId} knowledgeGraphStatus="READY" />;
   }
   if (statusQuery.isPending) {
     return <Centered>불러오는 중…</Centered>;
@@ -39,10 +45,11 @@ export default function KnowledgeGraphPage() {
 }
 
 function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: string; knowledgeGraphStatus: KnowledgeGraphStatus | null }) {
+  const { trial } = useTrialMode();
   // 제목만 쓰지만 학습 화면과 같은 키라 오가는 동안 캐시를 공유한다.
   const contentQuery = useQuery({
-    queryKey: ['paper-content', paperId],
-    queryFn: () => getPaperContent(paperId),
+    queryKey: ['paper-content', paperId, trial],
+    queryFn: () => getPaperContent(paperId, trial),
   });
   const ready = knowledgeGraphStatus === 'READY';
   useEffect(() => {
@@ -51,7 +58,7 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
   // 진입할 때마다 새 URL을 받는다(gcTime 0). 떠 있는 동안은 포커스·재접속에도 다시 받지 않는다 — URL이 바뀌면 iframe이 통째로 다시 로드된다.
   const viewQuery = useQuery({
     queryKey: ['knowledge-graph-view', paperId],
-    queryFn: () => getKnowledgeGraphView(paperId),
+    queryFn: () => (trial ? getTrialKnowledgeGraphView(paperId) : getKnowledgeGraphView(paperId)),
     enabled: ready,
     staleTime: Infinity,
     gcTime: 0,
@@ -80,7 +87,7 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
         {!ready ? (
           <Centered>
             {knowledgeGraphDisabledReason(knowledgeGraphStatus)}{' '}
-            <Link to={`/papers/${paperId}`} style={{ marginLeft: 8 }}>본문으로</Link>
+            <Link to={`${trial ? '/try/papers' : '/papers'}/${paperId}`} style={{ marginLeft: 8 }}>본문으로</Link>
           </Centered>
         ) : viewQuery.data ? (
           // S3 오리진 문서라 앱 오리진과 격리된다. allow-same-origin은 viz.html의 localStorage(번역 모드 기억)용이다.
