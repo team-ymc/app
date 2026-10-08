@@ -18,6 +18,9 @@ export interface AnalyticsEventProps {
   knowledge_graph_opened: { paper_id: string };
   translation_requested: { paper_id: string; type: 'full' | 'inline' };
   chat_question_sent: { paper_id: string };
+  trial_page_opened: undefined;
+  trial_paper_opened: { paper_id: string; topic: string };
+  trial_signup_prompted: { source: 'upload' | 'login' | 'chat' };
 }
 
 export type AnalyticsEvent = keyof AnalyticsEventProps;

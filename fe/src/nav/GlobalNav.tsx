@@ -8,6 +8,7 @@ import { AccountMenu } from '../account/AccountMenu';
 export const GLOBAL_NAV_HEIGHT = 64;
 
 const MENU = [
+  { to: '/try', label: '체험' },
   { to: '/plans', label: '플랜' },
   { to: '/features', label: '기능' },
 ];
