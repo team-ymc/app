@@ -33,6 +33,7 @@ import { isExhausted, exhaustedPlaceholder } from '../plan/planLabels';
 import { StudyTopBar } from './study/StudyTopBar';
 import { usePaperStatusQuery } from './study/usePaperStatusQuery';
 import { track } from '../analytics/analytics';
+import { useTrialMode } from '../trial/TrialMode';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
@@ -52,11 +53,16 @@ export function splitPctForChatWidth(regionWidth: number): number | null {
 
 export default function StudyPage() {
   const { paperId } = useParams<{ paperId: string }>();
+  const { trial } = useTrialMode();
 
-  const statusQuery = usePaperStatusQuery(paperId);
+  // 체험 논문은 status 경로가 없다 — 준비된 논문만 노출되므로 본문 응답의 번역 상태만 쓰고 지식 그래프는 READY로 본다.
+  const statusQuery = usePaperStatusQuery(trial ? undefined : paperId);
 
   if (!paperId) {
-    return <Navigate to="/library" replace state={{ toast: '잘못된 접근입니다' }} />;
+    return <Navigate to={trial ? '/try' : '/library'} replace state={{ toast: '잘못된 접근입니다' }} />;
+  }
+  if (trial) {
+    return <StudyPageContent paperId={paperId} translationStatus={null} knowledgeGraphStatus="READY" compileRetryable={false} />;
   }
   if (statusQuery.isPending) {
     return (
@@ -90,13 +96,15 @@ export default function StudyPage() {
 }
 
 function StudyPageContent({
-  paperId, translationStatus, knowledgeGraphStatus, compileRetryable,
+  paperId, translationStatus: translationStatusProp, knowledgeGraphStatus, compileRetryable,
 }: {
   paperId: string;
-  translationStatus: TranslationStatus;
+  /** null이면 본문 응답의 번역 상태를 쓴다 (체험). */
+  translationStatus: TranslationStatus | null;
   knowledgeGraphStatus: KnowledgeGraphStatus | null;
   compileRetryable: boolean;
 }) {
+  const { trial } = useTrialMode();
   const queryClient = useQueryClient();
   const [compileRetryBusy, setCompileRetryBusy] = useState(false);
   const [compileRetryError, setCompileRetryError] = useState<{ message: string; blocked: boolean } | null>(null);
@@ -117,9 +125,10 @@ function StudyPageContent({
     }
   }
   const contentQuery = useQuery({
-    queryKey: ['paper-content', paperId],
-    queryFn: () => getPaperContent(paperId),
+    queryKey: ['paper-content', paperId, trial],
+    queryFn: () => getPaperContent(paperId, trial),
   });
+  const translationStatus = translationStatusProp ?? contentQuery.data?.translationStatus ?? 'PENDING';
 
   // READY로 바뀌는 순간 본문을 다시 받는다. 기존 데이터를 보여주다 새 데이터로 바뀌므로 화면이 비지 않는다.
   const prevTranslationStatus = useRef(translationStatus);
@@ -145,7 +154,7 @@ function StudyPageContent({
     if (contentShown) track('viewer_opened', { paper_id: paperId });
   }, [contentShown, paperId]);
 
-  const planQuery = usePlanQuery();
+  const planQuery = usePlanQuery(!trial);
   const aiUsage = planQuery.data?.usage.aiQuery;
 
   const [tocOpen, setTocOpen] = useState(false);
@@ -167,7 +176,8 @@ function StudyPageContent({
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [prerequisiteOn, setPrerequisiteOn] = useState(false);
+  // 체험은 선행지식 하이라이트가 켜진 채 열린다.
+  const [prerequisiteOn, setPrerequisiteOn] = useState(trial);
   // 세 오버레이(선행지식·선택·질문하기)가 서로를 닫는 신호. 값이 바뀌면 해당 오버레이가 idle로 돌아간다.
   const [overlaySignals, setOverlaySignals] = useState({ prerequisite: 0, selection: 0, ask: 0 });
   // SelectionLayer·ContentAskLayer의 "AI에게 질문" → 컴포저 인용 첨부 목록으로 누적된다 (FT-006 Story 5).
@@ -308,8 +318,11 @@ function StudyPageContent({
   }
   if (contentQuery.isError) {
     // 진입 게이트(status COMPLETED)를 통과했는데 409면 적재 지연 등 일시 상태 — 서재로 안내
+    if (trial && contentQuery.error instanceof ApiError && contentQuery.error.httpStatus === 404) {
+      return <Navigate to="/try" replace />;
+    }
     if (contentQuery.error instanceof ApiError && contentQuery.error.code === 'PAPER_NOT_READY') {
-      return <Navigate to="/library" replace state={{ toast: '본문 준비 중입니다. 잠시 후 다시 열어주세요' }} />;
+      return <Navigate to={trial ? '/try' : '/library'} replace state={{ toast: '본문 준비 중입니다. 잠시 후 다시 열어주세요' }} />;
     }
     return (
       <div style={{ padding: 48, textAlign: 'center', fontFamily: 'var(--font-sans)', color: 'var(--color-text-muted)' }}>

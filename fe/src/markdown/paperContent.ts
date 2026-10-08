@@ -1,7 +1,7 @@
 // 본문 계약(getPaperContent) 응답을 뷰어 블록 모델로 정규화하는 유일한 접점.
 // 제목·본문·수식·이미지는 markdown 문자열로 변환해 기존 PaperMarkdown 렌더러를 재사용하고,
 // 표는 html 그대로 넘겨 렌더 측에서 정화한다.
-import { fetchPaperContent } from '../api/papers';
+import { fetchPaperContent, fetchTrialPaperContent } from '../api/papers';
 import type { PaperContentBlockDto, PaperContentResponse, PrerequisiteHighlight, TranslationStatus } from '../api/types';
 
 export type BlockType = 'heading' | 'subheading' | 'para' | 'caption' | 'figure' | 'equation' | 'table' | 'other';
@@ -41,8 +41,8 @@ export interface PaperContent {
   prerequisiteHighlights: PrerequisiteHighlight[];
 }
 
-export async function getPaperContent(paperId: string): Promise<PaperContent> {
-  return adaptPaperContent(await fetchPaperContent(paperId));
+export async function getPaperContent(paperId: string, trial = false): Promise<PaperContent> {
+  return adaptPaperContent(await (trial ? fetchTrialPaperContent(paperId) : fetchPaperContent(paperId)));
 }
 
 export function adaptPaperContent(res: PaperContentResponse): PaperContent {
