@@ -1,10 +1,24 @@
-// 체험 논문 목록. 주제·소개 문구는 마케팅 문구라 정적으로 두고, paperId만 환경 변수로 받는다
-// (dev·prod가 다르다). VITE_TRIAL_PAPER_IDS는 아래 순서대로 쉼표로 잇는다.
+// 체험 논문 목록. 주제·소개 문구는 마케팅 문구라 정적으로 두고, paperId는 호스트별로 코드에 박는다
+// (dist 하나를 dev·prod에 그대로 올리므로 빌드 시점 환경 변수는 쓸 수 없다 — analytics.ts의 토큰과 같은 방식).
+// 논문을 바꾸면 여기만 고친다. 체험 경로는 paper.trial인 논문만 응답하므로 id가 공개돼도 문제없다.
 import { isDevPreview } from '../dev/preview';
+
+export type TrialTopicKey = 'love' | 'ai' | 'semiconductor' | 'space' | 'sleep';
+
+/** 호스트별 체험 논문 paperId. 마스터 계정이 올린 뒤 trial을 켠 논문이다. 비어 있으면 "준비 중"으로 보인다. */
+export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, string>>> = {
+  'dev.papertutor.co.kr': {},
+  'papertutor.co.kr': {},
+};
+
+const PREVIEW_IDS: Record<TrialTopicKey, string> = {
+  love: 'preview-transformers', ai: 'preview-transformers', semiconductor: 'preview-transformers',
+  space: 'preview-transformers', sleep: 'preview-transformers',
+};
 
 export interface TrialPaper {
   topic: string;
-  topicKey: string;
+  topicKey: TrialTopicKey;
   title: string;
   hook: string;
   year: string;
@@ -21,12 +35,9 @@ const ENTRIES: Omit<TrialPaper, 'paperId'>[] = [
   { topicKey: 'sleep', topic: '수면', title: 'Sleep Loss Causes Social Withdrawal and Loneliness', hook: '하룻밤 잠을 설치면 사람을 피하게 되고, 그 외로움은 옆 사람에게까지 옮는다. 뇌 영상과 실험으로 보인 연구.', year: '2018', venue: 'Nature Communications', image: '/trial/sleep.jpg' },
 ];
 
-// 미리보기(dev:preview)는 완료 상태인 샘플 논문 한 편을 다섯 자리에 쓴다.
-const PREVIEW_IDS = Array(5).fill('preview-transformers').join(',');
-
 export function trialPapers(
-  idsEnv: string | undefined = import.meta.env.VITE_TRIAL_PAPER_IDS ?? (isDevPreview ? PREVIEW_IDS : undefined),
+  hostname: string = typeof window === 'undefined' ? '' : window.location.hostname,
 ): TrialPaper[] {
-  const ids = (idsEnv ?? '').split(',').map((s) => s.trim());
-  return ENTRIES.map((e, i) => ({ ...e, paperId: ids[i] || null }));
+  const ids = isDevPreview ? PREVIEW_IDS : (TRIAL_PAPER_IDS[hostname] ?? {});
+  return ENTRIES.map((e) => ({ ...e, paperId: ids[e.topicKey] ?? null }));
 }

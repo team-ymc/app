@@ -16,7 +16,8 @@ vi.mock('../nav/GlobalNav', () => ({ GlobalNav: () => <nav data-testid="global-n
 vi.mock('../analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('../trial/trialPapers', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../trial/trialPapers')>();
-  return { ...mod, trialPapers: () => mod.trialPapers('love-1,ai-1,,space-1,sleep-1') };
+  mod.TRIAL_PAPER_IDS['test.local'] = { love: 'love-1', ai: 'ai-1', space: 'space-1', sleep: 'sleep-1' };
+  return { ...mod, trialPapers: () => mod.trialPapers('test.local') };
 });
 
 const useAuthMock = vi.mocked(useAuth);
