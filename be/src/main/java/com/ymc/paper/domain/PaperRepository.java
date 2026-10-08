@@ -29,6 +29,10 @@ public interface PaperRepository extends JpaRepository<Paper, UUID> {
     @Query("select p from Paper p where p.id = :id and p.deletedAt is null")
     Optional<Paper> findActiveById(@Param("id") UUID id);
 
+    /** 체험 경로용 조회 — 체험 논문이 아니면 존재를 숨기기 위해 없는 것으로 본다. */
+    @Query("select p from Paper p where p.id = :id and p.trial = true and p.deletedAt is null")
+    Optional<Paper> findActiveTrialById(@Param("id") UUID id);
+
     /** 논리 삭제 CAS — 아직 살아 있을 때만 1 row. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
