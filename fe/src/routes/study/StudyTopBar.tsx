@@ -76,6 +76,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
 
   return (
     <div
+      className="pt-study-topbar"
       style={{
         height: '64px',
         flexShrink: 0,
@@ -85,7 +86,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
         alignItems: 'stretch',
       }}
     >
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: '0 20px 0 16px', gap: '16px' }}>
+      <div className="pt-study-topbar-main" style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', padding: '0 20px 0 16px', gap: '16px' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', letterSpacing: '-0.005em', whiteSpace: 'nowrap' }}>
             Paper Teacher
@@ -156,6 +157,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
         </div>
       </div>
       <div
+        className="pt-study-topbar-actions"
         style={{
           flexShrink: 0,
           display: 'flex',

@@ -38,6 +38,7 @@ export const PaperViewer = memo(function PaperViewer({ blocks, containerRef, tra
   const sheetWidth = side ? '1240px' : '1000px';
   return (
     <div
+      className="pt-paper-viewer"
       ref={containerRef}
       style={{
         flex: 1,

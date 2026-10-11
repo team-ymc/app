@@ -29,7 +29,7 @@ export function TocRail({ toc, activeId, tocOpen, onToggle, onJump }: TocRailPro
   };
 
   return (
-    <div style={railStyle}>
+    <div className="pt-toc-rail" data-open={tocOpen} style={railStyle}>
       <IconButton
         icon={tocOpen ? 'x' : 'list'}
         label={tocOpen ? '목차 닫기' : '목차 열기'}
