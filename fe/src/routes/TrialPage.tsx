@@ -1,6 +1,7 @@
 // 체험 페이지(YMC-430): 가입 없이 주제별 논문 한 편을 바로 읽어본다. 디자인: project-docs/design/trial.
-// 데스크톱 전용 한 화면 — 모바일은 랜딩으로 보낸다. 오늘의 논문 하나를 크게 세우고 나머지는 목록으로 둔다.
-import { useEffect } from 'react';
+// 데스크톱 전용 한 화면 — 모바일은 랜딩으로 보낸다. 왼쪽 큰 자리는 처음엔 오늘의 논문이고,
+// 오른쪽 목록에 마우스를 올리면 그 논문으로 바뀐다.
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { UploadSimple } from '@phosphor-icons/react';
 import { GlobalNav } from '../nav/GlobalNav';
@@ -17,10 +18,10 @@ function trackOpen(paper: TrialPaper) {
   track('trial_paper_opened', { paper_id: paper.paperId!, topic: paper.topicKey });
 }
 
-function Feature({ paper }: { paper: TrialPaper }) {
+function Feature({ paper, today }: { paper: TrialPaper; today: boolean }) {
   const body = (
     <>
-      <span className="trial-feature-tag">오늘의 논문</span>
+      {today && <span className="trial-feature-tag">오늘의 논문</span>}
       <div className="trial-feature-pic"><img src={paper.image} alt={`${paper.title} 첫 페이지`} /></div>
       <div className="trial-feature-text">
         <p className="trial-feature-topic">{paper.topic}</p>
@@ -37,7 +38,7 @@ function Feature({ paper }: { paper: TrialPaper }) {
   return <Link className="trial-feature" to={`/try/papers/${paper.paperId}`} onClick={() => trackOpen(paper)}>{body}</Link>;
 }
 
-function ListItem({ paper }: { paper: TrialPaper }) {
+function ListItem({ paper, active, onPreview }: { paper: TrialPaper; active: boolean; onPreview: () => void }) {
   const body = (
     <>
       <img src={paper.image} alt="" />
@@ -47,10 +48,15 @@ function ListItem({ paper }: { paper: TrialPaper }) {
       <span className="trial-item-read">{paper.paperId ? '→' : '준비 중'}</span>
     </>
   );
+  const className = `trial-item${active ? ' trial-item-active' : ''}`;
   if (!paper.paperId) {
-    return <div className="trial-item trial-unavailable" title="아직 준비 중인 논문입니다">{body}</div>;
+    return <div className={`${className} trial-unavailable`} title="아직 준비 중인 논문입니다" onMouseEnter={onPreview}>{body}</div>;
   }
-  return <Link className="trial-item" to={`/try/papers/${paper.paperId}`} onClick={() => trackOpen(paper)}>{body}</Link>;
+  return (
+    <Link className={className} to={`/try/papers/${paper.paperId}`} onClick={() => trackOpen(paper)} onMouseEnter={onPreview} onFocus={onPreview}>
+      {body}
+    </Link>
+  );
 }
 
 function TrialPageContent() {
@@ -60,8 +66,8 @@ function TrialPageContent() {
     track('trial_page_opened');
   }, []);
 
-  const today = pickTodaysPaper(PAPERS);
-  const others = PAPERS.filter((p) => p !== today);
+  const today = useMemo(() => pickTodaysPaper(PAPERS), []);
+  const [current, setCurrent] = useState(today);
 
   return (
     <div className="trial-page">
@@ -75,10 +81,10 @@ function TrialPageContent() {
           </button>
         </div></section>
         <section className="trial-shelf" aria-label="체험 논문"><div className="trial-container">
-          <Feature paper={today} />
-          <nav className="trial-others" aria-label="다른 주제의 체험 논문">
-            <div className="trial-others-head">다른 주제도 골라보세요</div>
-            {others.map((p) => <ListItem key={p.topicKey} paper={p} />)}
+          <Feature paper={current} today={current === today} />
+          <nav className="trial-others" aria-label="체험 논문 목록">
+            <div className="trial-others-head">주제를 골라보세요</div>
+            {PAPERS.map((p) => <ListItem key={p.topicKey} paper={p} active={p === current} onPreview={() => setCurrent(p)} />)}
           </nav>
         </div></section>
       </main>
