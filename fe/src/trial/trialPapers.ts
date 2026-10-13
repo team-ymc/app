@@ -3,29 +3,29 @@
 // 논문을 바꾸면 여기만 고친다. 체험 경로는 paper.trial인 논문만 응답하므로 id가 공개돼도 문제없다.
 import { isDevPreview } from '../dev/preview';
 
-export type TrialTopicKey = 'love' | 'ai' | 'semiconductor' | 'space' | 'sleep';
+export type TrialTopicKey = 'game' | 'sleep' | 'money' | 'art' | 'love' | 'music' | 'language' | 'space' | 'happiness';
 
 /** 호스트별 체험 논문 paperId. 마스터 계정이 올린 뒤 trial을 켠 논문이다. 비어 있으면 "준비 중"으로 보인다. */
 export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, string>>> = {
   'dev.papertutor.co.kr': {
-    love: '1e90a612-731b-40bc-8a57-267326ca0882',
-    ai: '374defd7-bc38-4655-8025-3cc443c761e1',
-    semiconductor: '71d0231d-73be-442a-8c25-6a327f07dae6',
-    space: '03bb177f-bf69-4bca-b603-2f4202998790',
-    sleep: 'a8c6b6a3-d141-4c1f-8046-b1927ef207fa',
+    game: 'd881cd9e-e2da-4efd-86ce-cf59454eaa22',
+    sleep: '2e38e5ea-b696-473a-8891-157ee827a445',
+    money: 'fe8e1932-af02-47c0-9b4f-cc1413abbf17',
+    art: '06b57e6d-c8cc-4e6d-ab43-6622534d6937',
+    love: '6b413b15-4b28-4fe1-b9e0-0acd4c0567f5',
+    music: 'a43fff95-69c0-42a2-8b2d-be12632c69c3',
+    language: '0b6a9dfd-b07a-4da5-8528-b50da96db220',
+    space: 'ab84c414-b17d-44c9-8dbf-4dd8bcb37bb5',
+    happiness: 'dfda6c8b-9f64-4a75-a432-70fbc31449e0',
   },
-  'papertutor.co.kr': {
-    love: '572d3d66-181d-4364-8319-352317d3405a',
-    ai: '35cc834e-ff84-4159-b9a7-c5c9716da9a3',
-    semiconductor: '43710f00-174a-43a3-bd65-d5a21bd2451c',
-    space: 'dde1989b-99b0-4387-8a2a-034fb382077f',
-    // sleep: prod에서는 당분간 '준비 중'으로 둔다. 켤 때 0209060b-f4fd-4cfe-ad98-aea5b7fd9b79.
-  },
+  // prod는 9편을 올려 trial을 켠 뒤 채운다. 그 전까지는 모두 준비 중.
+  'papertutor.co.kr': {},
 };
 
 const PREVIEW_IDS: Record<TrialTopicKey, string> = {
-  love: 'preview-transformers', ai: 'preview-transformers', semiconductor: 'preview-transformers',
-  space: 'preview-transformers', sleep: 'preview-transformers',
+  game: 'preview-transformers', sleep: 'preview-transformers', money: 'preview-transformers',
+  art: 'preview-transformers', love: 'preview-transformers', music: 'preview-transformers',
+  language: 'preview-transformers', space: 'preview-transformers', happiness: 'preview-transformers',
 };
 
 export interface TrialPaper {
@@ -40,11 +40,15 @@ export interface TrialPaper {
 }
 
 const ENTRIES: Omit<TrialPaper, 'paperId'>[] = [
-  { topicKey: 'love', topic: '사랑', title: 'Love-related Changes in the Brain: A Resting-state fMRI Study', hook: '사랑에 빠진 사람, 막 이별한 사람, 연애한 적 없는 사람. 가만히 쉬고 있을 때조차 세 집단의 뇌는 다르게 움직인다.', year: '2015', venue: 'Frontiers in Human Neuroscience', image: '/trial/love.jpg' },
-  { topicKey: 'ai', topic: 'AI', title: 'Attention Is All You Need', hook: 'ChatGPT를 비롯한 오늘날 언어 모델의 뼈대, 트랜스포머가 처음 등장한 논문.', year: '2017', venue: 'NeurIPS', image: '/trial/attention.jpg' },
-  { topicKey: 'semiconductor', topic: '반도체', title: 'Cramming More Components onto Integrated Circuits', hook: "반세기 동안 반도체 산업을 이끈 '무어의 법칙'이 처음 쓰인 네 쪽짜리 글.", year: '1965', venue: 'Electronics', image: '/trial/moore.jpg' },
-  { topicKey: 'space', topic: '우주', title: 'Observation of Gravitational Waves from a Binary Black Hole Merger', hook: '13억 년 전 두 블랙홀이 합쳐지며 낸 시공간의 떨림을 인류가 처음 들은 날의 기록.', year: '2016', venue: 'Physical Review Letters', image: '/trial/ligo.jpg' },
-  { topicKey: 'sleep', topic: '수면', title: 'Sleep Loss Causes Social Withdrawal and Loneliness', hook: '하룻밤 잠을 설치면 사람을 피하게 되고, 그 외로움은 옆 사람에게까지 옮는다. 뇌 영상과 실험으로 보인 연구.', year: '2018', venue: 'Nature Communications', image: '/trial/sleep.jpg' },
+  { topicKey: 'game', topic: '게임', title: 'Playing Atari with Deep Reinforcement Learning', hook: '화면 픽셀만 보고 아타리 게임을 사람보다 잘하게 된 첫 신경망. 지금의 딥마인드가 여기서 시작됐다.', year: '2013', venue: 'arXiv', image: '/trial/game.jpg' },
+  { topicKey: 'sleep', topic: '수면', title: 'Why Dream? A Conjecture on Dreaming', hook: '잠은 왜 필요하고 꿈은 왜 꾸는가. 몸이 세포를 갈아 끼우는 동안 뇌가 새 회로를 점검한다는 가설.', year: '2009', venue: 'arXiv', image: '/trial/sleep.jpg' },
+  { topicKey: 'money', topic: '돈', title: 'Bitcoin: A Peer-to-Peer Electronic Cash System', hook: '은행 없이 돈을 보내는 방법을 아홉 쪽에 담은, 비트코인의 출발점.', year: '2008', venue: 'bitcoin.org', image: '/trial/money.jpg' },
+  { topicKey: 'art', topic: '미술', title: 'Instance Normalization: The Missing Ingredient for Fast Stylization', hook: '사진을 고흐 풍으로 바꾸는 스타일 변환. 정규화 한 줄을 바꿔 품질을 끌어올린 발견.', year: '2016', venue: 'arXiv', image: '/trial/art.jpg' },
+  { topicKey: 'love', topic: '사랑', title: 'Do LLMs Give Good Romantic Relationship Advice?', hook: '연애 고민을 AI에게 털어놓으면 어떻게 될까. 만족도와 태도 변화를 실험으로 본 연구.', year: '2025', venue: 'preprint', image: '/trial/love.jpg' },
+  { topicKey: 'music', topic: '음악', title: 'Simple and Controllable Music Generation', hook: '문장 한 줄로 음악을 만드는 MusicGen. 멜로디까지 조건으로 줄 수 있다.', year: '2023', venue: 'arXiv', image: '/trial/music.jpg' },
+  { topicKey: 'language', topic: '언어', title: 'Efficient Estimation of Word Representations in Vector Space', hook: '왕 − 남자 + 여자 = 여왕. 단어를 숫자로 바꾸는 word2vec이 처음 나온 논문.', year: '2013', venue: 'arXiv', image: '/trial/language.jpg' },
+  { topicKey: 'space', topic: '우주', title: 'Dissolving the Fermi Paradox', hook: '외계인은 왜 안 보이는가. 불확실성을 제대로 계산하면 역설이 사라진다는 주장.', year: '2018', venue: 'arXiv', image: '/trial/space.jpg' },
+  { topicKey: 'happiness', topic: '행복', title: 'Happiness Is Assortative in Online Social Networks', hook: '트위터 글을 분석하니 행복한 사람은 행복한 사람끼리 이어져 있었다. 감정이 네트워크에서 모이는 방식.', year: '2011', venue: 'arXiv', image: '/trial/happiness.jpg' },
 ];
 
 export function trialPapers(
@@ -52,4 +56,12 @@ export function trialPapers(
 ): TrialPaper[] {
   const ids = isDevPreview ? PREVIEW_IDS : (TRIAL_PAPER_IDS[hostname] ?? {});
   return ENTRIES.map((e) => ({ ...e, paperId: ids[e.topicKey] ?? null }));
+}
+
+/** 오늘의 논문. 준비된 논문을 현지 날짜 기준으로 하루에 하나씩 돌아가며 고른다. */
+export function pickTodaysPaper(papers: TrialPaper[], date: Date = new Date()): TrialPaper {
+  const ready = papers.filter((p) => p.paperId);
+  const pool = ready.length > 0 ? ready : papers;
+  const day = Math.floor((date.getTime() - date.getTimezoneOffset() * 60_000) / 86_400_000);
+  return pool[day % pool.length];
 }

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import TrialPage from './TrialPage';
 import { useAuth } from '../auth/AuthContext';
 import { track } from '../analytics/analytics';
+import { pickTodaysPaper, trialPapers } from '../trial/trialPapers';
 
 const navigateMock = vi.fn();
 const startLoginMock = vi.fn();
@@ -16,7 +17,7 @@ vi.mock('../nav/GlobalNav', () => ({ GlobalNav: () => <nav data-testid="global-n
 vi.mock('../analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('../trial/trialPapers', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../trial/trialPapers')>();
-  mod.TRIAL_PAPER_IDS['test.local'] = { love: 'love-1', ai: 'ai-1', space: 'space-1', sleep: 'sleep-1' };
+  mod.TRIAL_PAPER_IDS['test.local'] = { game: 'game-1', money: 'money-1', space: 'space-1', sleep: 'sleep-1' };
   return { ...mod, trialPapers: () => mod.trialPapers('test.local') };
 });
 
@@ -28,21 +29,37 @@ function renderPage() {
   return render(<MemoryRouter initialEntries={['/try']}><TrialPage /></MemoryRouter>);
 }
 
+const TODAY = new Date('2026-10-13T12:00:00');
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(TODAY);
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
 });
-afterEach(cleanup);
+afterEach(() => {
+  vi.useRealTimers();
+  cleanup();
+});
 
 describe('TrialPage', () => {
-  it('주제 다섯 개를 보여주고 준비된 논문만 뷰어로 연결한다', () => {
+  it('오늘의 논문 하나를 크게, 나머지를 목록으로 보여주고 준비된 논문만 뷰어로 연결한다', () => {
     mockAuth('guest');
     renderPage();
-    for (const topic of ['사랑', 'AI', '반도체', '우주', '수면']) expect(screen.getByRole('heading', { name: topic })).toBeTruthy();
-    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/try/papers/'));
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/try/papers/love-1', '/try/papers/ai-1', '/try/papers/space-1', '/try/papers/sleep-1']);
-    fireEvent.click(links[1]);
-    expect(track).toHaveBeenCalledWith('trial_paper_opened', { paper_id: 'ai-1', topic: 'ai' });
+    const papers = trialPapers();
+    const today = pickTodaysPaper(papers, TODAY);
+    const feature = screen.getByRole('link', { name: /오늘의 논문/ });
+    expect(feature.getAttribute('href')).toBe(`/try/papers/${today.paperId}`);
+    expect(screen.getByRole('heading', { name: today.title })).toBeTruthy();
+
+    const listLinks = screen.getAllByRole('link').filter((a) => a !== feature && a.getAttribute('href')?.startsWith('/try/papers/'));
+    const expected = papers.filter((p) => p.paperId && p !== today).map((p) => `/try/papers/${p.paperId}`);
+    expect(listLinks.map((a) => a.getAttribute('href'))).toEqual(expected);
+    for (const p of papers.filter((p) => !p.paperId)) expect(screen.getByText(p.title).closest('a')).toBeNull();
+
+    fireEvent.click(listLinks[0]);
+    const first = papers.find((p) => `/try/papers/${p.paperId}` === expected[0])!;
+    expect(track).toHaveBeenCalledWith('trial_paper_opened', { paper_id: first.paperId, topic: first.topicKey });
   });
 
   it('업로드 버튼은 방문자에게 가입 모달을 열고, Google 버튼이 로그인을 시작한다', () => {
