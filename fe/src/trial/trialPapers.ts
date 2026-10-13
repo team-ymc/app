@@ -7,8 +7,18 @@ export type TrialTopicKey = 'game' | 'sleep' | 'money' | 'art' | 'love' | 'music
 
 /** 호스트별 체험 논문 paperId. 마스터 계정이 올린 뒤 trial을 켠 논문이다. 비어 있으면 "준비 중"으로 보인다. */
 export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, string>>> = {
-  // 9편을 새로 올린 뒤 호스트별로 채운다. 그 전까지는 모두 준비 중.
-  'dev.papertutor.co.kr': {},
+  'dev.papertutor.co.kr': {
+    game: 'd881cd9e-e2da-4efd-86ce-cf59454eaa22',
+    sleep: '2e38e5ea-b696-473a-8891-157ee827a445',
+    money: 'fe8e1932-af02-47c0-9b4f-cc1413abbf17',
+    art: '06b57e6d-c8cc-4e6d-ab43-6622534d6937',
+    love: '6b413b15-4b28-4fe1-b9e0-0acd4c0567f5',
+    music: 'a43fff95-69c0-42a2-8b2d-be12632c69c3',
+    language: '0b6a9dfd-b07a-4da5-8528-b50da96db220',
+    space: 'ab84c414-b17d-44c9-8dbf-4dd8bcb37bb5',
+    happiness: 'dfda6c8b-9f64-4a75-a432-70fbc31449e0',
+  },
+  // prod는 9편을 올려 trial을 켠 뒤 채운다. 그 전까지는 모두 준비 중.
   'papertutor.co.kr': {},
 };
 
