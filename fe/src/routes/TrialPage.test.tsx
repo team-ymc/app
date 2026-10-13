@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe('TrialPage', () => {
-  it('오늘의 논문 하나를 크게, 나머지를 목록으로 보여주고 준비된 논문만 뷰어로 연결한다', () => {
+  it('처음엔 오늘의 논문을 크게 보여주고, 목록에는 9편을 모두 두되 준비된 논문만 뷰어로 연결한다', () => {
     mockAuth('guest');
     renderPage();
     const papers = trialPapers();
@@ -53,13 +53,26 @@ describe('TrialPage', () => {
     expect(screen.getByRole('heading', { name: today.title })).toBeTruthy();
 
     const listLinks = screen.getAllByRole('link').filter((a) => a !== feature && a.getAttribute('href')?.startsWith('/try/papers/'));
-    const expected = papers.filter((p) => p.paperId && p !== today).map((p) => `/try/papers/${p.paperId}`);
+    const expected = papers.filter((p) => p.paperId).map((p) => `/try/papers/${p.paperId}`);
     expect(listLinks.map((a) => a.getAttribute('href'))).toEqual(expected);
     for (const p of papers.filter((p) => !p.paperId)) expect(screen.getByText(p.title).closest('a')).toBeNull();
 
     fireEvent.click(listLinks[0]);
     const first = papers.find((p) => `/try/papers/${p.paperId}` === expected[0])!;
     expect(track).toHaveBeenCalledWith('trial_paper_opened', { paper_id: first.paperId, topic: first.topicKey });
+  });
+
+  it('목록에 마우스를 올리면 큰 자리가 그 논문으로 바뀌고, 오늘의 논문 꼬리표는 사라진다', () => {
+    mockAuth('guest');
+    renderPage();
+    const papers = trialPapers();
+    const today = pickTodaysPaper(papers, TODAY);
+    const other = papers.find((p) => p.paperId && p !== today)!;
+    const row = screen.getAllByRole('link').find((a) => a.getAttribute('href') === `/try/papers/${other.paperId}` && a.className.includes('trial-item'))!;
+    fireEvent.mouseEnter(row);
+    expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
+    expect(screen.queryByText('오늘의 논문')).toBeNull();
+    expect(row.className).toContain('trial-item-active');
   });
 
   it('업로드 버튼은 방문자에게 가입 모달을 열고, Google 버튼이 로그인을 시작한다', () => {
