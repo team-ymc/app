@@ -18,6 +18,7 @@ export function GlobalNav() {
 
   return (
     <div
+      className="pt-global-nav"
       style={{
         position: 'fixed',
         top: 0,
@@ -35,7 +36,7 @@ export function GlobalNav() {
         zIndex: 5,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '22px', height: '100%' }}>
+      <div className="pt-global-nav-main" style={{ display: 'flex', alignItems: 'center', gap: '22px', height: '100%' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, textDecoration: 'none', color: 'inherit' }}>
           <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: '18px', whiteSpace: 'nowrap' }}>Paper Teacher</span>
         </Link>
@@ -47,7 +48,7 @@ export function GlobalNav() {
         </nav>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div className="pt-global-nav-account" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
         {status === 'authed' && <AccountMenu />}
         {status === 'guest' && <LoginButton onClick={startLogin} />}
       </div>

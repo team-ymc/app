@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { BookOpen, ChatCircleText } from '@phosphor-icons/react';
 import { IconButton } from '../design/components/IconButton';
 import { ApiError, type TranslationStatus, type KnowledgeGraphStatus } from '../api/types';
 import { getPaperContent } from '../markdown/paperContent';
@@ -40,6 +41,7 @@ const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
 const SPLIT_MIN = 30;
 const SPLIT_MAX = 75;
 const SPLIT_DEFAULT = 70;
+const PHONE_VIEWPORT = '(max-width: 680px)';
 // 옆 배치로 들어갈 때 맞추는 채팅 폭과 스플리터 폭.
 const CHAT_SIDE_WIDTH = 320;
 const SPLITTER_WIDTH = 6;
@@ -177,6 +179,7 @@ function StudyPageContent({
   const [splitPct, setSplitPct] = useState(SPLIT_DEFAULT);
   const [splitterHover, setSplitterHover] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   // 체험은 선행지식 하이라이트가 켜진 채 열린다.
   const [prerequisiteOn, setPrerequisiteOn] = useState(trial);
   // 세 오버레이(선행지식·선택·질문하기)가 서로를 닫는 신호. 값이 바뀌면 해당 오버레이가 idle로 돌아간다.
@@ -286,6 +289,7 @@ function StudyPageContent({
     attachSeqRef.current += 1;
     setAttachEvent({ seq: attachSeqRef.current, mode });
     setChatCollapsed(false);
+    if (window.matchMedia?.(PHONE_VIEWPORT)?.matches) setMobileChatOpen(true);
   }
 
   function handleRemoveAttachment(index: number) {
@@ -345,6 +349,8 @@ function StudyPageContent({
 
   return (
     <div
+      className="pt-study-page"
+      data-mobile-panel={mobileChatOpen ? 'chat' : 'paper'}
       data-theme={nightMode ? 'night' : undefined}
       style={{
         height: '100vh',
@@ -396,13 +402,30 @@ function StudyPageContent({
       />
 
       {/* R2 Study work area */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+      <div className="pt-study-workspace" style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         {/* R3 TOC nav rail */}
-        <TocRail toc={toc} activeId={activeId} tocOpen={tocOpen} onToggle={() => setTocOpen((v) => !v)} onJump={handleJump} />
+        <div className="pt-study-toolbar">
+          <TocRail toc={toc} activeId={activeId} tocOpen={tocOpen} onToggle={() => setTocOpen((v) => !v)} onJump={handleJump} />
+          <button
+            type="button"
+            className="pt-study-panel-toggle"
+            aria-label={mobileChatOpen ? '논문으로 전환' : 'AI 튜터로 전환'}
+            title={mobileChatOpen ? '논문으로 전환' : 'AI 튜터로 전환'}
+            aria-controls={mobileChatOpen ? 'pt-study-reader' : 'pt-study-chat'}
+            onClick={() => {
+              setMobileChatOpen((open) => !open);
+              setChatCollapsed(false);
+            }}
+          >
+            {mobileChatOpen ? <BookOpen size={24} aria-hidden="true" /> : <ChatCircleText size={24} aria-hidden="true" />}
+          </button>
+        </div>
 
-        <div ref={splitRegionRef} style={{ flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden' }}>
+        <div className="pt-study-panels" ref={splitRegionRef} style={{ flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden' }}>
           {/* R4 Paper viewer */}
           <div
+            className="pt-study-reader"
+            id="pt-study-reader"
             style={{
               width: chatCollapsed ? 'calc(100% - 44px - 6px)' : `${splitPct}%`,
               minWidth: 0,
@@ -440,6 +463,7 @@ function StudyPageContent({
 
           {/* Resizable splitter */}
           <div
+            className="pt-study-splitter"
             onPointerDown={handleSplitterPointerDown}
             onMouseEnter={() => setSplitterHover(true)}
             onMouseLeave={() => setSplitterHover(false)}
@@ -456,6 +480,9 @@ function StudyPageContent({
 
           {/* R5 AI chat panel */}
           <div
+            className="pt-study-chat"
+            id="pt-study-chat"
+            data-collapsed={chatCollapsed}
             style={{
               width: chatCollapsed ? '44px' : `${100 - splitPct}%`,
               minWidth: 0,
@@ -473,7 +500,12 @@ function StudyPageContent({
               onAttachmentsConsumed={() => setAttachments([])}
               attachNotice={attachNotice}
               collapsed={chatCollapsed}
-              onToggleCollapse={() => setChatCollapsed((v) => !v)}
+              onToggleCollapse={() => {
+                if (window.matchMedia?.(PHONE_VIEWPORT)?.matches) {
+                  setMobileChatOpen(chatCollapsed);
+                  setChatCollapsed(false);
+                } else setChatCollapsed((v) => !v);
+              }}
               queryLocked={aiUsage ? isExhausted(aiUsage) : false}
               lockPlaceholder={exhaustedPlaceholder(aiUsage?.resetAt ?? null)}
             />

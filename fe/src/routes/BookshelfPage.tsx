@@ -194,6 +194,7 @@ export default function BookshelfPage() {
 
   return (
     <div
+      className="pt-bookshelf-page"
       style={{
         height: '100vh',
         width: '100%',
@@ -212,12 +213,12 @@ export default function BookshelfPage() {
       `}</style>
 
       {/* R1 spacer: 진짜 바는 아래 fixed overlay (profile-menu 앵커링 필요) */}
-      <div style={{ height: '64px', flexShrink: 0 }} />
+      <div className="pt-bookshelf-nav-spacer" style={{ height: '64px', flexShrink: 0 }} />
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: '960px', padding: '0 32px 64px', boxSizing: 'border-box' }}>
+        <div className="pt-bookshelf-content" style={{ width: '100%', maxWidth: '960px', padding: '0 32px 64px', boxSizing: 'border-box' }}>
           {/* R2 Bookshelf header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 0 14px' }}>
+          <div className="pt-bookshelf-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 0 14px' }}>
             <h1
               style={{
                 display: 'flex',
@@ -326,7 +327,7 @@ export default function BookshelfPage() {
           {/* R4 Paper list */}
           {hasResults && (
             isGridView ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+              <div className="pt-bookshelf-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
                 {pageItems.map((paper) => (
                   <PaperGridCard
                     key={paper.paperId}
@@ -446,6 +447,7 @@ export default function BookshelfPage() {
       {/* Toast — 업로드 외에도 학습 진입 거부 등에 재사용된다 */}
       {toast && (
         <div
+          className="pt-bookshelf-toast"
           style={{
             position: 'fixed',
             bottom: '28px',
@@ -590,6 +592,7 @@ function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, on
   const [hover, setHover] = useState(false);
   return (
     <div
+      className="pt-paper-list-row"
       role="button"
       tabIndex={0}
       // 이름 변경 중에는 blur로 저장되는 클릭이 곧바로 페이지 이동으로 이어지지 않게 막는다
@@ -653,6 +656,7 @@ function PaperListRow({ paper, renaming, onSelect, onDownload, onRenameStart, on
 function PaperGridCard({ paper, renaming, onSelect, onDownload, onRenameStart, onRenameSave, onRenameCancel, onDeleteRequest, retrying, onRetry }: PaperItemProps) {
   return (
     <div
+      className="pt-paper-grid-card"
       role="button"
       tabIndex={0}
       onClick={() => { if (!renaming) onSelect(paper); }}

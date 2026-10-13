@@ -69,6 +69,7 @@ function KnowledgeGraphContent({ paperId, knowledgeGraphStatus }: { paperId: str
 
   return (
     <div
+      className="pt-graph-page"
       style={{
         height: '100vh',
         width: '100%',

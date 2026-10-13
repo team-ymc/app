@@ -111,6 +111,29 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe('StudyPage — phone panel switching', () => {
+  it.each([true, false])('opens quoted questions in chat only on phones (phone=%s)', async (phone) => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: phone });
+    try {
+      vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+      vi.mocked(useTextSelection).mockReturnValue(selection());
+      renderStudy();
+      const askButton = await screen.findByRole('button', { name: '질문하기' });
+      const viewer = document.querySelector('.pt-paper-viewer');
+      const tutor = screen.getByTestId('tutor-panel');
+
+      fireEvent.click(askButton);
+
+      expect(document.querySelector('.pt-study-page')?.getAttribute('data-mobile-panel')).toBe(phone ? 'chat' : 'paper');
+      expect(document.querySelector('.pt-paper-viewer')).toBe(viewer);
+      expect(screen.getByTestId('tutor-panel')).toBe(tutor);
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+});
+
 describe('StudyPage — 전체 번역 순환', () => {
   it('버튼 클릭이 off → 아래 → 옆 → off로 순환하고 저장된다', async () => {
     vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));

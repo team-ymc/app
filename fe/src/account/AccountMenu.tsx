@@ -57,6 +57,7 @@ export function AccountMenu() {
 
       {menuOpen && (
         <div
+          className="pt-account-menu"
           ref={menuRef}
           style={{
             position: 'fixed',
@@ -119,6 +120,7 @@ export function AccountMenu() {
           </DropdownButton>
           {usageOpen && plan && (
             <div
+              className="pt-account-usage"
               style={{
                 position: 'absolute',
                 top: 0,
