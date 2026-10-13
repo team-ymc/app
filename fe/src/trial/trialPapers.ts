@@ -18,8 +18,17 @@ export const TRIAL_PAPER_IDS: Record<string, Partial<Record<TrialTopicKey, strin
     space: 'ab84c414-b17d-44c9-8dbf-4dd8bcb37bb5',
     happiness: 'dfda6c8b-9f64-4a75-a432-70fbc31449e0',
   },
-  // prod는 9편을 올려 trial을 켠 뒤 채운다. 그 전까지는 모두 준비 중.
-  'papertutor.co.kr': {},
+  'papertutor.co.kr': {
+    game: '7e717495-f5ee-4b60-a8dc-5437a40fd9e4',
+    sleep: 'ff8aa871-858e-421b-b807-ed788f659c65',
+    money: 'b4d5ea89-b6bf-4bb9-85f9-f21103f969ec',
+    // art: prod 파싱이 OCR 일시 장애로 실패해 '준비 중'으로 둔다. 재시도 성공 후 b40ef02e-3dbc-483d-9312-358a4da9f424.
+    love: 'f573c6f5-c328-4910-bc0d-26c287fd6974',
+    music: '1823d914-7d97-4306-87bd-a57ea7edf8ff',
+    language: '6c420ddd-86ee-4c57-bca6-18c9fd7551e3',
+    space: '4966b9cf-1c14-42dc-9445-81f79daeb45e',
+    happiness: 'a9e04bbe-03b8-4be8-9057-f29dbcc915ad',
+  },
 };
 
 const PREVIEW_IDS: Record<TrialTopicKey, string> = {
