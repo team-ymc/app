@@ -47,7 +47,7 @@ let captured: Captured | null = null;
 
 beforeEach(() => {
   captured = null;
-  vi.mocked(useTrialMode).mockReturnValue({ trial: false, requestSignup: vi.fn() });
+  vi.mocked(useTrialMode).mockReturnValue({ trial: false, home: '/try', requestSignup: vi.fn() });
   vi.mocked(streamTranslation).mockImplementation(async ({ onEvent, signal }) => {
     captured = { onEvent, signal };
   });
@@ -93,7 +93,7 @@ describe('SelectionLayer — 현재 상태기계', () => {
   });
 
   it('체험 모드면 스트림 요청에 trial을 넘긴다', async () => {
-    vi.mocked(useTrialMode).mockReturnValue({ trial: true, requestSignup: vi.fn() });
+    vi.mocked(useTrialMode).mockReturnValue({ trial: true, home: '/try', requestSignup: vi.fn() });
     setup(selection());
     fireEvent.click(screen.getByRole('button', { name: /번역/ }));
     await waitFor(() => expect(captured).not.toBeNull());

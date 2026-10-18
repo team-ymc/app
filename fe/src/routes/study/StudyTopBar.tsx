@@ -65,7 +65,7 @@ function KnowledgeGraphIcon() {
 }
 
 export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rightSlot }: StudyTopBarProps) {
-  const { trial, requestSignup } = useTrialMode();
+  const { trial, home, requestSignup } = useTrialMode();
   const base = trial ? '/try/papers' : '/papers';
   const graphDisabled = knowledgeGraphStatus !== 'READY';
   const graphReason = knowledgeGraphDisabledReason(knowledgeGraphStatus);
@@ -94,7 +94,7 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
         </Link>
         <div style={DIVIDER} />
         <Link
-          to={trial ? '/try' : '/library'}
+          to={trial ? home : '/library'}
           style={{
             display: 'flex',
             alignItems: 'center',

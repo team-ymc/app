@@ -5,6 +5,7 @@ import TrialPage from './TrialPage';
 import { useAuth } from '../auth/AuthContext';
 import { track } from '../analytics/analytics';
 import { pickTodaysPaper, trialPapers } from '../trial/trialPapers';
+import { trialHome } from '../trial/trialHome';
 
 const navigateMock = vi.fn();
 const startLoginMock = vi.fn();
@@ -25,8 +26,8 @@ const useAuthMock = vi.mocked(useAuth);
 function mockAuth(status: 'guest' | 'authed' | 'loading') {
   useAuthMock.mockReturnValue({ status, user: null, initialError: null, startLogin: startLoginMock, signOut: vi.fn() });
 }
-function renderPage() {
-  return render(<MemoryRouter initialEntries={['/try']}><TrialPage /></MemoryRouter>);
+function renderPage(layout?: 'today' | 'panels') {
+  return render(<MemoryRouter initialEntries={['/try']}><TrialPage layout={layout} /></MemoryRouter>);
 }
 
 const TODAY = new Date('2026-10-13T12:00:00');
@@ -48,6 +49,7 @@ describe('TrialPage', () => {
     renderPage();
     const papers = trialPapers();
     const today = pickTodaysPaper(papers, TODAY);
+    expect(trialHome()).toBe('/try');
     const feature = screen.getByRole('link', { name: /오늘의 논문/ });
     expect(feature.getAttribute('href')).toBe(`/try/papers/${today.paperId}`);
     expect(screen.getByRole('heading', { name: today.title })).toBeTruthy();
@@ -73,6 +75,22 @@ describe('TrialPage', () => {
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
     expect(screen.queryByText('오늘의 논문')).toBeNull();
     expect(row.className).toContain('trial-item-active');
+  });
+
+  it('패널 레이아웃은 주제별 패널 9장을 한 줄로 두고, 준비된 논문만 뷰어로 연결한다', () => {
+    mockAuth('guest');
+    renderPage('panels');
+    const papers = trialPapers();
+    expect(trialHome()).toBe('/trys');
+    expect(screen.queryByText('오늘의 논문')).toBeNull();
+    for (const p of papers) expect(screen.getByRole('heading', { name: p.topic })).toBeTruthy();
+    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/try/papers/'));
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(papers.filter((p) => p.paperId).map((p) => `/try/papers/${p.paperId}`));
+    for (const p of papers.filter((p) => !p.paperId)) expect(screen.getByText(p.title).closest('a')).toBeNull();
+
+    fireEvent.click(links[0]);
+    const first = papers.find((p) => p.paperId)!;
+    expect(track).toHaveBeenCalledWith('trial_paper_opened', { paper_id: first.paperId, topic: first.topicKey });
   });
 
   it('업로드 버튼은 방문자에게 가입 모달을 열고, Google 버튼이 로그인을 시작한다', () => {

@@ -1,6 +1,6 @@
 // 체험 페이지(YMC-430): 가입 없이 주제별 논문 한 편을 바로 읽어본다. 디자인: project-docs/design/trial.
-// 데스크톱 전용 한 화면 — 모바일은 랜딩으로 보낸다. 왼쪽 큰 자리는 처음엔 오늘의 논문이고,
-// 오른쪽 목록에 마우스를 올리면 그 논문으로 바뀐다.
+// 데스크톱 전용 한 화면 — 모바일은 랜딩으로 보낸다.
+// 레이아웃은 두 가지다. /try는 오늘의 논문(왼쪽 큰 자리 + 오른쪽 목록), /trys는 주제별 패널 한 줄. A/B 비교용.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { UploadSimple } from '@phosphor-icons/react';
@@ -9,8 +9,12 @@ import { PaperStackMark } from '../design/components/PaperStackMark';
 import { TrialModeProvider, useTrialMode } from '../trial/TrialMode';
 import { pickTodaysPaper, trialPapers, type TrialPaper } from '../trial/trialPapers';
 import { useDesktopOnly } from '../trial/useDesktopOnly';
+import { rememberTrialHome } from '../trial/trialHome';
 import { track } from '../analytics/analytics';
+import { PanelShelf } from './trial/PanelShelf';
 import './TrialPage.css';
+
+export type TrialLayout = 'today' | 'panels';
 
 const PAPERS = trialPapers();
 
@@ -59,18 +63,30 @@ function ListItem({ paper, active, onPreview }: { paper: TrialPaper; active: boo
   );
 }
 
-function TrialPageContent() {
+function TodayShelf() {
+  const today = useMemo(() => pickTodaysPaper(PAPERS), []);
+  const [current, setCurrent] = useState(today);
+  return (
+    <section className="trial-shelf" aria-label="체험 논문"><div className="trial-container">
+      <Feature paper={current} today={current === today} />
+      <nav className="trial-others" aria-label="체험 논문 목록">
+        <div className="trial-others-head">주제를 골라보세요</div>
+        {PAPERS.map((p) => <ListItem key={p.topicKey} paper={p} active={p === current} onPreview={() => setCurrent(p)} />)}
+      </nav>
+    </div></section>
+  );
+}
+
+function TrialPageContent({ layout }: { layout: TrialLayout }) {
   const { requestSignup } = useTrialMode();
   useDesktopOnly();
   useEffect(() => {
+    rememberTrialHome(layout === 'panels' ? '/trys' : '/try');
     track('trial_page_opened');
-  }, []);
-
-  const today = useMemo(() => pickTodaysPaper(PAPERS), []);
-  const [current, setCurrent] = useState(today);
+  }, [layout]);
 
   return (
-    <div className="trial-page">
+    <div className={`trial-page${layout === 'panels' ? ' trial-page-panels' : ''}`}>
       <GlobalNav />
       <main>
         <section className="trial-hero"><div className="trial-container">
@@ -80,13 +96,7 @@ function TrialPageContent() {
             <UploadSimple size={22} />내 논문 업로드하기
           </button>
         </div></section>
-        <section className="trial-shelf" aria-label="체험 논문"><div className="trial-container">
-          <Feature paper={current} today={current === today} />
-          <nav className="trial-others" aria-label="체험 논문 목록">
-            <div className="trial-others-head">주제를 골라보세요</div>
-            {PAPERS.map((p) => <ListItem key={p.topicKey} paper={p} active={p === current} onPreview={() => setCurrent(p)} />)}
-          </nav>
-        </div></section>
+        {layout === 'panels' ? <PanelShelf papers={PAPERS} onOpen={trackOpen} /> : <TodayShelf />}
       </main>
       <footer className="trial-footer"><div className="trial-container">
         <Link to="/" className="trial-brand"><PaperStackMark size={20} color="currentColor" />Paper Teacher</Link>
@@ -97,10 +107,10 @@ function TrialPageContent() {
   );
 }
 
-export default function TrialPage() {
+export default function TrialPage({ layout = 'today' }: { layout?: TrialLayout }) {
   return (
     <TrialModeProvider>
-      <TrialPageContent />
+      <TrialPageContent layout={layout} />
     </TrialModeProvider>
   );
 }

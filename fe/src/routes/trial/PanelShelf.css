@@ -1,0 +1,31 @@
+/* 패널 레이아웃. 색·글꼴 변수는 TrialPage.css에서 받고, 컨테이너는 그쪽 grid 규칙을 이기도록 .trial-page를 앞에 둔다. */
+/* 페이지 높이를 화면에 고정해 호버로 소개가 펼쳐져도 패널 높이가 안 변한다. 낮은 화면에선 880px로 잡아 겹치지 않고 스크롤된다. */
+.trial-page-panels { height:max(100vh,880px); }
+.trial-page .trial-shelf-panels .trial-container { display:flex; flex-direction:column; padding-top:24px; padding-bottom:24px; }
+.trial-panels-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; color:#b9aa98; font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; }
+.trial-panels-head span:last-child { letter-spacing:.02em; text-transform:none; font-weight:500; color:#9c8d7b; }
+.trial-panels { flex:1; min-height:0; display:flex; gap:10px; }
+.trial-panel { position:relative; flex:1 1 0; min-width:0; min-height:420px; display:flex; flex-direction:column; border-radius:6px; background:#f4ecdf; border:1px solid rgba(255,255,255,.06); color:var(--ink); overflow:hidden; transition:flex .45s cubic-bezier(.2,.7,.2,1),background .3s; }
+.trial-panel:not(.trial-unavailable):hover,.trial-panel:focus-visible { flex:3 1 0; background:var(--paper); }
+.trial-panel-head { display:flex; justify-content:center; padding:16px 12px 14px; background:#3a2e27; color:#fffaf1; border-bottom:2px solid var(--brass); white-space:nowrap; transition:background .3s; }
+.trial-panel:not(.trial-unavailable):hover .trial-panel-head,.trial-panel:focus-visible .trial-panel-head { background:var(--navy); border-bottom-color:#8fa3bd; }
+.trial-panel-head h2 { margin:0; font:600 26px/1.1 var(--serif); letter-spacing:-.04em; color:#fffaf1; }
+.trial-thumb { position:relative; flex:1; min-height:0; margin:14px 12px 0; overflow:hidden; border-radius:3px 3px 0 0; }
+.trial-thumb img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; background:#fff; border:1px solid #e3dac9; border-bottom:0; border-radius:2px 2px 0 0; box-shadow:0 14px 30px rgba(77,56,29,.14); transition:transform .35s; }
+.trial-panel:not(.trial-unavailable):hover .trial-thumb img { transform:translateY(-6px); }
+.trial-thumb:after { content:''; position:absolute; left:0; right:0; bottom:0; height:60px; background:linear-gradient(180deg,rgba(244,236,223,0) 0%,#f4ecdf 100%); transition:background .3s; pointer-events:none; }
+.trial-panel:not(.trial-unavailable):hover .trial-thumb:after { background:linear-gradient(180deg,rgba(255,253,248,0) 0%,#fffdf8 100%); }
+.trial-panel-body { flex:none; padding:12px 12px 14px; }
+/* 좁을 때는 제목만 세 줄, 넓어지면 두 줄로 키우고 소개를 펼친다. */
+.trial-panel-title { margin:0 0 6px; font:600 13px/1.4 var(--serif); letter-spacing:-.02em; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; hyphens:auto; overflow-wrap:anywhere; transition:font-size .3s; }
+.trial-panel:not(.trial-unavailable):hover .trial-panel-title,.trial-panel:focus-visible .trial-panel-title { -webkit-line-clamp:2; font-size:17px; color:var(--navy); }
+.trial-panel-hook { margin:0; color:var(--muted); font-size:13.5px; line-height:1.65; word-break:keep-all; max-height:0; opacity:0; overflow:hidden; transition:max-height .4s ease,opacity .3s ease .1s; }
+.trial-panel:not(.trial-unavailable):hover .trial-panel-hook,.trial-panel:focus-visible .trial-panel-hook { max-height:90px; opacity:1; }
+.trial-panel-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; color:#9b8f7e; font-size:11.5px; letter-spacing:.02em; white-space:nowrap; }
+.trial-panel-meta { display:flex; align-items:center; gap:6px; overflow:hidden; }
+.trial-panel-venue { overflow:hidden; text-overflow:ellipsis; }
+/* 좁은 패널에서 연도·출처 자리를 뺏지 않게 접혀 있다가 호버 때 펼친다. */
+.trial-panel-read { display:inline-flex; align-items:center; flex:none; max-width:0; overflow:hidden; color:var(--navy); font-size:13px; font-weight:700; opacity:0; transform:translateX(-6px); transition:opacity .25s,transform .25s,max-width .25s; }
+.trial-panel:not(.trial-unavailable):hover .trial-panel-read,.trial-panel:focus-visible .trial-panel-read,.trial-unavailable .trial-panel-read { max-width:120px; opacity:1; transform:none; }
+.trial-unavailable .trial-panel-read { color:#9b8f7e; font-size:11.5px; font-weight:600; }
+@media (prefers-reduced-motion:reduce) { .trial-panel,.trial-thumb img,.trial-panel-title,.trial-panel-hook,.trial-panel-read,.trial-thumb:after { transition:none; } }

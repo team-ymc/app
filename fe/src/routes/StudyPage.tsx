@@ -55,13 +55,13 @@ export function splitPctForChatWidth(regionWidth: number): number | null {
 
 export default function StudyPage() {
   const { paperId } = useParams<{ paperId: string }>();
-  const { trial } = useTrialMode();
+  const { trial, home } = useTrialMode();
 
   // 체험 논문은 status 경로가 없다 — 준비된 논문만 노출되므로 본문 응답의 번역 상태만 쓰고 지식 그래프는 READY로 본다.
   const statusQuery = usePaperStatusQuery(trial ? undefined : paperId);
 
   if (!paperId) {
-    return <Navigate to={trial ? '/try' : '/library'} replace state={{ toast: '잘못된 접근입니다' }} />;
+    return <Navigate to={trial ? home : '/library'} replace state={{ toast: '잘못된 접근입니다' }} />;
   }
   if (trial) {
     return <StudyPageContent paperId={paperId} translationStatus={null} knowledgeGraphStatus="READY" compileRetryable={false} />;
@@ -106,7 +106,7 @@ function StudyPageContent({
   knowledgeGraphStatus: KnowledgeGraphStatus | null;
   compileRetryable: boolean;
 }) {
-  const { trial } = useTrialMode();
+  const { trial, home } = useTrialMode();
   const queryClient = useQueryClient();
   const [compileRetryBusy, setCompileRetryBusy] = useState(false);
   const [compileRetryError, setCompileRetryError] = useState<{ message: string; blocked: boolean } | null>(null);
@@ -324,10 +324,10 @@ function StudyPageContent({
   if (contentQuery.isError) {
     // 진입 게이트(status COMPLETED)를 통과했는데 409면 적재 지연 등 일시 상태 — 서재로 안내
     if (trial && contentQuery.error instanceof ApiError && contentQuery.error.httpStatus === 404) {
-      return <Navigate to="/try" replace />;
+      return <Navigate to={home} replace />;
     }
     if (contentQuery.error instanceof ApiError && contentQuery.error.code === 'PAPER_NOT_READY') {
-      return <Navigate to={trial ? '/try' : '/library'} replace state={{ toast: '본문 준비 중입니다. 잠시 후 다시 열어주세요' }} />;
+      return <Navigate to={trial ? home : '/library'} replace state={{ toast: '본문 준비 중입니다. 잠시 후 다시 열어주세요' }} />;
     }
     return (
       <div style={{ padding: 48, textAlign: 'center', fontFamily: 'var(--font-sans)', color: 'var(--color-text-muted)' }}>
