@@ -60,6 +60,16 @@ public class TranslationCommandService {
                 TranslationRun.start(ownerId, paperId, objectMapper.valueToTree(selection), now));
         paperAccessRecorder.recordAccess(paperId, now);
         usageService.reserve(ownerId, UsageType.AI_QUERY, run.getId(), UsageSourceType.INLINE_TRANSLATION);
-        return new TranslationStartResult(paperId, aiPaperId.toString(), run.getId());
+        return new TranslationStartResult(paperId, aiPaperId.toString(), run.getId(), false);
+    }
+
+    /**
+     * 체험 시작. 행·예약·사용자당 상한 없이 식별자만 만든다 — 저장하지 않으므로 트랜잭션도 없다.
+     *
+     * @throws ApiException PAPER_NOT_FOUND / PAPER_NOT_READY
+     */
+    public TranslationStartResult startTrial(UUID paperId) {
+        UUID aiPaperId = paperChatAccessValidator.requireReadyTrialRequestPaperId(paperId);
+        return new TranslationStartResult(paperId, aiPaperId.toString(), UUID.randomUUID(), true);
     }
 }

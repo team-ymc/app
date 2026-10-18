@@ -35,7 +35,22 @@ public class PaperChatAccessValidator {
      */
     @Transactional(readOnly = true)
     public UUID requireReadyRequestPaperId(UUID paperId, UUID ownerId) {
-        Paper paper = getOwned(paperId, ownerId);
+        return requireReady(getOwned(paperId, ownerId));
+    }
+
+    /**
+     * 체험 경로. 소유 대신 trial 플래그를 본다 — 아니면 존재를 숨기기 위해 404다.
+     *
+     * @throws ApiException PAPER_NOT_FOUND(404) / PAPER_NOT_READY(409)
+     */
+    @Transactional(readOnly = true)
+    public UUID requireReadyTrialRequestPaperId(UUID paperId) {
+        Paper paper = paperRepository.findActiveTrialById(paperId).orElseThrow(
+                () -> new ApiException(ErrorCode.PAPER_NOT_FOUND, "존재하지 않는 논문입니다."));
+        return requireReady(paper);
+    }
+
+    private UUID requireReady(Paper paper) {
         Document document = views.documentOf(paper).orElse(null);
         PaperStatus status = PaperDocumentViews.derivedStatus(paper, document);
         if (status != PaperStatus.COMPLETED) {

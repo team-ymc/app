@@ -62,6 +62,15 @@ describe('translationStream — 스트림 소비와 종결 판정', () => {
     expect(JSON.parse(opts.body)).toEqual({ selection: SELECTION });
   });
 
+  it('체험 모드: 인증 없는 /api/trial 경로를 호출한다', async () => {
+    mockStreamFetch([frame('translation.completed', { type: 'translation.completed', translation: 'x', contentFormat: 'markdown', status: 'COMPLETED' })]);
+    await streamTranslation({ paperId: 'p-1', selection: SELECTION, trial: true, onEvent: () => {} });
+    const [url, opts] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('/api/trial/papers/p-1/inline-translations');
+    expect(opts.method).toBe('POST');
+    expect(opts.headers.Authorization).toBeUndefined();
+  });
+
   it('error event: 확인된 실패, retryable은 이벤트 값 그대로', async () => {
     mockStreamFetch([
       frame('translation.started', { type: 'translation.started', translationId: 't-1' }),

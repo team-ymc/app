@@ -13,6 +13,8 @@ export type TranslationStreamEvent =
 export interface TranslationStreamOpts {
   paperId: string;
   selection: SelectionAnchors;
+  /** 체험 모드: 인증 없는 /api/trial 경로를 authFetch 대신 fetch로 부른다. */
+  trial?: boolean;
   signal?: AbortSignal;
   onEvent: (e: TranslationStreamEvent) => void;
 }
@@ -26,10 +28,11 @@ function isAbortError(e: unknown): boolean {
  * terminal 없는 EOF·네트워크 예외=결과 미상 실패 / heartbeat=무시.
  * abort는 "듣기 중단"일 뿐이다 — translation.started 이후라면 BE는 완주한다.
  */
-export async function streamTranslation({ paperId, selection, signal, onEvent }: TranslationStreamOpts): Promise<void> {
+export async function streamTranslation({ paperId, selection, trial = false, signal, onEvent }: TranslationStreamOpts): Promise<void> {
+  const url = trial ? `/api/trial/papers/${paperId}/inline-translations` : `/api/papers/${paperId}/inline-translations`;
   let res: Response;
   try {
-    res = await authFetch(`/api/papers/${paperId}/inline-translations`, {
+    res = await (trial ? fetch : authFetch)(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify({ selection }),

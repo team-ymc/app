@@ -205,7 +205,7 @@ public class TranslationStreamService {
             }
             boolean committed;
             try {
-                committed = transitions.complete(ids.translationId(), finalContent, estimatedCostUsd);
+                committed = commitCompleted(estimatedCostUsd);
             } catch (RuntimeException e) {
                 log.error("최종 번역 저장 실패. translationId={}", ids.translationId(), e);
                 failLocked("TRANSLATION_PERSISTENCE_FAILED", "번역을 저장하지 못했습니다.", true);
@@ -251,10 +251,21 @@ public class TranslationStreamService {
             failWith("AI_STREAM_DISCONNECTED", "번역 생성 연결이 끊어졌습니다.", true);
         }
 
+        /** 체험 실행은 translation_run 행이 없다 — finished CAS가 종결의 주인이므로 DB 전이를 건너뛴다. */
+        private boolean commitCompleted(BigDecimal estimatedCostUsd) {
+            return ids.trial() || transitions.complete(ids.translationId(), finalContent, estimatedCostUsd);
+        }
+
+        private void commitFailed() {
+            if (!ids.trial()) {
+                transitions.fail(ids.translationId());
+            }
+        }
+
         private void failLocked(String code, String message, boolean retryable) {
             cancelTimers();
             try {
-                transitions.fail(ids.translationId());
+                commitFailed();
             } catch (RuntimeException e) {
                 log.error("FAILED 전이조차 실패 — terminal 없이 종료. translationId={}", ids.translationId(), e);
                 emitter.completeWithError(e);
