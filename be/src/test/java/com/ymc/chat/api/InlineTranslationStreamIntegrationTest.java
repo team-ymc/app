@@ -139,4 +139,58 @@ class InlineTranslationStreamIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("TRANSLATION_IN_PROGRESS"));
         assertThat(translationRunRepository.count()).isEqualTo(1);
     }
+
+    /** 운영자가 SQL로 켜는 것과 같은 경로. */
+    private void markTrial(Paper paper) {
+        jdbcTemplate.update("update paper set trial = true where id = ?", paper.getId());
+    }
+
+    private MvcResult startTrialStream(Paper paper) throws Exception {
+        return mockMvc.perform(post("/api/trial/papers/{paperId}/inline-translations", paper.getId())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(BODY))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+    }
+
+    @Test
+    @DisplayName("체험: 인증 없이 started → delta → completed, run 행과 사용량 기록은 만들지 않음")
+    void trialSuccess() throws Exception {
+        Paper paper = givenCompletedPaper();
+        markTrial(paper);
+
+        MvcResult result = startTrialStream(paper);
+        await().atMost(Duration.ofSeconds(10)).until(() -> result.getResponse()
+                .getContentAsString(StandardCharsets.UTF_8).contains("event:translation.completed"));
+        String stream = streamBody(result);
+
+        assertThat(stream).contains("event:translation.started");
+        assertThat(stream).contains("\"paperId\":\"" + paper.getId() + "\"");
+        assertThat(stream).contains("\"delta\":\"가짜 \"");
+        assertThat(stream).contains("\"translation\":\"가짜 번역입니다.\"");
+        assertThat(translationRunRepository.count()).isZero();
+        assertThat(usageRecordRepository.count()).isZero();
+        assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store, no-transform");
+    }
+
+    @Test
+    @DisplayName("체험: 체험 논문이 아니면 404, 파싱 중이면 409 PAPER_NOT_READY")
+    void trialPreStreamErrors() throws Exception {
+        Paper notTrial = givenCompletedPaper();
+        mockMvc.perform(post("/api/trial/papers/{paperId}/inline-translations", notTrial.getId())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PAPER_NOT_FOUND"));
+
+        Paper processing = givenProcessingPaper("trial-processing.pdf");
+        markTrial(processing);
+        mockMvc.perform(post("/api/trial/papers/{paperId}/inline-translations", processing.getId())
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAPER_NOT_READY"));
+        assertThat(translationRunRepository.count()).isZero();
+    }
 }
