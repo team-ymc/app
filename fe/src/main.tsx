@@ -30,6 +30,7 @@ const router = createBrowserRouter([
   },
   // 체험(YMC-430): 인증 가드 밖. 뷰어는 같은 컴포넌트를 체험 모드로 쓴다.
   { path: '/try', element: <TrialPage /> },
+  { path: '/trys', element: <TrialPage layout="panels" /> },
   {
     element: <TrialModeProvider><Outlet /></TrialModeProvider>,
     children: [
