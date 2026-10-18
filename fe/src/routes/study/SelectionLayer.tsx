@@ -12,6 +12,7 @@ import { useTextSelection } from './useTextSelection';
 import { computeToolbarPosition } from './selectionPosition';
 import { checkTranslationSelection, type TranslationSelectionCheck } from '../../chat/selectionAttachments';
 import { streamTranslation } from '../../translation/translationStream';
+import { useTrialMode } from '../../trial/TrialMode';
 import { PaperMarkdown } from '../../markdown/PaperMarkdown';
 import type { SelectionAnchors } from './selectionAnchors';
 import { track } from '../../analytics/analytics';
@@ -54,6 +55,7 @@ function translateBlockedMessage(check: TranslationSelectionCheck): string | und
 
 export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationVisible, closeSignal, onOpen }: SelectionLayerProps) {
   const sel = useTextSelection(viewerRef, blocks);
+  const { trial } = useTrialMode();
   const [layer, setLayer] = useState<Layer>({ phase: 'idle' });
   // 스트리밍 중 누적 텍스트. layer 밖에 두는 이유: delta마다 layer를 갈아끼우면 아래 번역 effect가 재실행돼 요청을 다시 보낸다.
   const [partial, setPartial] = useState('');
@@ -150,6 +152,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationV
     void streamTranslation({
       paperId,
       selection: anchors,
+      trial,
       signal: controller.signal,
       onEvent: (e) => {
         if (controller.signal.aborted) return;
@@ -175,7 +178,7 @@ export function SelectionLayer({ paperId, viewerRef, blocks, onAsk, translationV
       },
     });
     return () => controller.abort();
-  }, [layer, paperId]);
+  }, [layer, paperId, trial]);
 
   if (layer.phase === 'idle') return null;
 

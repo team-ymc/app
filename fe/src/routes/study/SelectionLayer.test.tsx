@@ -4,10 +4,12 @@ import { createRef } from 'react';
 import { SelectionLayer } from './SelectionLayer';
 import { useTextSelection, type TextSelection } from './useTextSelection';
 import { streamTranslation, type TranslationStreamEvent } from '../../translation/translationStream';
+import { useTrialMode } from '../../trial/TrialMode';
 import type { PaperBlock } from '../../markdown/paperContent';
 
 vi.mock('./useTextSelection', () => ({ useTextSelection: vi.fn() }));
 vi.mock('../../translation/translationStream', () => ({ streamTranslation: vi.fn() }));
+vi.mock('../../trial/TrialMode', () => ({ useTrialMode: vi.fn() }));
 
 const BLOCKS: PaperBlock[] = [
   { id: 'b0', type: 'para', markdown: 'An attention function', sourceText: 'An attention function', sourceOffsetShift: 0 },
@@ -45,6 +47,7 @@ let captured: Captured | null = null;
 
 beforeEach(() => {
   captured = null;
+  vi.mocked(useTrialMode).mockReturnValue({ trial: false, requestSignup: vi.fn() });
   vi.mocked(streamTranslation).mockImplementation(async ({ onEvent, signal }) => {
     captured = { onEvent, signal };
   });
@@ -87,6 +90,14 @@ describe('SelectionLayer — 현재 상태기계', () => {
     emit({ type: 'completed', translation: '어텐션은 **함수**다' });
     expect(screen.getByText('함수').tagName).toBe('STRONG'); // PaperMarkdown 렌더
     expect(screen.queryByText('번역 중…')).toBeNull();
+  });
+
+  it('체험 모드면 스트림 요청에 trial을 넘긴다', async () => {
+    vi.mocked(useTrialMode).mockReturnValue({ trial: true, requestSignup: vi.fn() });
+    setup(selection());
+    fireEvent.click(screen.getByRole('button', { name: /번역/ }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    expect(vi.mocked(streamTranslation).mock.calls[0][0]).toMatchObject({ paperId: 'p-1', trial: true });
   });
 
   it('anchor가 없으면 번역 버튼이 비활성이고 사유가 title로 보인다', () => {
