@@ -34,6 +34,14 @@ function content(): PaperContentResponse {
   };
 }
 
+const session = new Map<string, string>();
+vi.stubGlobal('sessionStorage', {
+  getItem: (k: string) => session.get(k) ?? null,
+  setItem: (k: string, v: string) => { session.set(k, String(v)); },
+  removeItem: (k: string) => { session.delete(k); },
+  clear: () => session.clear(),
+});
+
 function renderTrialStudy() {
   vi.mocked(useAuth).mockReturnValue({ status: 'guest', user: null, initialError: null, startLogin: vi.fn(), signOut: vi.fn() });
   vi.mocked(fetchTrialPaperContent).mockResolvedValue(content());
@@ -52,7 +60,7 @@ function renderTrialStudy() {
   );
 }
 
-beforeEach(() => { vi.clearAllMocks(); store.clear(); });
+beforeEach(() => { vi.clearAllMocks(); store.clear(); session.clear(); });
 afterEach(cleanup);
 
 describe('StudyPage — 체험 모드', () => {
@@ -66,6 +74,13 @@ describe('StudyPage — 체험 모드', () => {
     expect(fetchPaperContent).not.toHaveBeenCalled();
     expect(getStatus).not.toHaveBeenCalled();
     expect(getMyPlan).not.toHaveBeenCalled();
+  });
+
+  it('패널 체험 페이지(/trys)에서 들어왔으면 뒤로가기도 그쪽으로 간다', async () => {
+    session.set('trialHome', '/trys');
+    renderTrialStudy();
+    await screen.findAllByText('체험 논문');
+    expect(screen.getByRole('link', { name: /다른 논문 보기/ }).getAttribute('href')).toBe('/trys');
   });
 
   it('선행지식이 켜진 채 열리고, 상단 바는 체험용 뒤로가기와 로그인 버튼을 보인다', async () => {
