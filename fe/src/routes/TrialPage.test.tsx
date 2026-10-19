@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import TrialPage from './TrialPage';
 import { useAuth } from '../auth/AuthContext';
@@ -113,10 +113,39 @@ describe('TrialPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('모바일 폭이면 랜딩으로 보낸다', () => {
-    mockAuth('guest');
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
-    renderPage();
-    expect(navigateMock).toHaveBeenCalledWith('/', { replace: true });
+  describe('모바일 폭', () => {
+    const scrollIntoView = vi.fn();
+    beforeEach(() => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    it('어느 주소로 들어와도 큰 카드와 목록 한 화면을 보여 주고, 목록 줄은 카드만 바꾼다', () => {
+      mockAuth('guest');
+      renderPage('panels');
+      const papers = trialPapers();
+      const today = pickTodaysPaper(papers, TODAY);
+      expect(navigateMock).not.toHaveBeenCalled();
+      expect(trialHome()).toBe('/trys');
+      expect(screen.queryByText('Nine topics · Nine papers')).toBeNull();
+      expect(screen.getByRole('link', { name: /오늘의 논문/ }).getAttribute('href')).toBe(`/try/papers/${today.paperId}`);
+
+      const list = screen.getByRole('navigation', { name: '체험 논문 목록' });
+      expect(within(list).queryAllByRole('link')).toHaveLength(0);
+      const rows = within(list).getAllByRole('button');
+      expect(rows).toHaveLength(papers.length);
+
+      const other = papers.find((p) => p.paperId && p !== today)!;
+      const row = rows.find((b) => b.textContent?.includes(other.title))!;
+      fireEvent.click(row);
+      expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
+      expect(screen.queryByText('오늘의 논문')).toBeNull();
+      expect(row.getAttribute('aria-pressed')).toBe('true');
+      expect(row.className).toContain('trial-item-active');
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/try/papers/'));
+      expect(links.map((a) => a.getAttribute('href'))).toEqual([`/try/papers/${other.paperId}`]);
+      expect(track).not.toHaveBeenCalledWith('trial_paper_opened', expect.anything());
+    });
   });
 });
