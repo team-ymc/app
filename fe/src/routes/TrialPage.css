@@ -20,6 +20,8 @@
 .trial-shelf { flex:1; min-height:0; display:flex; flex-direction:column; background:var(--walnut); background-image:radial-gradient(ellipse at 50% 0%,rgba(214,185,130,.10) 0,transparent 60%); }
 .trial-shelf .trial-container { flex:1; min-height:0; display:grid; grid-template-columns:7fr 5fr; gap:24px; padding-top:24px; padding-bottom:24px; }
 .trial-unavailable { opacity:.55; cursor:default; }
+.trial-feature-slot { display:flex; flex-direction:column; min-height:0; }
+.trial-feature { flex:1; }
 
 .trial-feature { position:relative; min-height:440px; display:grid; grid-template-columns:1fr 1.15fr; gap:28px; padding:28px 30px 26px; border-radius:8px; background:var(--paper); color:var(--ink); overflow:hidden; }
 .trial-feature-tag { position:absolute; top:0; left:30px; padding:6px 12px; border-radius:0 0 6px 6px; background:var(--navy); color:#fff; font-size:11.5px; font-weight:800; letter-spacing:.12em; }
@@ -56,3 +58,46 @@
 .trial-page .trial-footer-link { border:0; background:transparent; color:#e8d9bf; font-size:12px; font-weight:600; }
 .trial-page .trial-footer-link:hover { color:#fffaf1; }
 @media (prefers-reduced-motion:reduce) { .trial-feature-pic img,.trial-feature-read,.trial-item,.trial-item-read { transition:none; } }
+
+/* 모바일(1023px 이하): 어느 주소든 큰 카드 + 목록 한 화면. 시안 project-docs/design/trial/Paper Trial Page - Mobile.html */
+@media (max-width:1023px) {
+  .trial-page { min-width:0; padding-top:56px; }
+  /* 상단 바는 제품명과 로그인만. GlobalNav가 인라인 스타일이라 !important로 덮는다. */
+  .trial-page .pt-global-nav { height:56px !important; padding:0 16px !important; display:flex !important; }
+  .trial-page .pt-global-nav-main > div,.trial-page .pt-global-nav-main nav { display:none !important; }
+  .trial-container { width:min(100% - 32px,560px); }
+  .trial-hero { padding:30px 0 26px; }
+  .trial-eyebrow { gap:10px; margin-bottom:12px; font-size:11px; }
+  .trial-eyebrow:before,.trial-eyebrow:after { width:22px; }
+  .trial-hero h1 { margin-bottom:20px; font-size:34px; line-height:1.25; letter-spacing:-.05em; white-space:normal; }
+  .trial-page .trial-upload { width:100%; min-height:54px; padding:0 24px; font-size:16px; box-shadow:0 0 0 4px rgba(214,185,130,.28),0 14px 28px rgba(36,58,85,.24); }
+  .trial-shelf .trial-container { display:flex; flex-direction:column; gap:14px; padding-top:20px; padding-bottom:24px; }
+  .trial-feature-slot { flex:none; scroll-margin-top:68px; }
+  .trial-feature { flex:none; min-height:0; display:block; padding:0 0 20px; border-radius:10px; }
+  .trial-feature-tag { top:12px; left:12px; z-index:1; padding:6px 11px; border-radius:100px; font-size:11px; letter-spacing:.1em; }
+  .trial-feature-pic { margin:0; height:168px; overflow:hidden; background:#efe6d7; border-bottom:1px solid var(--line); }
+  .trial-feature-pic:before { display:none; }
+  .trial-feature-pic img,.trial-feature:not(.trial-unavailable):hover .trial-feature-pic img { width:100%; height:100%; object-fit:cover; object-position:top; border:0; box-shadow:none; transform:none; }
+  .trial-feature-text { padding:18px 18px 0; }
+  .trial-feature-topic { margin-bottom:6px; font-size:22px; }
+  .trial-feature-title { margin-bottom:8px; font-size:18px; }
+  .trial-feature-hook { margin-bottom:12px; font-size:14px; line-height:1.65; }
+  .trial-meta { margin-bottom:16px; font-size:12px; }
+  .trial-feature-read { align-self:stretch; justify-content:center; min-height:48px; }
+  .trial-others { flex:none; border-radius:10px; }
+  .trial-others-head { padding:12px 16px 10px; font-size:11px; }
+  /* 목록 줄은 버튼. 누르면 위 카드가 바뀌고, 누른 줄이 밝게 남는다. */
+  .trial-page .trial-item { flex:none; width:100%; display:grid; grid-template-columns:34px minmax(0,1fr) auto auto; grid-template-rows:auto auto; column-gap:12px; row-gap:3px; align-items:center; min-height:64px; padding:10px 14px 10px 16px; border:0; border-bottom:1px solid #e9dfcf; border-radius:0; background:transparent; text-align:left; }
+  .trial-page .trial-item:last-child { border-bottom:0; }
+  .trial-page .trial-item-active,.trial-page .trial-item:active { background:var(--paper); }
+  .trial-item img { grid-row:1 / 3; width:34px; height:44px; }
+  .trial-item-topic { grid-column:2; grid-row:1; width:auto; align-self:end; font-size:15px; }
+  .trial-item-title { grid-column:2; grid-row:2; align-self:start; font-size:13px; }
+  .trial-item-year { grid-column:3; grid-row:1 / 3; }
+  .trial-item-read,.trial-unavailable .trial-item-read { grid-column:4; grid-row:1 / 3; opacity:1; transform:none; color:#b1a48f; font-size:22px; font-weight:400; line-height:1; }
+  .trial-item-active .trial-item-read { color:var(--navy); }
+  .trial-unavailable .trial-item-read { font-size:11.5px; }
+  .trial-footer { padding:18px 0 28px; }
+  .trial-footer .trial-container { flex-direction:column; align-items:flex-start; gap:10px; }
+  .trial-page .trial-footer-link { padding:0; text-align:left; }
+}
