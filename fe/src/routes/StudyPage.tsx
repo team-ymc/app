@@ -35,6 +35,8 @@ import { StudyTopBar } from './study/StudyTopBar';
 import { usePaperStatusQuery } from './study/usePaperStatusQuery';
 import { track } from '../analytics/analytics';
 import { useTrialMode } from '../trial/TrialMode';
+import { isDevPreview } from '../dev/preview';
+import { FeaturePreparation } from './study/FeaturePreparation';
 
 const NIGHT_STORAGE_KEY = 'pt-night';
 const TRANSLATION_STORAGE_KEY = 'pt-translation-mode';
@@ -402,6 +404,12 @@ function StudyPageContent({
       />
 
       {/* R2 Study work area */}
+      <FeaturePreparation
+        key={paperId}
+        preparing={!trial && (translationStatus === 'PENDING' || knowledgeGraphStatus === 'PENDING')}
+        ready={knowledgeGraphStatus === 'READY' && (translationStatus === 'READY' || translationStatus === 'NOT_APPLICABLE')}
+        preview={isDevPreview}
+      />
       <div className="pt-study-workspace" style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         {/* R3 TOC nav rail */}
         <div className="pt-study-toolbar">

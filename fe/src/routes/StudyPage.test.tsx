@@ -9,6 +9,8 @@ import { useTextSelection, type TextSelection } from './study/useTextSelection';
 import { track } from '../analytics/analytics';
 import type { KnowledgeGraphStatus, PaperContentResponse, TranslationStatus } from '../api/types';
 
+const previewMode = vi.hoisted(() => ({ enabled: false }));
+vi.mock('../dev/preview', () => ({ get isDevPreview() { return previewMode.enabled; } }));
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), fetchPaperContent: vi.fn() }));
 vi.mock('../api/plan', () => ({ getMyPlan: vi.fn() }));
 vi.mock('../account/AccountMenu', () => ({ AccountMenu: () => <div /> }));
@@ -93,6 +95,7 @@ function renderStudy() {
 }
 
 beforeEach(() => {
+  previewMode.enabled = false;
   localStorage.clear();
   vi.mocked(useTextSelection).mockReturnValue(null);
   vi.mocked(getStatus).mockResolvedValue(statusResponse());
@@ -248,6 +251,71 @@ describe('StudyPage — 번역 상태', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('StudyPage — standalone feature preparation indicator', () => {
+  it('removes the indicator when compilation finishes using the existing 5s poll', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(getStatus)
+        .mockResolvedValueOnce(statusResponse('PENDING', 'PENDING'))
+        .mockResolvedValue(statusResponse('READY', 'READY'));
+      vi.mocked(fetchPaperContent)
+        .mockResolvedValueOnce(contentResponse(false, 'en', 'PENDING'))
+        .mockResolvedValue(contentResponse(true, 'en', 'READY', [{
+          highlightId: 'h1', blockId: 'b1', startOffset: 3, endOffset: 12, text: 'attention',
+        }]));
+      renderStudy();
+      await screen.findByRole('status', { name: '추가 기능 분석 중' });
+      const prerequisite = screen.getByRole('switch', { name: '선행지식' }) as HTMLButtonElement;
+      const graph = screen.getByRole('link', { name: '지식 그래프' });
+      expect(prerequisite.disabled).toBe(true);
+      expect(modeButton().disabled).toBe(true);
+      expect(graph.getAttribute('aria-disabled')).toBe('true');
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await waitFor(() => expect(prerequisite.disabled).toBe(false));
+      expect(modeButton().disabled).toBe(false);
+      expect(graph.getAttribute('aria-disabled')).toBeNull();
+      expect(screen.getByText('100%')).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(650);
+      await waitFor(() => expect(screen.queryByRole('status', { name: '추가 기능 분석 중' })).toBeNull());
+      expect(getStatus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not show analysis for a failed compilation', async () => {
+    vi.mocked(getStatus).mockResolvedValue(statusResponse('FAILED', 'FAILED'));
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(false));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(screen.queryByRole('status', { name: '추가 기능 분석 중' })).toBeNull();
+    expect(modeButton().title).toBe('번역 생성에 실패했습니다');
+  });
+
+  it('automatically shows the demo in dev:preview without a URL option', async () => {
+    previewMode.enabled = true;
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    const indicator = await screen.findByRole('status', { name: '추가 기능 분석 중' });
+    const content = screen.getByRole('link', { name: '본문' });
+    const graph = screen.getByRole('link', { name: '지식 그래프' });
+    expect(content.parentElement).toBe(graph.parentElement);
+    expect(indicator.closest('.pt-study-topbar')).toBeNull();
+    expect(indicator.previousElementSibling?.classList.contains('pt-study-topbar')).toBe(true);
+    expect(modeButton().disabled).toBe(false);
+  });
+
+  it('does not show the demo outside dev:preview', async () => {
+    vi.mocked(fetchPaperContent).mockResolvedValue(contentResponse(true));
+    renderStudy();
+    await waitFor(() => expect(modeButton()).toBeTruthy());
+    expect(screen.queryByRole('status', { name: '추가 기능 분석 중' })).toBeNull();
+    expect(modeButton().disabled).toBe(false);
   });
 });
 
