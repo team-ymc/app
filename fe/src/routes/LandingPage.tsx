@@ -112,14 +112,13 @@ export default function LandingPage() {
         <section className="hero"><div className="container hero-layout">
           <div>
             <div className="eyebrow">A BETTER WAY TO READ PAPERS</div>
-            <h1>논문 리딩의<br />새로운 기준,<br /><em className="brand-line">Paper Teacher!!</em></h1>
-            <p className="hero-copy">언어와 낯선 개념 앞에서 멈추지 않도록. 번역과 선행지식, AI 튜터와 지식 그래프가 논문을 이해하는 과정을 함께합니다.</p>
+            <h1>논문 리딩의<br />새로운 기준,<br /><span className="brand-line">Paper Teacher</span></h1>
             <div className="hero-actions">{cta()}<a className="button-text" href="#journey">기능 살펴보기</a></div>
             {initialError && <p className="landing-error" role="alert">{initialError}</p>}
             <p className="cta-note">로그인 또는 회원가입 후 서재에서 논문을 업로드할 수 있어요.</p>
             <div className="hero-note"><span className="line" />한 편의 논문이 이해되는 여정</div>
           </div>
-          <div className="hero-visual"><Screenshot name="translation" alt="논문 뷰어에서 영어 원문과 한국어 번역을 나란히 읽는 화면" /><div className="visual-tag">실제 제품 화면 ↗</div></div>
+          <div className="hero-visual"><Screenshot name="translation" alt="논문 뷰어에서 영어 원문과 한국어 번역을 나란히 읽는 화면" /></div>
         </div></section>
         <section className="pain" id="pain"><div className="container">
           <div className="pain-top"><p className="section-kicker">SOUND FAMILIAR?</p><h2>논문 한 편을 읽는 일이<br />생각보다 어려웠던 이유.</h2></div>
