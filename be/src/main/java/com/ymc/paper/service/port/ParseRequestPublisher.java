@@ -8,6 +8,12 @@ import java.util.UUID;
  */
 public interface ParseRequestPublisher {
 
-    /** 실패 시 예외를 던진다. 삼키면 레코드만 전이되고 파싱이 시작되지 않는다. */
+    /** 수락 여부가 불확실한 실패는 {@link AcceptanceUnknownException}으로 전달한다. */
     void publish(UUID paperId, String fileKey);
+
+    final class AcceptanceUnknownException extends RuntimeException {
+        public AcceptanceUnknownException(Throwable cause) {
+            super("SQS 파싱 요청 수락 여부를 확인할 수 없습니다.", cause);
+        }
+    }
 }

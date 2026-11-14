@@ -45,27 +45,21 @@ public class PaperUploadCompletionService {
     private final PaperUploadPolicy uploadPolicy;
 
     public PaperStatusView complete(UUID paperId, UUID ownerId) {
-        Paper paper = find(paperId);
-        if (!paper.getOwnerId().equals(ownerId)) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
-        }
-
-        if (paper.getExpiredAt() != null) {
-            // 만료가 먼저 커밋됐으면 예약은 이미 반환됐다 — 업로드를 이어가지 않는다
-            throw new ApiException(ErrorCode.UPLOAD_EXPIRED, "업로드가 만료된 논문입니다. 다시 등록해 주세요.");
-        }
-
-        // 멱등 재호출. 발행 규칙을 먼저 거치는 이유: 발행 실패로 UPLOADED에 정체된 Document를
-        // 재호출이 구제할 수 있는 유일한 창구이기 때문이다.
+        Paper paper = findCompletable(paperId, ownerId);
         if (paper.getDocumentId() != null) {
-            parsingStarter.startIfUploaded(paper.getDocumentId());
-            return views.statusView(find(paperId));
+            return completeLinked(paper);
         }
 
-        UploadedObjectMetadata uploadedObject = fileStorage.head(paper.getFileKey()).orElseThrow(() ->
-                new ApiException(ErrorCode.UPLOAD_NOT_FOUND,
-                        "업로드된 파일을 찾을 수 없습니다. 업로드 후 다시 시도해 주세요."));
-
+        UploadedObjectMetadata uploadedObject = fileStorage.head(paper.getFileKey()).orElse(null);
+        if (uploadedObject == null) {
+            // 다른 complete가 연결을 커밋하고 중복 객체를 삭제했을 수 있다.
+            Paper current = findCompletable(paperId, ownerId);
+            if (current.getDocumentId() != null) {
+                return completeLinked(current);
+            }
+            throw new ApiException(ErrorCode.UPLOAD_NOT_FOUND,
+                    "업로드된 파일을 찾을 수 없습니다. 업로드 후 다시 시도해 주세요.");
+        }
         if (uploadPolicy.exceedsLimit(uploadedObject.contentLength())) {
             log.warn("상한 초과 객체 삭제: paperId={}, contentLength={}, limit={}",
                     paperId, uploadedObject.contentLength(), uploadPolicy.maxFileBytes());
@@ -102,6 +96,23 @@ public class PaperUploadCompletionService {
             parsingStarter.startIfUploaded(outcome.document().getId());
         }
         return views.statusView(find(paperId));
+    }
+
+    private Paper findCompletable(UUID paperId, UUID ownerId) {
+        Paper paper = find(paperId);
+        if (!paper.getOwnerId().equals(ownerId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "이 논문에 접근할 권한이 없습니다.");
+        }
+        if (paper.getExpiredAt() != null) {
+            throw new ApiException(ErrorCode.UPLOAD_EXPIRED, "업로드가 만료된 논문입니다. 다시 등록해 주세요.");
+        }
+        return paper;
+    }
+
+    private PaperStatusView completeLinked(Paper paper) {
+        // 발행 실패로 UPLOADED에 남은 Document는 멱등 재호출에서도 구제할 수 있다.
+        parsingStarter.startIfUploaded(paper.getDocumentId());
+        return views.statusView(find(paper.getId()));
     }
 
     private void deleteBestEffort(UUID paperId, UUID documentId, String fileKey) {
