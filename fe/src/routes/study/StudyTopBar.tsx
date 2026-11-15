@@ -7,6 +7,7 @@ import { AccountMenu } from '../../account/AccountMenu';
 import type { KnowledgeGraphStatus } from '../../api/types';
 import { knowledgeGraphDisabledReason } from './knowledgeGraphStatus';
 import { useTrialMode } from '../../trial/TrialMode';
+import { useAuth } from '../../auth/AuthContext';
 
 export type StudyView = 'content' | 'graph';
 
@@ -66,6 +67,7 @@ function KnowledgeGraphIcon() {
 
 export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rightSlot }: StudyTopBarProps) {
   const { trial, home, requestSignup } = useTrialMode();
+  const { status } = useAuth();
   const base = trial ? '/try/papers' : '/papers';
   const graphDisabled = knowledgeGraphStatus !== 'READY';
   const graphReason = knowledgeGraphDisabledReason(knowledgeGraphStatus);
@@ -169,7 +171,8 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
       >
         {rightSlot}
         {rightSlot ? <div style={DIVIDER} /> : null}
-        {trial ? (
+        {/* 체험 뷰어도 로그인 상태면 계정 메뉴. 로그인 버튼은 비로그인 방문자에게만. */}
+        {trial && status === 'guest' && (
           <button
             type="button"
             onClick={() => requestSignup('login')}
@@ -181,9 +184,8 @@ export function StudyTopBar({ paperId, title, current, knowledgeGraphStatus, rig
           >
             로그인
           </button>
-        ) : (
-          <AccountMenu />
         )}
+        {(!trial || status === 'authed') && <AccountMenu />}
       </div>
     </div>
   );

@@ -2,12 +2,21 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { StudyTopBar, type StudyTopBarProps } from './StudyTopBar';
+import { TrialModeProvider } from '../../trial/TrialMode';
+import { useAuth } from '../../auth/AuthContext';
 
 vi.mock('../../account/AccountMenu', () => ({ AccountMenu: () => <div data-testid="account-menu" /> }));
+vi.mock('../../auth/AuthContext', () => ({ useAuth: vi.fn() }));
+vi.mock('../../analytics/analytics', () => ({ track: vi.fn() }));
+
+function mockAuth(status: 'loading' | 'guest' | 'authed') {
+  vi.mocked(useAuth).mockReturnValue({ status, user: null, initialError: null, startLogin: vi.fn(), signOut: vi.fn() });
+}
 
 afterEach(cleanup);
 
 function renderBar(props: Partial<StudyTopBarProps> = {}) {
+  mockAuth('authed');
   render(
     <MemoryRouter initialEntries={['/papers/p1']}>
       <Routes>
@@ -74,5 +83,38 @@ describe('StudyTopBar — 본문 | 지식 그래프 쌍', () => {
   it('rightSlot이 있으면 계정 메뉴 왼쪽에 그린다', () => {
     renderBar({ rightSlot: <button type="button">번역</button> });
     expect(screen.getByRole('button', { name: '번역' })).toBeTruthy();
+  });
+});
+
+function renderTrialBar() {
+  render(
+    <MemoryRouter initialEntries={['/try/papers/p1']}>
+      <TrialModeProvider>
+        <StudyTopBar paperId="p1" title="Attention" current="content" knowledgeGraphStatus="READY" />
+      </TrialModeProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe('StudyTopBar — 체험 모드 계정 영역', () => {
+  it('비로그인이면 로그인 버튼을 둔다', () => {
+    mockAuth('guest');
+    renderTrialBar();
+    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy();
+    expect(screen.queryByTestId('account-menu')).toBeNull();
+  });
+
+  it('로그인 상태면 로그인 버튼 대신 계정 메뉴를 둔다', () => {
+    mockAuth('authed');
+    renderTrialBar();
+    expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
+    expect(screen.getByTestId('account-menu')).toBeTruthy();
+  });
+
+  it('확인 중이면 둘 다 그리지 않는다', () => {
+    mockAuth('loading');
+    renderTrialBar();
+    expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
+    expect(screen.queryByTestId('account-menu')).toBeNull();
   });
 });

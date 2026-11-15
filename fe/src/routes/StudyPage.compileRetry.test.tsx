@@ -11,6 +11,9 @@ import { ApiError, type PaperContentResponse, type PaperStatusResponse } from '.
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), fetchPaperContent: vi.fn(), retryPaper: vi.fn() }));
 vi.mock('../api/plan', () => ({ getMyPlan: vi.fn() }));
 vi.mock('../account/AccountMenu', () => ({ AccountMenu: () => <div /> }));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ status: 'authed', user: null, initialError: null, startLogin: vi.fn(), signOut: vi.fn() }),
+}));
 vi.mock('./study/TutorPanel', () => ({ TutorPanel: () => <div data-testid="tutor-panel" /> }));
 vi.mock('./study/useTextSelection', () => ({ useTextSelection: vi.fn() }));
 
