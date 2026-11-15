@@ -11,6 +11,8 @@ import com.ymc.paper.infra.messaging.message.ParseRequestMessage;
 import com.ymc.paper.service.port.ParseRequestPublisher;
 
 import lombok.RequiredArgsConstructor;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
@@ -37,10 +39,23 @@ public class SqsParseRequestPublisher implements ParseRequestPublisher {
 
     @Override
     public void publish(UUID paperId, String fileKey) {
-        sqs.sendMessage(SendMessageRequest.builder()
+        SendMessageRequest request = SendMessageRequest.builder()
                 .queueUrl(queueUrl())
                 .messageBody(serialize(new ParseRequestMessage(paperId, fileKey)))
-                .build());
+                // 표준 큐는 응답을 잃은 SendMessage의 재전송을 중복 제거하지 않는다.
+                .overrideConfiguration(o -> o.addPlugin(client ->
+                        client.overrideConfiguration(config -> config.retryStrategy(retries -> retries.maxAttempts(1)))))
+                .build();
+        try {
+            sqs.sendMessage(request);
+        } catch (SdkClientException e) {
+            throw new AcceptanceUnknownException(e);
+        } catch (AwsServiceException e) {
+            if (e.statusCode() >= 400 && e.statusCode() < 500 && e.statusCode() != 408) {
+                throw e;
+            }
+            throw new AcceptanceUnknownException(e);
+        }
     }
 
     private String queueUrl() {

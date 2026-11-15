@@ -10,12 +10,13 @@ import com.ymc.paper.domain.Document;
 import com.ymc.paper.domain.DocumentRepository;
 import com.ymc.paper.domain.DocumentStatus;
 import com.ymc.paper.service.port.ParseRequestPublisher;
+import com.ymc.paper.service.port.ParseRequestPublisher.AcceptanceUnknownException;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * 발행 규칙 — 생성·연결·멱등 재호출 모든 경로가 이 메서드 하나를 거친다.
- * UPLOADED면 선점(CAS) 승자만 발행하고, 실패하면 반납해 다음 complete가 구제할 수 있게 한다.
+ * UPLOADED면 선점(CAS) 승자만 발행한다. 발행되지 않은 경우에만 선점을 반납한다.
  * 메시지 식별자는 언제나 Document에 보존된 최초 paperId다.
  */
 @Service
@@ -39,6 +40,9 @@ public class DocumentParsingStarter {
         }
         try {
             parseRequestPublisher.publish(document.getRequestPaperId(), document.getFileKey());
+        } catch (AcceptanceUnknownException e) {
+            log.warn("파싱 요청 수락 여부 불명, PROCESSING 유지: documentId={}", documentId, e);
+            throw e;
         } catch (RuntimeException e) {
             revertBestEffort(documentId);
             log.warn("파싱 요청 발행 실패, UPLOADED 반납: documentId={}, requestPaperId={}",
@@ -50,12 +54,16 @@ public class DocumentParsingStarter {
     }
 
     /**
-     * 재시도 전이를 마친 Document의 요청을 발행한다. 실패하면 상태만 되돌리지 않고 실패 정산한다 —
+     * 재시도 전이를 마친 Document의 요청을 발행한다. 미발행이면 실패 정산한다 —
      * 전이와 발행 사이에 합류한 Paper의 예약까지 풀어야 하기 때문이다.
      */
     public void publishRetry(UUID paperId, UUID documentId, UUID requestPaperId, String fileKey) {
         try {
             parseRequestPublisher.publish(requestPaperId, fileKey);
+        } catch (AcceptanceUnknownException e) {
+            log.warn("재시도 파싱 요청 수락 여부 불명, PROCESSING 유지: paperId={}, documentId={}",
+                    paperId, documentId, e);
+            throw e;
         } catch (RuntimeException e) {
             settleFailedBestEffort(documentId);
             log.warn("재시도 파싱 요청 발행 실패, 실패 정산: paperId={}, documentId={}, requestPaperId={}",
