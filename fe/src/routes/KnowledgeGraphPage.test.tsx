@@ -8,6 +8,9 @@ import { ApiError, type KnowledgeGraphStatus, type PaperStatus } from '../api/ty
 
 vi.mock('../api/papers', () => ({ getStatus: vi.fn(), getKnowledgeGraphView: vi.fn(), fetchPaperContent: vi.fn() }));
 vi.mock('../account/AccountMenu', () => ({ AccountMenu: () => <div /> }));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ status: 'authed', user: null, initialError: null, startLogin: vi.fn(), signOut: vi.fn() }),
+}));
 
 function statusResponse(knowledgeGraphStatus: KnowledgeGraphStatus | null = 'READY', status: PaperStatus = 'COMPLETED') {
   return { paperId: 'p1', status, translationStatus: 'READY' as const, knowledgeGraphStatus, updatedAt: '2026-09-17T00:00:00Z' };
